@@ -3,30 +3,38 @@
 #include <string.h>
 #include <stdio.h>
 
+// Room size constraints
 #define MIN_ROOM_W  5
 #define MAX_ROOM_W  10
 #define MIN_ROOM_H  5
 #define MAX_ROOM_H  10
 #define MAX_ROOMS   8
+
+// Padding: empty space forced between rooms / halls and other features
 #define ROOM_PAD    2
 #define HALL_PAD    3
 #define HALL_MIN    5
+
 #define MAX_ATTEMPTS 200
 
+// Internal room representation with connection tracking
 typedef struct {
-    int x, y, w, h;
-    int cx, cy;
-    int usedDirs;
+    int x, y, w, h;      // Bounding box (tile coordinates)
+    int cx, cy;           // Centre tile
+    int usedDirs;         // Bitmask: which directions have sprouted branches
 } Room;
 
+// Copy of the generated rooms exposed via GetGeneratedRooms() for the spawner
 static ProceduralRoom s_generatedRooms[MAX_GENERATED_ROOMS];
 static int s_generatedRoomCount = 0;
 
+// Returns 1 if tile (x, y) is still void (un-carved)
 static int TileFree(int* data, int mapW, int mapH, int x, int y) {
     if (x < 0 || x >= mapW || y < 0 || y >= mapH) return 0;
     return data[y * mapW + x] == 0;
 }
 
+// Returns 1 if the entire rectangle (rx,ry)-(rx+rw-1,ry+rh-1) is void
 static int RectFree(int* data, int mapW, int mapH, int rx, int ry, int rw, int rh) {
     for (int y = ry; y < ry + rh; y++)
         for (int x = rx; x < rx + rw; x++)
@@ -34,6 +42,7 @@ static int RectFree(int* data, int mapW, int mapH, int rx, int ry, int rw, int r
     return 1;
 }
 
+// Carve a horizontal corridor from x1 to x2 at row y
 static void CarveHLine(int* data, int mapW, int mapH, int x1, int x2, int y) {
     if (y < 0 || y >= mapH) return;
     if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
@@ -41,6 +50,7 @@ static void CarveHLine(int* data, int mapW, int mapH, int x1, int x2, int y) {
         if (x >= 0 && x < mapW) data[y * mapW + x] = TILE_FLOOR;
 }
 
+// Carve a vertical corridor from y1 to y2 at column x
 static void CarveVLine(int* data, int mapW, int mapH, int y1, int y2, int x) {
     if (x < 0 || x >= mapW) return;
     if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
@@ -48,8 +58,8 @@ static void CarveVLine(int* data, int mapW, int mapH, int y1, int y2, int x) {
         if (y >= 0 && y < mapH) data[y * mapW + x] = TILE_FLOOR;
 }
 
-// Check that rectangle (rx,ry)-(rx+rw-1,ry+rh-1) is all void,
-// skipping tiles within the skip rectangle.
+// Check that a rectangle is entirely void, ignoring a sub-rectangle to skip
+// (allows hall clearance to overlap with the parent room).
 static int RectClearSkip(int* data, int mapW, int mapH,
                          int rx, int ry, int rw, int rh,
                          int skipX, int skipY, int skipW, int skipH) {
@@ -63,8 +73,10 @@ static int RectClearSkip(int* data, int mapW, int mapH,
     return 1;
 }
 
-// Primary dir: 0=N, 1=S, 2=W, 3=E
-// Turn dir: 0 = turn left, 1 = turn right (relative to primary direction)
+// Sprout a new branch from an existing room.
+// The branch runs in primDir (0=N,1=S,2=W,3=E), takes a 90-degree turn
+// (0=left,1=right), and places a room at the end.
+// Returns 1 on success, 0 if the space was occupied.
 static int GrowBranch(int* data, int mapW, int mapH,
                       Room* rooms, int* roomCount,
                       int parentIdx, int primDir, int turnDir) {
@@ -318,7 +330,7 @@ static void PlaceICornersSW(int* data, int mapW, int mapH) {
                 data[y * mapW + x] = TILE_WALL_ICORNER_SW;
 }
 
-// ---- Main generation ----
+// ---- Main entry point: generates a dungeon with branching corridors ----
 
 MapData* GenerateProceduralMap(int width, int height) {
     MapData* map = (MapData*)calloc(1, sizeof(MapData));
@@ -350,7 +362,7 @@ MapData* GenerateProceduralMap(int width, int height) {
     if (!collLayer->data) { free(layer->data); free(map); return NULL; }
     map->layerCount = 2;
 
-    // Place spawn room at center
+    // ---- Place the first (spawn) room at the map centre ----
     Room rooms[MAX_ROOMS];
     int roomCount = 0;
 
@@ -364,7 +376,7 @@ MapData* GenerateProceduralMap(int width, int height) {
         for (int x = sx; x < sx + sw; x++)
             layer->data[y * width + x] = TILE_FLOOR;
 
-    // Grow branches like a plant: each room tries to sprout in unused directions
+    // ---- Grow branches like a plant: each room tries to sprout in unused directions ----
     for (int attempt = 0; attempt < MAX_ATTEMPTS && roomCount < MAX_ROOMS; attempt++) {
         int candidates[MAX_ROOMS];
         int candCount = 0;
@@ -403,7 +415,9 @@ MapData* GenerateProceduralMap(int width, int height) {
 
     TraceLog(LOG_INFO, "Procedural: Placed %d rooms", roomCount);
 
-    // Place walls
+    // ---- Place directional wall tiles around all carved areas ----
+    // Each step adds a specific wall type; multiple passes are needed so
+    // that walls register along every edge and corners are resolved correctly.
     PlaceNorthWalls(layer->data, width, height);
     PlaceWestWalls(layer->data, width, height);
     PlaceEastWalls(layer->data, width, height);
@@ -418,11 +432,11 @@ MapData* GenerateProceduralMap(int width, int height) {
     PlaceICornersSE(layer->data, width, height);
     PlaceICornersSW(layer->data, width, height);
 
-    // Sync collision
+    // Sync the collision layer: anything that is not void and not floor is a wall
     for (int i = 0; i < tileCount; i++)
         collLayer->data[i] = (layer->data[i] != 0 && layer->data[i] != TILE_FLOOR) ? 1 : 0;
 
-    // Store generated rooms for spawner use
+    // Store room metadata so Spawner_Populate knows where to place entities
     s_generatedRoomCount = roomCount < MAX_GENERATED_ROOMS ? roomCount : MAX_GENERATED_ROOMS;
     for (int i = 0; i < s_generatedRoomCount; i++) {
         s_generatedRooms[i].x  = rooms[i].x;
@@ -433,7 +447,7 @@ MapData* GenerateProceduralMap(int width, int height) {
         s_generatedRooms[i].cy = rooms[i].cy;
     }
 
-    // Player spawn at center of first room
+    // Place a MapObject for the player at the centre of the first (spawn) room
     MapObject* obj = &map->objects[0];
     strcpy(obj->name, "player");
     strcpy(obj->type, "Player");

@@ -11,14 +11,14 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "Heros of Taboo - Roguelike");
     SetTargetFPS(60);
     SetExitKey(KEY_ESCAPE);
-    
-    // Initialize random seed
+
+    // Seed the RNG with current time for varied runs
     SetRandomSeed((unsigned int)time(NULL));
-    
+
     Game game;
     bool gameLoaded = false;
-    
-    // Try to load the map - first check for a TMX file
+
+    // --- Map loading: try TMX files first, then fall back to procedural generation ---
     const char* mapFiles[] = {
         "resources/map.tmx",
         "resources/map.TMX",
@@ -26,7 +26,7 @@ int main(void)
         "./map.tmx",
         "map.tmx"
     };
-    
+
     int numMaps = sizeof(mapFiles) / sizeof(mapFiles[0]);
     for (int i = 0; i < numMaps; i++) {
         if (FileExists(mapFiles[i])) {
@@ -35,12 +35,14 @@ int main(void)
             if (gameLoaded) break;
         }
     }
-    
+
+    // Fallback: no TMX found, generate a dungeon procedurally
     if (!gameLoaded) {
         TraceLog(LOG_WARNING, "No TMX map found. Generating procedural map...");
         gameLoaded = InitGame(&game, "resources/");
     }
 
+    // If everything failed, show an error screen and exit
     if (!gameLoaded) {
         TraceLog(LOG_ERROR, "Could not initialize game.");
         while (!WindowShouldClose())
@@ -55,10 +57,10 @@ int main(void)
         return 0;
     }
 
-    // Main game loop
+    // --- Main game loop: input → update → render ---
     while (!WindowShouldClose())
     {
-        // Handle restart
+        // Press R to restart from scratch
         if (IsKeyPressed(KEY_R)) {
             CleanupGame(&game);
             const char* mapFile = "resources/map.tmx";
@@ -68,26 +70,27 @@ int main(void)
             gameLoaded = InitGame(&game, mapFile);
             if (!gameLoaded) break;
         }
-        
-        // Handle input during player turn
+
+        // Read player input and move the player (only during player turn)
         HandleInput(&game);
-        
-        // Update game (process enemy turns)
+
+        // Run monster AI and advance animation timers
         UpdateGame(&game);
-        
-        // Update camera to follow player
+
+        // Centre the camera on the player's current tile
         game.camera.target = (Vector2){
             game.player.x * game.map->tileWidth + game.map->tileWidth / 2,
             game.player.y * game.map->tileHeight + game.map->tileHeight / 2
         };
-        
-        // Draw
+
+        // Clear screen and draw everything
         BeginDrawing();
             ClearBackground(BLACK);
             RenderGame(&game);
         EndDrawing();
     }
 
+    // --- Clean shutdown ---
     CleanupGame(&game);
     CloseWindow();
 

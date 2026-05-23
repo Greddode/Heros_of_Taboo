@@ -52,8 +52,7 @@ void Monster_InitTemplates(void) {
         .level           = 2,
         .color           = { 220, 220, 200, 255 },
         .spritePath      = "resources/sprite_animations/idle/Fungal_Myconid.png",
-        .frameCount      = 4
-        ,
+        .frameCount      = 4,
         .animSpeed       = 0.5f,
         .detectionRange  = 8,
     };
@@ -221,7 +220,7 @@ void Monster_UpdateAnimations(float dt) {
 // ============================================================================
 
 static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
-                            const unsigned char blocking[][100],
+                            const unsigned char blocking[][MAP_WIDTH],
                             int maxDist) {
     int dx = abs(x1 - x0);
     int dy = abs(y1 - y0);
@@ -248,7 +247,7 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
 
 bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
                            float* playerHitFlash,
-                           const unsigned char blocking[][100],
+                           const unsigned char blocking[][MAP_WIDTH],
                            int mapWidth, int mapHeight) {
     for (int i = 0; i < s_monsterCount; i++) {
         Monster* m = &s_monsters[i];
@@ -345,7 +344,7 @@ bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDef
 //  RENDER
 // ============================================================================
 
-void Monster_RenderAll(const unsigned char visibility[][100],
+void Monster_RenderAll(const unsigned char visibility[][MAP_WIDTH],
                         int mapWidth, int mapHeight,
                         int tileWidth, int tileHeight,
                         float t) {

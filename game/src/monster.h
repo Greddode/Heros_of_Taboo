@@ -2,6 +2,7 @@
 #define MONSTER_H
 
 #include "raylib.h"
+#include "game.h"
 #include <stdbool.h>
 
 #define MAX_MONSTERS 64
@@ -102,13 +103,13 @@ void Monster_UpdateAnimations(float dt);
 // Run AI for all living monsters.
 //  * playerX, playerY, playerDefense, playerHp — the player's current state
 //  * playerHitFlash — the player's hitFlashTimer (set on attack for white flash)
-//  * blocking — the walkability grid (1 = blocked, 0 = open)
-//  * mapWidth, mapHeight — dimensions of the blocking grid
+//  * blocking — walkability grid (1 = blocked, 0 = open), indexed as [y][x]
+//  * mapWidth, mapHeight — logical map dimensions (≤ MAP_WIDTH / MAP_HEIGHT)
 // The function applies damage to *playerHp when monsters attack.
 // Returns false if the player was killed.
 bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
                            float* playerHitFlash,
-                           const unsigned char blocking[][100],
+                           const unsigned char blocking[][MAP_WIDTH],
                            int mapWidth, int mapHeight);
 
 // Load shared monster sprite sheets (call after InitGame map loading).
@@ -118,9 +119,10 @@ void Monster_LoadSprites(void);
 void Monster_UnloadSprites(void);
 
 // Render all visible monsters.
+//  * visibility — visibility grid, indexed as [y][x]
 //  * t — interpolation factor (0.0 = previous positions, 1.0 = current).
 //    Pass -1.0 or a value outside [0,1] to skip interpolation.
-void Monster_RenderAll(const unsigned char visibility[][100],
+void Monster_RenderAll(const unsigned char visibility[][MAP_WIDTH],
                         int mapWidth, int mapHeight,
                         int tileWidth, int tileHeight,
                         float t);

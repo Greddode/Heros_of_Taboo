@@ -3,6 +3,8 @@
 
 #include "tmx.h"
 
+// Tile GID constants — these match specific tiles in the gray tileset.
+// Each defines a wall orientation or floor type.
 #define TILE_WALL_CORNER_NW   1
 #define TILE_WALL_NORTH       2
 #define TILE_WALL_CORNER_NE   4
@@ -19,11 +21,18 @@
 
 #define MAX_GENERATED_ROOMS 8
 
+// Metadata for a single generated room (position, size, centre).
 typedef struct {
-    int x, y, w, h, cx, cy;
+    int x, y;    // top-left tile
+    int w, h;    // width and height in tiles
+    int cx, cy;  // centre tile (for hall connections)
 } ProceduralRoom;
 
+// Generate a complete dungeon map. Returns a MapData that must be freed with UnloadTMX().
 MapData* GenerateProceduralMap(int width, int height);
+
+// Fill an array with the room metadata from the last generation.
+// Returns the number of rooms written.
 int GetGeneratedRooms(ProceduralRoom* outRooms, int maxRooms);
 
 #endif

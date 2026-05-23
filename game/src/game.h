@@ -9,7 +9,7 @@
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
 
-// Directions for movement
+// Direction an entity can move
 typedef enum {
     DIR_NONE = 0,
     DIR_UP,
@@ -18,26 +18,24 @@ typedef enum {
     DIR_RIGHT
 } Direction;
 
-// Player entity
+// Shared entity type used for the player (monsters have their own Monster struct)
 typedef struct {
     char name[32];
-    int x, y;           // Tile position
-    int prevX, prevY;   // Previous position for smooth interpolation
-    int hp;
-    int maxHp;
-    int attack;
-    int defense;
+    int x, y;              // Current tile position
+    int prevX, prevY;      // Previous tile position (for smooth interpolation)
+    int hp, maxHp;
+    int attack, defense;
     int level;
     int expValue;
     bool alive;
-    bool isPlayer;
+    bool isPlayer;         // True for the player entity, false for monsters using this struct
     Color color;
     bool facingRight;
-    int animFrame;      // 0-3 for 4-frame animation cycle
-    float hitFlashTimer; // >0 when entity was just hit (white flash)
+    int animFrame;         // 0-3 for 4-frame animation cycle
+    float hitFlashTimer;   // >0 when entity was just hit (draws white flash)
 } Entity;
 
-// Game state
+// Turn / state machine
 typedef enum {
     STATE_PLAYER_TURN,
     STATE_ENEMY_TURN,
@@ -45,61 +43,64 @@ typedef enum {
     STATE_WIN
 } GameState;
 
+// Top-level game state
 typedef struct {
-    MapData* map;
+    MapData* map;           // Current map (TMX-loaded or procedurally generated)
     Texture2D tilesetTexture;
-    
-    Entity player;
-    
+
+    Entity player;          // The hero
+
     int turnCount;
     GameState state;
-    
-    Camera2D camera;
-    
-    // Visibility map (simple field-of-view)
-    // 0 = not visible, 1 = visible, 2 = explored
+
+    Camera2D camera;        // Camera centred on the player
+
+    // Visibility grid: 0 = unseen, 1 = currently visible, 2 = explored
     unsigned char visibility[MAP_HEIGHT][MAP_WIDTH];
-    
-    // Blocking map: 1 = wall/blocked, 0 = passable
+
+    // Blocking grid: 1 = wall or other obstruction, 0 = passable
     unsigned char blocking[MAP_HEIGHT][MAP_WIDTH];
-    
-    // Healing items
+
+    // Healing pickups placed on the map
     int healingCount;
-    int healingTiles[MAX_HEALING][2];  // x,y positions
+    int healingTiles[MAX_HEALING][2];   // [count][x, y]
     bool healingCollected[MAX_HEALING];
 } Game;
 
-// Initialize game from a TMX map
+// Load a TMX map (or generate one procedurally if tmxFile is a directory).
+// Returns false on failure.
 bool InitGame(Game* game, const char* tmxFile);
 
-// Cleanup game
+// Free all assets and zero the Game struct.
 void CleanupGame(Game* game);
 
-// Handle input for player turn
+// Poll keyboard and move the player if it is the player's turn.
 void HandleInput(Game* game);
 
-// Update game logic (enemy turns, animations, etc.)
+// Advance monster AI, animations, and timers. Must be called once per frame.
 void UpdateGame(Game* game);
 
-// Render the game
+// Draw the tile layers, entities, and HUD.
 void RenderGame(const Game* game);
 
-// Check if a tile is walkable
+// Returns true if (x, y) is in bounds, not a wall, and not occupied.
 bool IsWalkable(const Game* game, int x, int y);
 
-// Get the tile pixel position (top-left corner)
+// Convert tile coordinates to pixel position (top-left corner).
 Vector2 TileToScreen(int x, int y, int tileWidth, int tileHeight);
 
-// Compute field of view
+// Recalculate the shadowcast FOV from (px, py) with given sight radius.
+// NOTE: Currently unused — InitGame sets all tiles to visible (no fog).
 void ComputeFOV(Game* game, int px, int py, int radius);
 
-// Move an entity in a direction, returns true if moved
+// Attempt to move an entity one tile in a direction.
+// Returns true if the move or an attack occurred.
 bool MoveEntity(Game* game, Entity* entity, Direction dir);
 
-// Get entity at tile position (excluding the specified entity)
+// Find a non-excluded entity at a tile. Currently only checks the player.
 Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude);
 
-// Draw a single tile
+// Draw a single tile from the tileset at layer layerIndex at (x, y).
 void DrawTile(const Game* game, int x, int y, int layerIndex);
 
 #endif // GAME_H

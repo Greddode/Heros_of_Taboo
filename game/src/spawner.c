@@ -2,14 +2,18 @@
 #include "monster.h"
 #include <stdlib.h>
 
+// Minimum squared distance from the player's spawn for newly placed entities
 #define MIN_PLAYER_DIST 5
 
+// Squared distance helper (avoids sqrt for performance)
 static int DistSq(int ax, int ay, int bx, int by) {
     int dx = ax - bx;
     int dy = ay - by;
     return dx * dx + dy * dy;
 }
 
+// Populate each room with monsters and occasional healing items.
+// Uses shuffled floor tile indices so placement is randomised.
 void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
     if (!game || !game->map || roomCount == 0) return;
 
@@ -21,39 +25,44 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
     int py = game->player.y;
     int minDist = MIN_PLAYER_DIST * MIN_PLAYER_DIST;
 
+    // Upper bound: each room is at most 10x10 = 100 tiles
+    #define ROOM_MAX_FLOORS 256
+
     for (int r = 0; r < roomCount; r++) {
-        // Collect floor tiles in this room
-        int floorTiles[256];
+        // Collect all floor-tile indices inside this room
+        int floorTiles[ROOM_MAX_FLOORS];
         int floorCount = 0;
 
         for (int y = rooms[r].y; y < rooms[r].y + rooms[r].h; y++)
             for (int x = rooms[r].x; x < rooms[r].x + rooms[r].w; x++)
-                if (tiles[y * w + x] == TILE_FLOOR)
+                if (tiles[y * w + x] == TILE_FLOOR && floorCount < ROOM_MAX_FLOORS)
                     floorTiles[floorCount++] = y * w + x;
 
         if (floorCount < 4) continue;
 
-        // Shuffle floor tiles
+        // Fisher-Yates shuffle so placement order is random
         for (int i = floorCount - 1; i > 0; i--) {
             int j = GetRandomValue(0, i);
             int t = floorTiles[i]; floorTiles[i] = floorTiles[j]; floorTiles[j] = t;
         }
 
-        // --- Monsters ---
+        // --- Monsters: bigger rooms get more enemies ---
         int monsterCount = 1;
         if (floorCount >= 20) monsterCount = 2;
         if (floorCount >= 40) monsterCount = 3;
 
-        for (int m = 0; m < monsterCount; m++) {
-            if (m >= floorCount) break;
+        // Clamp to available tiles (safety)
+        if (monsterCount > floorCount) monsterCount = floorCount;
 
+        for (int m = 0; m < monsterCount; m++) {
             int mx = floorTiles[m] % w;
             int my = floorTiles[m] / w;
 
+            // Don't spawn too close to the player
             if (DistSq(mx, my, px, py) < minDist) continue;
-            Monster* existing = Monster_GetAt(mx, my, NULL);
-            if (existing && existing->alive) continue;
+            if (Monster_GetAt(mx, my, NULL)) continue;
 
+            // Weighted random monster selection (easier monsters are more common)
             MonsterType type;
             int roll = GetRandomValue(0, 100);
             if (roll < 40)      type = MONSTER_FLOATING_EYE;
@@ -63,7 +72,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             Monster_Spawn(type, mx, my);
         }
 
-        // --- Healing item (rare) ---
+        // --- Healing item: only in larger rooms, placed on the last shuffled tile ---
         if (floorCount >= 40 && game->healingCount < MAX_HEALING) {
             int fi = floorCount - 1;
             int hx = floorTiles[fi] % w;
@@ -76,6 +85,8 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             }
         }
     }
+
+    #undef ROOM_MAX_FLOORS
 
     TraceLog(LOG_INFO, "Spawner: %d monsters, %d healing items placed",
              Monster_GetAliveCount(), game->healingCount);

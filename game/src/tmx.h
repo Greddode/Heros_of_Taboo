@@ -9,52 +9,46 @@
 #define MAX_OBJECTS 64
 #define MAP_NAME_LEN 64
 
-// Tileset loaded from TMX
+// Tileset loaded from a <tileset> tag (inline or external .tsx)
 typedef struct {
-    int firstGID;
-    char name[64];
-    int tileWidth;
-    int tileHeight;
-    int tileCount;
-    int columns;
-    char imageSource[256];
-    int imageWidth;
-    int imageHeight;
+    int firstGID;               // first global tile ID in this tileset
+    char name[64];              // tileset name
+    int tileWidth, tileHeight;  // pixel dimensions of a single tile
+    int tileCount;              // total tiles in the set
+    int columns;                // tiles per row in the spritesheet image
+    char imageSource[256];      // path to the spritesheet PNG
+    int imageWidth, imageHeight;
 } TilesetDef;
 
-// A tile layer from TMX
+// A single tile layer from a <layer> tag
 typedef struct {
     char name[64];
-    int width;
-    int height;
-    int* data;        // Array of GIDs (width * height), 0 = empty
+    int width, height;          // tile count in each dimension
+    int* data;                  // flat array of GIDs (width*height), 0 = empty
     bool visible;
 } TileLayer;
 
-// Object from object group in TMX (for player/enemy spawns)
+// Object from an <objectgroup> tag (used for player/monster/item spawns)
 typedef struct {
     char name[64];
-    char type[32];
-    float x;
-    float y;
-    int gid;          // Optional tile GID
+    char type[32];              // identifies what kind of entity to spawn
+    float x, y;                 // pixel position (convert to tile coords when spawning)
+    int gid;                    // optional tile GID for object images
     bool hasGID;
 } MapObject;
 
-// Complete map loaded from TMX
+// A complete map loaded from a .tmx file (or generated procedurally)
 typedef struct {
-    int width;          // Map width in tiles
-    int height;         // Map height in tiles  
-    int tileWidth;      // Tile width in pixels
-    int tileHeight;     // Tile height in pixels
-    char orientation[16]; // "orthogonal", "isometric", etc.
-    
+    int width, height;          // map dimensions in tiles
+    int tileWidth, tileHeight;  // pixel size of each tile
+    char orientation[16];       // "orthogonal", "isometric", etc.
+
     int tilesetCount;
     TilesetDef tilesets[MAX_TILESETS];
-    
+
     int layerCount;
     TileLayer layers[MAX_LAYERS];
-    
+
     int objectCount;
     MapObject objects[MAX_OBJECTS];
 } MapData;

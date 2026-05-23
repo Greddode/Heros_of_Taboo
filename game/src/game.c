@@ -6,16 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ---------------------------------------------------------------------------
-// Tile <-> Screen coordinate conversion
-// ---------------------------------------------------------------------------
+// Convert tile grid coordinates to pixel position (top-left corner of the tile)
 Vector2 TileToScreen(int x, int y, int tileWidth, int tileHeight) {
     return (Vector2){ (float)(x * tileWidth), (float)(y * tileHeight) };
 }
 
-// ---------------------------------------------------------------------------
-// Walkability check
-// ---------------------------------------------------------------------------
+// Returns true if the tile at (x, y) is in bounds, not a wall, and unoccupied
 bool IsWalkable(const Game* game, int x, int y) {
     if (!game->map) return false;
     if (x < 0 || x >= game->map->width || y < 0 || y >= game->map->height) return false;
@@ -26,9 +22,8 @@ bool IsWalkable(const Game* game, int x, int y) {
     return true;
 }
 
-// ---------------------------------------------------------------------------
-// Find entity at a tile position (player only; monsters handled separately)
-// ---------------------------------------------------------------------------
+// Return a pointer to the player Entity if they are at (x, y) and not excluded.
+// Monsters are NOT tracked via this function (they use Monster_GetAt instead).
 Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude) {
     if (!exclude || !exclude->isPlayer) {
         if (game->player.alive && game->player.x == x && game->player.y == y) {
@@ -38,10 +33,10 @@ Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude) {
     return NULL;
 }
 
-// ---------------------------------------------------------------------------
-// Move an entity in a direction. Returns true if an action was taken.
-// Combat: the hitting entity deals damage to the target.
-// ---------------------------------------------------------------------------
+// Attempt to move an entity one step in the given direction.
+// If the target tile contains an enemy, the entity attacks instead.
+// The player also picks up healing items automatically when walking over them.
+// Returns true if the entity did something (moved or attacked).
 bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     if (!entity->alive) return false;
 
@@ -129,7 +124,8 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
 }
 
 // ---------------------------------------------------------------------------
-// Simple recursive shadowcasting FOV
+// Recursive shadowcasting FOV — currently unused
+// (all tiles are set to visible in InitGame instead)
 // ---------------------------------------------------------------------------
 static void CastLight(Game* game, int cx, int cy, int radius, int row,
                       float startSlope, float endSlope,
@@ -193,9 +189,9 @@ void ComputeFOV(Game* game, int px, int py, int radius) {
     CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0, 1,-1, 0);
 }
 
-// ---------------------------------------------------------------------------
-// Handle player input
-// ---------------------------------------------------------------------------
+// Read directional keys (arrow keys / WASD) and pass them to MoveEntity.
+// Period/space waits a turn, restoring 1 HP.
+// After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
     if (game->state != STATE_PLAYER_TURN) return;
 
@@ -221,9 +217,8 @@ void HandleInput(Game* game) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Update game logic
-// ---------------------------------------------------------------------------
+// Advance flash timers, run monster AI if it is the enemy turn,
+// and check win / loss conditions.
 void UpdateGame(Game* game) {
     if (!game) return;
 
@@ -262,9 +257,8 @@ void UpdateGame(Game* game) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Draw a single tile
-// ---------------------------------------------------------------------------
+// Look up the GID at (x, y) on the given layer, compute the source
+// rectangle in the tileset, and draw it to screen.
 void DrawTile(const Game* game, int x, int y, int layerIndex) {
     if (!game->map || !game->map->layers) return;
 
@@ -280,9 +274,8 @@ void DrawTile(const Game* game, int x, int y, int layerIndex) {
     DrawTexturePro(game->tilesetTexture, src, dest, (Vector2){0, 0}, 0, WHITE);
 }
 
-// ---------------------------------------------------------------------------
-// Render the game
-// ---------------------------------------------------------------------------
+// Render all visible tiles, healing items, monsters, the player,
+// and the HUD overlay.
 void RenderGame(const Game* game) {
     if (!game || !game->map) return;
 
@@ -376,9 +369,9 @@ void RenderGame(const Game* game) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Build blocking map from TMX layers
-// ---------------------------------------------------------------------------
+// Build the blocking grid from the tile map.
+// Looks for a layer named "collision" (case-sensitive); if not found,
+// uses layer index 1 as the collision layer.  Any non-zero GID blocks movement.
 static void BuildBlockingMap(Game* game) {
     if (!game || !game->map) return;
 
@@ -407,9 +400,8 @@ static void BuildBlockingMap(Game* game) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Spawn entities from TMX map objects
-// ---------------------------------------------------------------------------
+// Iterate map objects from the TMX file and spawn the player,
+// healing pickups, or monsters based on the object's type field.
 static void SpawnEntitiesFromObjects(Game* game) {
     if (!game || !game->map) return;
 
@@ -446,9 +438,9 @@ static void SpawnEntitiesFromObjects(Game* game) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Initialize game
-// ---------------------------------------------------------------------------
+// Initialise (or re-initialise) the game: load map, build blocking,
+// load tileset, spawn entities, set default player stats,
+// and configure the camera.
 bool InitGame(Game* game, const char* tmxFile) {
     if (!game) return false;
     memset(game, 0, sizeof(Game));
@@ -563,9 +555,8 @@ bool InitGame(Game* game, const char* tmxFile) {
     return true;
 }
 
-// ---------------------------------------------------------------------------
-// Cleanup game
-// ---------------------------------------------------------------------------
+// Free all runtime assets (sprites, map, textures) and zero the Game struct.
+// Safe to call on an already-cleaned-up Game (idempotent if map is NULL).
 void CleanupGame(Game* game) {
     if (!game) return;
 

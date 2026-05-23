@@ -5,11 +5,12 @@
 #include <ctype.h>
 
 // ---------------------------------------------------------------------------
-// Simple lightweight TMX (XML) parser
-// TMX is the Tiled Map Format. This parser handles orthogonal CSV layers.
+// Lightweight TMX (XML) parser
+// TMX is the Tiled Map Editor format. Handles orthogonal maps with CSV layers,
+// inline/external tilesets, and object groups for entity placement.
 // ---------------------------------------------------------------------------
 
-// Helper: find substring, case-insensitive
+// Case-insensitive substring search
 static const char* stristr(const char* haystack, const char* needle) {
     if (!*needle) return haystack;
     for (; *haystack; ++haystack) {
@@ -25,14 +26,14 @@ static const char* stristr(const char* haystack, const char* needle) {
     return NULL;
 }
 
-// Helper: move pointer past a substring
+// Advance pointer past the first occurrence of a substring
 static const char* skipPast(const char* ptr, const char* tag) {
     const char* found = strstr(ptr, tag);
     return found ? found + strlen(tag) : ptr;
 }
 
-// Helper: extract attribute value from an XML tag
-// Given a pointer to inside a tag like <map width="40" height="30">, extract "40" for attrName "width"
+// Extract an integer attribute from an XML tag
+// e.g. getIntAttr(ptr, "width") on '<map width="40">' returns 40
 static int getIntAttr(const char* tagStart, const char* attrName) {
     char search[64];
     snprintf(search, sizeof(search), "%s=\"", attrName);
@@ -42,6 +43,7 @@ static int getIntAttr(const char* tagStart, const char* attrName) {
     return atoi(valStart);
 }
 
+// Extract a string attribute from an XML tag into a fixed-size buffer
 static const char* getStringAttr(const char* tagStart, const char* attrName, char* out, int outLen) {
     char search[64];
     snprintf(search, sizeof(search), "%s=\"", attrName);
@@ -56,11 +58,9 @@ static const char* getStringAttr(const char* tagStart, const char* attrName, cha
     return valStart;
 }
 
-// Helper: resolve a relative path given a base file path
-// basePath is the path to the .tmx file, relativePath is the source attribute
-// Returns a newly allocated string with the resolved path. Caller must free().
+// Resolve a relative asset path against the TMX file's directory.
+// Returns a malloc'd string; caller must free().
 static char* resolvePath(const char* basePath, const char* relativePath) {
-    // Find the last directory separator in basePath
     const char* lastSep = NULL;
     const char* p = basePath;
     while (*p) {
@@ -76,7 +76,6 @@ static char* resolvePath(const char* basePath, const char* relativePath) {
         }
         return result;
     } else {
-        // No directory in basePath, just use relativePath as-is
         char* result = (char*)malloc(strlen(relativePath) + 1);
         if (result) strcpy(result, relativePath);
         return result;
@@ -84,7 +83,7 @@ static char* resolvePath(const char* basePath, const char* relativePath) {
 }
 
 // ---------------------------------------------------------------------------
-// Load a TMX file
+// Load a TMX file and parse it into a MapData structure
 // ---------------------------------------------------------------------------
 MapData* LoadTMX(const char* filename) {
     FILE* f = fopen(filename, "rb");
@@ -93,7 +92,7 @@ MapData* LoadTMX(const char* filename) {
         return NULL;
     }
 
-    // Read entire file
+    // Read the whole file into memory for string-based parsing
     fseek(f, 0, SEEK_END);
     long fileSize = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -104,11 +103,10 @@ MapData* LoadTMX(const char* filename) {
     xml[fileSize] = '\0';
     fclose(f);
 
-    // Allocate map
     MapData* map = (MapData*)calloc(1, sizeof(MapData));
     if (!map) { free(xml); return NULL; }
 
-    // --- Parse <map> tag ---
+    // -------- <map> tag: dimensions, orientation, tile size --------
     const char* mapTag = stristr(xml, "<map");
     if (!mapTag) {
         TraceLog(LOG_WARNING, "TMX: No <map> tag found");
@@ -124,27 +122,23 @@ MapData* LoadTMX(const char* filename) {
     TraceLog(LOG_INFO, "TMX: Loaded map %dx%d tiles, tile size %dx%d, orientation=%s",
              map->width, map->height, map->tileWidth, map->tileHeight, map->orientation);
 
-    // --- Parse <tileset> tags ---
+    // -------- <tileset> tags: inline or external (.tsx) --------
     const char* tsPtr = xml;
     while ((tsPtr = stristr(tsPtr, "<tileset")) != NULL && map->tilesetCount < MAX_TILESETS) {
         TilesetDef* ts = &map->tilesets[map->tilesetCount];
         memset(ts, 0, sizeof(TilesetDef));
 
-        // Check if it's a </tileset> closing tag
         const char* tagClose = strchr(tsPtr, '>');
         if (!tagClose) break;
 
-        // Check for firstgid
         ts->firstGID = getIntAttr(tsPtr, "firstgid");
 
-        // Get source attribute (for external tileset .tsx files)
+        // External tileset reference (self-closing <tileset source="..." />)
         char sourceAttr[256] = {0};
         getStringAttr(tsPtr, "source", sourceAttr, sizeof(sourceAttr));
-
-        // Check if self-closing (external tileset reference)
         bool isExternal = (*(tagClose - 1) == '/') && (strlen(sourceAttr) > 0);
 
-        // Get name (may be in external file)
+        // Read basic attributes (may be overridden by .tsx content)
         getStringAttr(tsPtr, "name", ts->name, sizeof(ts->name));
         ts->tileWidth  = getIntAttr(tsPtr, "tilewidth");
         ts->tileHeight = getIntAttr(tsPtr, "tileheight");
@@ -152,7 +146,7 @@ MapData* LoadTMX(const char* filename) {
         ts->columns    = getIntAttr(tsPtr, "columns");
 
         if (isExternal) {
-            // Load external .tsx tileset file
+            // Load external .tsx tileset definition file
             char* tsxPath = resolvePath(filename, sourceAttr);
             if (tsxPath) {
                 TraceLog(LOG_INFO, "TMX: Loading external tileset: %s", tsxPath);
@@ -168,10 +162,8 @@ MapData* LoadTMX(const char* filename) {
                         fread(tsxXml, 1, tsxSize, tsxF);
                         tsxXml[tsxSize] = '\0';
 
-                        // Parse the <tileset> tag from .tsx for name, tile dimensions, etc.
                         const char* tsxTsTag = stristr(tsxXml, "<tileset");
                         if (tsxTsTag) {
-                            // Get name (overrides map-level if provided)
                             char tsxName[64] = {0};
                             getStringAttr(tsxTsTag, "name", tsxName, sizeof(tsxName));
                             if (strlen(tsxName) > 0) strcpy(ts->name, tsxName);
@@ -185,7 +177,7 @@ MapData* LoadTMX(const char* filename) {
                             if (tc > 0) ts->tileCount = tc;
                             if (col > 0) ts->columns = col;
 
-                            // Find <image> tag inside the .tsx tileset
+                            // Extract the <image> tag inside the .tsx for the sprite sheet path
                             const char* tsxClose = strstr(tsxTsTag, "</tileset>");
                             const char* imgPtr = tsxTsTag;
                             while ((imgPtr = stristr(imgPtr, "<image")) != NULL &&
@@ -215,16 +207,13 @@ MapData* LoadTMX(const char* filename) {
                      ts->name, ts->firstGID, ts->imageSource);
 
             map->tilesetCount++;
-            tsPtr = tagClose + 1; // past self-closing tag
+            tsPtr = tagClose + 1;
             continue;
         }
 
-        // Inline tileset (not self-closing)
-        // Now find <image> inside this tileset
-        // We need to find the image tag that is BETWEEN this tileset opening and closing
+        // Inline tileset (content between <tileset> and </tileset>)
         const char* tsClose = strstr(tsPtr, "</tileset>");
         if (!tsClose) {
-            // Might be self-closing <tileset ... /> (no source attribute)
             if (*(tagClose - 1) == '/') {
                 tsPtr = tagClose + 1;
                 map->tilesetCount++;
@@ -233,10 +222,8 @@ MapData* LoadTMX(const char* filename) {
             break;
         }
 
-        // Look for <image ...> between tsPtr and tsClose
         const char* imgPtr = tsPtr;
         while ((imgPtr = stristr(imgPtr, "<image")) != NULL && imgPtr < tsClose) {
-            // Check for source attribute
             getStringAttr(imgPtr, "source", ts->imageSource, sizeof(ts->imageSource));
             ts->imageWidth  = getIntAttr(imgPtr, "width");
             ts->imageHeight = getIntAttr(imgPtr, "height");
@@ -251,10 +238,10 @@ MapData* LoadTMX(const char* filename) {
                  ts->name, ts->firstGID, ts->imageSource);
 
         map->tilesetCount++;
-        tsPtr = tsClose + 10; // past </tileset>
+        tsPtr = tsClose + 10;
     }
 
-    // --- Parse <layer> tags ---
+    // -------- <layer> tags: tile data for each map layer --------
     const char* layerPtr = xml;
     while ((layerPtr = stristr(layerPtr, "<layer")) != NULL && map->layerCount < MAX_LAYERS) {
         TileLayer* layer = &map->layers[map->layerCount];
@@ -265,7 +252,7 @@ MapData* LoadTMX(const char* filename) {
         layer->height = getIntAttr(layerPtr, "height");
         layer->visible = true;
 
-        // Check for visible="0"
+        // Parse visible="0" attribute
         const char* visStr = stristr(layerPtr, "visible");
         if (visStr && visStr < strstr(layerPtr, ">")) {
             if (stristr(visStr, "0")) layer->visible = false;
@@ -273,8 +260,7 @@ MapData* LoadTMX(const char* filename) {
 
         TraceLog(LOG_INFO, "TMX: Layer '%s' %dx%d", layer->name, layer->width, layer->height);
 
-        // Find the <data> section for this layer
-        // We need the <data> between this <layer> and </layer>
+        // Find <data> block between <layer> and </layer>
         const char* layerClose = strstr(layerPtr, "</layer>");
         if (!layerClose) break;
 
@@ -285,46 +271,36 @@ MapData* LoadTMX(const char* filename) {
             continue;
         }
 
-        // Check encoding
         char encoding[32] = {0};
         getStringAttr(dataTag, "encoding", encoding, sizeof(encoding));
 
-        // Find the start of the actual data (after the opening <data> tag)
+        // Text content of <data> tag
         const char* dataStart = strchr(dataTag, '>');
         if (!dataStart) { layerPtr = layerClose + 8; map->layerCount++; continue; }
         dataStart++;
 
-        // Find the end of data (before </data>)
         const char* dataEnd = strstr(dataStart, "</data>");
         if (!dataEnd) { layerPtr = layerClose + 8; map->layerCount++; continue; }
 
-        // Allocate tile data
         int tileCount = layer->width * layer->height;
         layer->data = (int*)calloc(tileCount, sizeof(int));
         if (!layer->data) { layerPtr = layerClose + 8; map->layerCount++; continue; }
 
         if (strcmp(encoding, "csv") == 0 || strlen(encoding) == 0) {
-            // Parse CSV data
+            // Parse comma-separated values
             const char* csv = dataStart;
             int idx = 0;
             while (csv < dataEnd && idx < tileCount) {
-                // Skip whitespace and newlines
                 while (csv < dataEnd && (*csv == ' ' || *csv == '\t' || *csv == '\n' || *csv == '\r')) csv++;
                 if (csv >= dataEnd) break;
-
-                // Parse number
-                int gid = atoi(csv);
-                layer->data[idx++] = gid;
-
-                // Skip past number
+                layer->data[idx++] = atoi(csv);
                 while (csv < dataEnd && (*csv >= '0' && *csv <= '9')) csv++;
-                // Skip comma
                 if (csv < dataEnd && *csv == ',') csv++;
             }
         } else if (strcmp(encoding, "base64") == 0) {
             TraceLog(LOG_WARNING, "TMX: base64 encoding not supported for layer '%s'", layer->name);
         } else {
-            // Raw XML tile data: <tile gid="1"/>
+            // Raw <tile gid="N"/> elements inside the data block
             int idx = 0;
             const char* tilePtr = dataStart;
             while ((tilePtr = stristr(tilePtr, "<tile")) != NULL && tilePtr < dataEnd && idx < tileCount) {
@@ -338,10 +314,9 @@ MapData* LoadTMX(const char* filename) {
         layerPtr = layerClose + 8;
     }
 
-    // --- Parse <objectgroup> tags (for spawn points, enemies, etc.) ---
+    // -------- <objectgroup> tags: entity / item spawn points --------
     const char* objPtr = xml;
     while ((objPtr = stristr(objPtr, "<objectgroup")) != NULL) {
-        // Find the first <object> within this group
         const char* ogClose = strstr(objPtr, "</objectgroup>");
         if (!ogClose) break;
 
@@ -350,14 +325,13 @@ MapData* LoadTMX(const char* filename) {
             MapObject* obj = &map->objects[map->objectCount];
             memset(obj, 0, sizeof(MapObject));
 
-            // Check it's not the closing tag </object>
-            if (*(objTag + 7) == '/') { objTag += 8; continue; }
-            if (*(objTag + 7) == '>') { objTag += 8; continue; }
+            // Skip closing tags
+            if (*(objTag + 7) == '/' || *(objTag + 7) == '>') { objTag += 8; continue; }
 
             getStringAttr(objTag, "name", obj->name, sizeof(obj->name));
             getStringAttr(objTag, "type", obj->type, sizeof(obj->type));
-            obj->x = getIntAttr(objTag, "x");
-            obj->y = getIntAttr(objTag, "y");
+            obj->x = (float)getIntAttr(objTag, "x");
+            obj->y = (float)getIntAttr(objTag, "y");
 
             int gid = getIntAttr(objTag, "gid");
             if (gid > 0) { obj->gid = gid; obj->hasGID = true; }
@@ -365,11 +339,7 @@ MapData* LoadTMX(const char* filename) {
             map->objectCount++;
 
             const char* objClose = strstr(objTag, "</object>");
-            if (objClose && objClose < ogClose) {
-                objTag = objClose + 9;
-            } else {
-                objTag++;
-            }
+            objTag = (objClose && objClose < ogClose) ? (objClose + 9) : (objTag + 1);
         }
 
         objPtr = ogClose + 13;
@@ -380,7 +350,7 @@ MapData* LoadTMX(const char* filename) {
 }
 
 // ---------------------------------------------------------------------------
-// Free a loaded map
+// Free a loaded map (including per-layer tile data arrays)
 // ---------------------------------------------------------------------------
 void UnloadTMX(MapData* map) {
     if (!map) return;
@@ -391,7 +361,7 @@ void UnloadTMX(MapData* map) {
 }
 
 // ---------------------------------------------------------------------------
-// Get tile GID at (x,y) in the given layer
+// Return the GID at tile (x, y) within a given layer, or 0 if out of bounds
 // ---------------------------------------------------------------------------
 int GetTileGID(const MapData* map, int layerIndex, int x, int y) {
     if (!map || layerIndex < 0 || layerIndex >= map->layerCount) return 0;
@@ -400,7 +370,7 @@ int GetTileGID(const MapData* map, int layerIndex, int x, int y) {
 }
 
 // ---------------------------------------------------------------------------
-// Find the tileset that contains the given GID
+// Find the index of the tileset that contains a given global tile ID
 // ---------------------------------------------------------------------------
 int FindTilesetForGID(const MapData* map, int gid) {
     if (!map || gid <= 0) return -1;
@@ -411,7 +381,7 @@ int FindTilesetForGID(const MapData* map, int gid) {
 }
 
 // ---------------------------------------------------------------------------
-// Get source rectangle from tileset for a tile GID
+// Get the source rectangle within the tileset image for a given tile GID
 // ---------------------------------------------------------------------------
 Rectangle GetTileSourceRect(const MapData* map, int gid) {
     Rectangle rect = { 0, 0, 0, 0 };
@@ -420,10 +390,10 @@ Rectangle GetTileSourceRect(const MapData* map, int gid) {
     int tsIndex = FindTilesetForGID(map, gid);
     if (tsIndex < 0) return rect;
 
-    TilesetDef* ts = &map->tilesets[tsIndex];
+    const TilesetDef* ts = &map->tilesets[tsIndex];
     int localID = gid - ts->firstGID;
 
-    rect.width = (float)ts->tileWidth;
+    rect.width  = (float)ts->tileWidth;
     rect.height = (float)ts->tileHeight;
 
     if (ts->columns > 0) {
