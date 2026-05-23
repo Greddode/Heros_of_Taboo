@@ -52,7 +52,8 @@ void Monster_InitTemplates(void) {
         .level           = 2,
         .color           = { 220, 220, 200, 255 },
         .spritePath      = "resources/sprite_animations/idle/Fungal_Myconid.png",
-        .frameCount      = 4,
+        .frameCount      = 4
+        ,
         .animSpeed       = 0.5f,
         .detectionRange  = 8,
     };

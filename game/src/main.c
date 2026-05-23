@@ -37,32 +37,20 @@ int main(void)
     }
     
     if (!gameLoaded) {
-        TraceLog(LOG_WARNING, "No TMX map found. Creating a procedural test map.");
-        // We'll create a hardcoded fallback since we can't easily create
-        // a TMX file from code. This serves as a built-in test.
-        TraceLog(LOG_WARNING, "Place a map.tmx in the resources/ folder to use Tiled maps.");
-        
-        // For now, just show instructions
+        TraceLog(LOG_WARNING, "No TMX map found. Generating procedural map...");
+        gameLoaded = InitGame(&game, "resources/");
+    }
+
+    if (!gameLoaded) {
+        TraceLog(LOG_ERROR, "Could not initialize game.");
         while (!WindowShouldClose())
         {
             BeginDrawing();
             ClearBackground(BLACK);
-            
-            DrawText("TURN-BASED ROGUELIKE DEMO", 200, 150, 30, YELLOW);
-            DrawText("No map.tmx found!", 300, 200, 20, RED);
-            DrawText("Create a Tiled map with:", 200, 250, 20, WHITE);
-            DrawText("  - Orthogonal orientation", 200, 280, 20, WHITE);
-            DrawText("  - CSV layer format", 200, 310, 20, WHITE);
-            DrawText("  - Layer 0 = walls (any tile)", 200, 340, 20, WHITE);
-            DrawText("  - Object layer with 'player' or 'Player' type", 200, 370, 20, WHITE);
-            DrawText("  - Object layer with 'goblin'/'skeleton'/'orc' types for enemies", 200, 400, 20, WHITE);
-            DrawText("", 200, 430, 20, WHITE);
-            DrawText("Save as: resources/map.tmx", 200, 460, 20, GREEN);
+            DrawText("Failed to initialize game!", 200, 200, 20, RED);
             DrawText("Press ESC to exit", 200, 500, 20, GRAY);
-            
             EndDrawing();
         }
-        
         CloseWindow();
         return 0;
     }
@@ -71,12 +59,12 @@ int main(void)
     while (!WindowShouldClose())
     {
         // Handle restart
-        if (IsKeyPressed(KEY_R) && (game.state == STATE_GAME_OVER || game.state == STATE_WIN)) {
+        if (IsKeyPressed(KEY_R)) {
             CleanupGame(&game);
-            // Reload the same map
             const char* mapFile = "resources/map.tmx";
             if (!FileExists(mapFile)) mapFile = "../resources/map.tmx";
             if (!FileExists(mapFile)) mapFile = "map.tmx";
+            if (!FileExists(mapFile)) mapFile = "resources/";
             gameLoaded = InitGame(&game, mapFile);
             if (!gameLoaded) break;
         }

@@ -1,5 +1,7 @@
 #include "game.h"
 #include "monster.h"
+#include "procedural.h"
+#include "spawner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -250,7 +252,7 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        if (Monster_AreAllDead()) {
+        if (Monster_GetCount() > 0 && Monster_AreAllDead()) {
             game->state = STATE_WIN;
             return;
         }
@@ -454,7 +456,11 @@ bool InitGame(Game* game, const char* tmxFile) {
     // Load TMX map
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
-        TraceLog(LOG_ERROR, "Failed to load TMX map: %s", tmxFile);
+        TraceLog(LOG_INFO, "TMX load failed, generating procedural map...");
+        game->map = GenerateProceduralMap(80, 50);
+    }
+    if (!game->map) {
+        TraceLog(LOG_ERROR, "Failed to create any map");
         return false;
     }
 
@@ -462,16 +468,20 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     // Try to load tileset texture
     if (game->map->tilesetCount > 0) {
-        char imgPath[512];
-        const char* lastSlash = strrchr(tmxFile, '/');
-        const char* lastBackslash = strrchr(tmxFile, '\\');
-        const char* sep = (lastSlash > lastBackslash) ? lastSlash : lastBackslash;
-
-        if (sep) {
-            int dirLen = (int)(sep - tmxFile) + 1;
-            snprintf(imgPath, sizeof(imgPath), "%.*s%s", dirLen, tmxFile, game->map->tilesets[0].imageSource);
-        } else {
-            snprintf(imgPath, sizeof(imgPath), "%s", game->map->tilesets[0].imageSource);
+        char imgPath[512] = {0};
+        if (tmxFile) {
+            const char* lastSlash = strrchr(tmxFile, '/');
+            const char* lastBackslash = strrchr(tmxFile, '\\');
+            const char* sep = (lastSlash > lastBackslash) ? lastSlash : lastBackslash;
+            if (sep) {
+                int dirLen = (int)(sep - tmxFile) + 1;
+                snprintf(imgPath, sizeof(imgPath), "%.*s%s", dirLen, tmxFile, game->map->tilesets[0].imageSource);
+            } else {
+                snprintf(imgPath, sizeof(imgPath), "%s", game->map->tilesets[0].imageSource);
+            }
+        }
+        if (imgPath[0] == '\0' || !FileExists(imgPath)) {
+            snprintf(imgPath, sizeof(imgPath), "resources/%s", game->map->tilesets[0].imageSource);
         }
 
         TraceLog(LOG_INFO, "Loading tileset image: %s", imgPath);
@@ -519,6 +529,13 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     // Spawn entities from map objects
     SpawnEntitiesFromObjects(game);
+
+    // Populate procedural maps with monsters and items
+    ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
+    int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
+    if (spawnRoomCount > 0) {
+        Spawner_Populate(game, spawnRooms, spawnRoomCount);
+    }
 
     // Load monster sprite sheets
     Monster_LoadSprites();
