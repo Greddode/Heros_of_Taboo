@@ -105,12 +105,14 @@ void Monster_UpdateAnimations(float dt);
 //  * playerHitFlash — the player's hitFlashTimer (set on attack for white flash)
 //  * blocking — walkability grid (1 = blocked, 0 = open), indexed as [y][x]
 //  * mapWidth, mapHeight — logical map dimensions (≤ MAP_WIDTH / MAP_HEIGHT)
+//  * combatLog — log where monster attack messages are written
 // The function applies damage to *playerHp when monsters attack.
 // Returns false if the player was killed.
 bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
                            float* playerHitFlash,
                            const unsigned char blocking[][MAP_WIDTH],
-                           int mapWidth, int mapHeight);
+                           int mapWidth, int mapHeight,
+                           CombatLog* combatLog);
 
 // Load shared monster sprite sheets (call after InitGame map loading).
 void Monster_LoadSprites(void);

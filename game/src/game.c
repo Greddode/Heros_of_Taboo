@@ -1,127 +1,13 @@
 #include "game.h"
+#include "entity.h"
+#include "player.h"
+#include "combat_log.h"
 #include "monster.h"
 #include "procedural.h"
 #include "spawner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// Convert tile grid coordinates to pixel position (top-left corner of the tile)
-Vector2 TileToScreen(int x, int y, int tileWidth, int tileHeight) {
-    return (Vector2){ (float)(x * tileWidth), (float)(y * tileHeight) };
-}
-
-// Returns true if the tile at (x, y) is in bounds, not a wall, and unoccupied
-bool IsWalkable(const Game* game, int x, int y) {
-    if (!game->map) return false;
-    if (x < 0 || x >= game->map->width || y < 0 || y >= game->map->height) return false;
-    if (game->blocking[y][x]) return false;
-    // Check if a monster occupies the tile
-    Monster* m = Monster_GetAt(x, y, NULL);
-    if (m && m->alive) return false;
-    return true;
-}
-
-// Return a pointer to the player Entity if they are at (x, y) and not excluded.
-// Monsters are NOT tracked via this function (they use Monster_GetAt instead).
-Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude) {
-    if (!exclude || !exclude->isPlayer) {
-        if (game->player.alive && game->player.x == x && game->player.y == y) {
-            return &game->player;
-        }
-    }
-    return NULL;
-}
-
-// Attempt to move an entity one step in the given direction.
-// If the target tile contains an enemy, the entity attacks instead.
-// The player also picks up healing items automatically when walking over them.
-// Returns true if the entity did something (moved or attacked).
-bool MoveEntity(Game* game, Entity* entity, Direction dir) {
-    if (!entity->alive) return false;
-
-    if (dir == DIR_LEFT)  entity->facingRight = false;
-    if (dir == DIR_RIGHT) entity->facingRight = true;
-
-    int newX = entity->x;
-    int newY = entity->y;
-
-    switch (dir) {
-        case DIR_UP:    newY--; break;
-        case DIR_DOWN:  newY++; break;
-        case DIR_LEFT:  newX--; break;
-        case DIR_RIGHT: newX++; break;
-        default: return false;
-    }
-
-    // Bounds check
-    if (newX < 0 || newX >= game->map->width ||
-        newY < 0 || newY >= game->map->height) return false;
-
-    // Check if there's an entity at the target (player vs player — rare)
-    Entity* target = GetEntityAt(game, newX, newY, entity);
-    if (target) {
-        int damage = entity->attack - target->defense;
-        if (damage < 1) damage = 1;
-        target->hp -= damage;
-        TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
-                 entity->name, target->name, damage, target->hp, target->maxHp);
-        if (target->hp <= 0) {
-            target->alive = false;
-            target->hp = 0;
-            TraceLog(LOG_INFO, "%s has been slain!", target->name);
-        }
-        return true;
-    }
-
-    // Player attacking a monster
-    if (entity->isPlayer) {
-        Monster* mon = Monster_GetAt(newX, newY, NULL);
-        if (mon && mon->alive) {
-            int damage = entity->attack - mon->defense;
-            if (damage < 1) damage = 1;
-            mon->hp -= damage;
-            entity->hitFlashTimer = 0.15f;
-            mon->hitFlashTimer = 0.15f;
-            TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
-                     entity->name, mon->name, damage, mon->hp, mon->maxHp);
-            if (mon->hp <= 0) {
-                mon->alive = false;
-                entity->expValue += mon->expValue;
-                TraceLog(LOG_INFO, "%s has been slain!", mon->name);
-            }
-            return true;
-        }
-    }
-
-    // Blocked by wall
-    if (game->blocking[newY][newX]) return false;
-
-    // Move
-    entity->prevX = entity->x;
-    entity->prevY = entity->y;
-    entity->x = newX;
-    entity->y = newY;
-
-    // Healing pickup (player only)
-    if (entity->isPlayer) {
-        for (int h = 0; h < game->healingCount; h++) {
-            if (!game->healingCollected[h] &&
-                game->healingTiles[h][0] == newX &&
-                game->healingTiles[h][1] == newY) {
-                game->healingCollected[h] = true;
-                int healAmt = 8;
-                game->player.hp += healAmt;
-                if (game->player.hp > game->player.maxHp)
-                    game->player.hp = game->player.maxHp;
-                TraceLog(LOG_INFO, "Picked up healing! HP: %d/%d",
-                         game->player.hp, game->player.maxHp);
-            }
-        }
-    }
-
-    return true;
-}
 
 // ---------------------------------------------------------------------------
 // Recursive shadowcasting FOV — currently unused
@@ -203,13 +89,16 @@ void HandleInput(Game* game) {
     else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) dir = DIR_RIGHT;
     else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
         game->turnCount++;
-        if (game->player.hp < game->player.maxHp) game->player.hp++;
+        if (game->player.ent.hp < game->player.ent.maxHp) {
+            game->player.ent.hp++;
+            CombatLog_Add(&game->combatLog, "Wait heals 1 HP");
+        }
         game->state = STATE_ENEMY_TURN;
         return;
     }
 
     if (dir != DIR_NONE) {
-        bool moved = MoveEntity(game, &game->player, dir);
+        bool moved = MoveEntity(game, &game->player.ent, dir);
         if (moved) {
             game->turnCount++;
             game->state = STATE_ENEMY_TURN;
@@ -223,9 +112,9 @@ void UpdateGame(Game* game) {
     if (!game) return;
 
     // Player flash timer countdown
-    if (game->player.hitFlashTimer > 0.0f) {
-        game->player.hitFlashTimer -= GetFrameTime();
-        if (game->player.hitFlashTimer < 0.0f) game->player.hitFlashTimer = 0.0f;
+    if (game->player.ent.hitFlashTimer > 0.0f) {
+        game->player.ent.hitFlashTimer -= GetFrameTime();
+        if (game->player.ent.hitFlashTimer < 0.0f) game->player.ent.hitFlashTimer = 0.0f;
     }
 
     Monster_UpdateAnimations(GetFrameTime());
@@ -236,13 +125,14 @@ void UpdateGame(Game* game) {
     if (game->state == STATE_ENEMY_TURN) {
         // Process all monster AI
         bool playerAlive = Monster_ProcessAllAI(
-            game->player.x, game->player.y, &game->player.hp, game->player.defense,
-            &game->player.hitFlashTimer,
-            game->blocking, game->map->width, game->map->height);
+            game->player.ent.x, game->player.ent.y, &game->player.ent.hp, game->player.ent.defense,
+            &game->player.ent.hitFlashTimer,
+            game->blocking, game->map->width, game->map->height,
+            &game->combatLog);
 
         if (!playerAlive) {
-            game->player.alive = false;
-            game->player.hp = 0;
+            game->player.ent.alive = false;
+            game->player.ent.hp = 0;
             game->state = STATE_GAME_OVER;
             return;
         }
@@ -255,23 +145,6 @@ void UpdateGame(Game* game) {
         // Switch back to player turn
         game->state = STATE_PLAYER_TURN;
     }
-}
-
-// Look up the GID at (x, y) on the given layer, compute the source
-// rectangle in the tileset, and draw it to screen.
-void DrawTile(const Game* game, int x, int y, int layerIndex) {
-    if (!game->map || !game->map->layers) return;
-
-    int gid = GetTileGID(game->map, layerIndex, x, y);
-    if (gid <= 0) return;
-
-    Rectangle src = GetTileSourceRect(game->map, gid);
-    if (src.width <= 0 || src.height <= 0) return;
-
-    Vector2 pos = TileToScreen(x, y, game->map->tileWidth, game->map->tileHeight);
-    Rectangle dest = { pos.x, pos.y, (float)game->map->tileWidth, (float)game->map->tileHeight };
-
-    DrawTexturePro(game->tilesetTexture, src, dest, (Vector2){0, 0}, 0, WHITE);
 }
 
 // Render all visible tiles, healing items, monsters, the player,
@@ -321,42 +194,89 @@ void RenderGame(const Game* game) {
     Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, -1.0f);
 
     // --- Player --------------------------------------------------------------
-    if (game->player.alive) {
-        float px = (float)(game->player.x * tw);
-        float py = (float)(game->player.y * th);
+    if (game->player.ent.alive) {
+        float px = (float)(game->player.ent.x * tw);
+        float py = (float)(game->player.ent.y * th);
 
-        int pad = tw / 6;
-        Color playerColor = (game->player.hitFlashTimer > 0.0f) ? WHITE : game->player.color;
-        DrawRectangle(px + pad, py + pad, tw - 2*pad, th - 2*pad, playerColor);
-
-        int cx = px + tw / 2;
-        int cy = py + th / 2;
-        DrawCircle(cx - 3, cy - 2, 2, WHITE);
-        DrawCircle(cx + 3, cy - 2, 2, WHITE);
-
-        // Simple mouth
-        if (game->player.facingRight) {
-            DrawCircle(cx + 5, cy + 4, 1, WHITE);
+        if (game->player.ent.spriteSheet.id > 0) {
+            int cellStride = 17; // 16px tile + 1px spacing
+            Rectangle src = {
+                (float)(game->player.ent.animFrame * cellStride),
+                (float)(game->player.ent.spriteRow * cellStride),
+                16.0f, 16.0f
+            };
+            Rectangle dest = { px, py, (float)tw, (float)th };
+            Color tint = (game->player.ent.hitFlashTimer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;
+            DrawTexturePro(game->player.ent.spriteSheet, src, dest, (Vector2){ 0, 0 }, 0, tint);
         } else {
-            DrawCircle(cx - 5, cy + 4, 1, WHITE);
+            // Fallback: coloured rectangle with face
+            int pad = tw / 6;
+            Color playerColor = (game->player.ent.hitFlashTimer > 0.0f) ? WHITE : game->player.ent.color;
+            DrawRectangle(px + pad, py + pad, tw - 2*pad, th - 2*pad, playerColor);
+
+            int cx = px + tw / 2;
+            int cy = py + th / 2;
+            DrawCircle(cx - 3, cy - 2, 2, WHITE);
+            DrawCircle(cx + 3, cy - 2, 2, WHITE);
+
+            if (game->player.ent.facingRight) {
+                DrawCircle(cx + 5, cy + 4, 1, WHITE);
+            } else {
+                DrawCircle(cx - 5, cy + 4, 1, WHITE);
+            }
         }
     }
 
     EndMode2D();
 
     // --- HUD (screen space) --------------------------------------------------
-    char turnText[64];
-    snprintf(turnText, sizeof(turnText), "Turn: %d", game->turnCount);
-    DrawText(turnText, 10, 10, 20, WHITE);
 
+    // Stats panel (bottom-left)
+    int panelX = 10;
+    int panelW = 260;
+    int barW = panelW - 20;
+    int barH = 16;
+    int textY = 0;
+
+    // Level
+    char levelText[64];
+    snprintf(levelText, sizeof(levelText), "Lv %d", game->player.ent.level);
+    int panelH = 100;
+    int panelY = GetScreenHeight() - 10 - panelH;
+    DrawRectangle(panelX - 4, panelY, panelW, panelH, (Color){ 0, 0, 0, 180 });
+    textY = panelY + 4;
+    DrawText(levelText, panelX, textY, 18, WHITE);
+
+    // HP bar
+    textY += 24;
+    float hpRatio = (float)game->player.ent.hp / (float)game->player.ent.maxHp;
+    if (hpRatio < 0) hpRatio = 0;
+    DrawRectangle(panelX, textY, barW, barH, (Color){ 60, 0, 0, 255 });
+    DrawRectangle(panelX, textY, (int)(barW * hpRatio), barH, RED);
     char hpText[64];
-    snprintf(hpText, sizeof(hpText), "HP: %d/%d", game->player.hp, game->player.maxHp);
-    DrawText(hpText, 10, 35, 20, WHITE);
+    snprintf(hpText, sizeof(hpText), "HP: %d/%d", game->player.ent.hp, game->player.ent.maxHp);
+    DrawText(hpText, panelX + 4, textY + 1, 14, WHITE);
 
-    char enemyText[64];
-    snprintf(enemyText, sizeof(enemyText), "Enemies: %d", Monster_GetAliveCount());
-    DrawText(enemyText, 10, 60, 20, WHITE);
+    // EXP bar
+    textY += barH + 6;
+    float expRatio = (float)game->player.exp / (float)game->player.expToNext;
+    if (expRatio < 0) expRatio = 0;
+    DrawRectangle(panelX, textY, barW, barH, (Color){ 0, 0, 60, 255 });
+    DrawRectangle(panelX, textY, (int)(barW * expRatio), barH, (Color){ 80, 80, 255, 255 });
+    char expText[64];
+    snprintf(expText, sizeof(expText), "EXP: %d/%d", game->player.exp, game->player.expToNext);
+    DrawText(expText, panelX + 4, textY + 1, 14, WHITE);
 
+    // Turn + enemies
+    textY += barH + 6;
+    char infoText[64];
+    snprintf(infoText, sizeof(infoText), "Turn: %d   Enemies: %d", game->turnCount, Monster_GetAliveCount());
+    DrawText(infoText, panelX, textY, 14, LIGHTGRAY);
+
+    // Combat log (bottom-right)
+    CombatLog_Render(&game->combatLog, GetScreenWidth() - 370, GetScreenHeight() - 10, 14, 18);
+
+    // State text (bottom center)
     const char* stateText = "";
     if (game->state == STATE_GAME_OVER) stateText = "GAME OVER - Press R to restart";
     else if (game->state == STATE_WIN) stateText = "YOU WIN! - Press R to restart";
@@ -413,10 +333,10 @@ static void SpawnEntitiesFromObjects(Game* game) {
         // --- Player spawn ----------------------------------------------------
         if (strcmp(obj->type, "player") == 0 || strcmp(obj->name, "player") == 0 ||
             strcmp(obj->type, "Player") == 0) {
-            game->player.x = tileX;
-            game->player.y = tileY;
-            game->player.prevX = tileX;
-            game->player.prevY = tileY;
+            game->player.ent.x = tileX;
+            game->player.ent.y = tileY;
+            game->player.ent.prevX = tileX;
+            game->player.ent.prevY = tileY;
             TraceLog(LOG_INFO, "Player spawned at (%d, %d)", tileX, tileY);
         }
         // --- Healing item ----------------------------------------------------
@@ -501,20 +421,31 @@ bool InitGame(Game* game, const char* tmxFile) {
     }
 
     // Initialize player defaults (overridden by map objects below)
-    game->player.x = 1;
-    game->player.y = 1;
-    game->player.prevX = 1;
-    game->player.prevY = 1;
-    strcpy(game->player.name, "Hero");
-    game->player.hp = 20;
-    game->player.maxHp = 20;
-    game->player.attack = 5;
-    game->player.defense = 1;
-    game->player.level = 1;
-    game->player.alive = true;
-    game->player.isPlayer = true;
-    game->player.facingRight = true;
-    game->player.color = (Color){ 50, 200, 255, 255 };
+    game->player.ent.x = 1;
+    game->player.ent.y = 1;
+    game->player.ent.prevX = 1;
+    game->player.ent.prevY = 1;
+    strcpy(game->player.ent.name, "Hero");
+    game->player.ent.hp = 20;
+    game->player.ent.maxHp = 20;
+    game->player.ent.attack = 5;
+    game->player.ent.defense = 1;
+    game->player.ent.level = 1;
+    game->player.ent.alive = true;
+    game->player.ent.isPlayer = true;
+    game->player.ent.facingRight = true;
+    game->player.ent.color = (Color){ 50, 200, 255, 255 };
+    game->player.ent.spriteRow = 6;
+
+    // Load player character spritesheet
+    game->player.ent.spriteSheet = LoadTexture("resources/roguelikeChar_transparent.png");
+    if (game->player.ent.spriteSheet.id == 0) {
+        TraceLog(LOG_WARNING, "Could not load player spritesheet, using fallback rendering");
+    }
+
+    // Player-specific fields (exp / leveling)
+    game->player.exp = 0;
+    game->player.expToNext = ExpForLevel(1);
 
     // Initialize monster templates (must be ready before spawning)
     Monster_InitTemplates();
@@ -545,8 +476,8 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     // Setup camera
     game->camera.target = (Vector2){
-        game->player.x * game->map->tileWidth  + game->map->tileWidth  / 2,
-        game->player.y * game->map->tileHeight + game->map->tileHeight / 2
+        game->player.ent.x * game->map->tileWidth  + game->map->tileWidth  / 2,
+        game->player.ent.y * game->map->tileHeight + game->map->tileHeight / 2
     };
     game->camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
     game->camera.rotation = 0;
@@ -563,6 +494,7 @@ void CleanupGame(Game* game) {
     Monster_UnloadSprites();
     Monster_ResetAll();
 
+    if (game->player.ent.spriteSheet.id > 0) UnloadTexture(game->player.ent.spriteSheet);
     if (game->tilesetTexture.id > 0) UnloadTexture(game->tilesetTexture);
     if (game->map) {
         UnloadTMX(game->map);

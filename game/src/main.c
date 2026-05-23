@@ -79,8 +79,8 @@ int main(void)
 
         // Centre the camera on the player's current tile
         game.camera.target = (Vector2){
-            game.player.x * game.map->tileWidth + game.map->tileWidth / 2,
-            game.player.y * game.map->tileHeight + game.map->tileHeight / 2
+            game.player.ent.x * game.map->tileWidth + game.map->tileWidth / 2,
+            game.player.ent.y * game.map->tileHeight + game.map->tileHeight / 2
         };
 
         // Clear screen and draw everything

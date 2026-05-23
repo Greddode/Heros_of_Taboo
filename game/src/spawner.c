@@ -21,8 +21,8 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
     int w = game->map->width;
     int h = game->map->height;
 
-    int px = game->player.x;
-    int py = game->player.y;
+    int px = game->player.ent.x;
+    int py = game->player.ent.y;
     int minDist = MIN_PLAYER_DIST * MIN_PLAYER_DIST;
 
     // Upper bound: each room is at most 10x10 = 100 tiles

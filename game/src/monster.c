@@ -248,7 +248,8 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
 bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
                            float* playerHitFlash,
                            const unsigned char blocking[][MAP_WIDTH],
-                           int mapWidth, int mapHeight) {
+                           int mapWidth, int mapHeight,
+                           CombatLog* combatLog) {
     for (int i = 0; i < s_monsterCount; i++) {
         Monster* m = &s_monsters[i];
         if (!m->alive || !m->active) continue;
@@ -292,6 +293,7 @@ bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDef
                     if (playerHitFlash) *playerHitFlash = 0.15f;
                     TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                              m->name, dmg, *playerHp);
+                    CombatLog_Add(combatLog, "%s hits you for %d!", m->name, dmg);
                     goto next_monster;  // skip movement — we attacked
                 }
 
