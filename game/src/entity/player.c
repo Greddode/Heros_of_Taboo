@@ -1,6 +1,6 @@
 #include "player.h"
-#include "game.h"
-#include "combat_log.h"
+#include "core/game.h"
+#include "ui/combat_log.h"
 #include <stdio.h>
 
 // Base experience needed: 20 + level * 10

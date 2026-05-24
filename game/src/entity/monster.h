@@ -2,7 +2,7 @@
 #define MONSTER_H
 
 #include "raylib.h"
-#include "game.h"
+#include "core/game.h"
 #include <stdbool.h>
 
 #define MAX_MONSTERS 64

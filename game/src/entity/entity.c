@@ -1,8 +1,9 @@
 #include "entity.h"
-#include "game.h"
+#include "core/game.h"
+#include "core/audio.h"
 #include "monster.h"
 #include "player.h"
-#include "combat_log.h"
+#include "ui/combat_log.h"
 #include <stdio.h>
 
 // Convert tile grid coordinates to pixel position (top-left corner of the tile)
@@ -60,6 +61,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
         int damage = entity->attack - target->defense;
         if (damage < 1) damage = 1;
         target->hp -= damage;
+        PlayHitSound();
         TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
                  entity->name, target->name, damage, target->hp, target->maxHp);
         CombatLog_Add(&game->combatLog, "%s hits %s for %d!", entity->name, target->name, damage);
@@ -79,6 +81,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
             int damage = entity->attack - mon->defense;
             if (damage < 1) damage = 1;
             mon->hp -= damage;
+            PlayHitSound();
             entity->hitFlashTimer = 0.15f;
             mon->hitFlashTimer = 0.15f;
             TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
@@ -117,6 +120,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                 TraceLog(LOG_INFO, "Picked up healing! HP: %d/%d",
                          game->player.ent.hp, game->player.ent.maxHp);
                 CombatLog_Add(&game->combatLog, "Healing restores %d HP!", healAmt);
+                PlayPickupSound();
             }
         }
     }

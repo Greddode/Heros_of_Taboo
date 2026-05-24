@@ -1,10 +1,10 @@
 #include "game.h"
-#include "entity.h"
-#include "player.h"
-#include "combat_log.h"
-#include "monster.h"
+#include "entity/entity.h"
+#include "entity/player.h"
+#include "ui/combat_log.h"
+#include "entity/monster.h"
 #include "procedural.h"
-#include "spawner.h"
+#include "entity/spawner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,6 +93,7 @@ void HandleInput(Game* game) {
             game->player.ent.hp++;
             CombatLog_Add(&game->combatLog, "Wait heals 1 HP");
         }
+        game->enemyTurnCooldown = 0.08f;
         game->state = STATE_ENEMY_TURN;
         return;
     }
@@ -101,6 +102,7 @@ void HandleInput(Game* game) {
         bool moved = MoveEntity(game, &game->player.ent, dir);
         if (moved) {
             game->turnCount++;
+            game->enemyTurnCooldown = 0.15f;
             game->state = STATE_ENEMY_TURN;
         }
     }
@@ -123,6 +125,12 @@ void UpdateGame(Game* game) {
 
     // --- Enemy turn -----------------------------------------------------------
     if (game->state == STATE_ENEMY_TURN) {
+        // Brief pause before monsters act so the player's hit sound plays first
+        if (game->enemyTurnCooldown > 0.0f) {
+            game->enemyTurnCooldown -= GetFrameTime();
+            return;
+        }
+
         // Process all monster AI
         bool playerAlive = Monster_ProcessAllAI(
             game->player.ent.x, game->player.ent.y, &game->player.ent.hp, game->player.ent.defense,
@@ -142,7 +150,6 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        // Switch back to player turn
         game->state = STATE_PLAYER_TURN;
     }
 }
@@ -466,6 +473,7 @@ bool InitGame(Game* game, const char* tmxFile) {
     // Game state
     game->state = STATE_PLAYER_TURN;
     game->turnCount = 0;
+    game->enemyTurnCooldown = 0.0f;
 
     // Full visibility (no fog of war)
     for (int y = 0; y < game->map->height; y++) {

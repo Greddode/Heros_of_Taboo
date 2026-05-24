@@ -1,7 +1,18 @@
 #include "raylib.h"
-#include "game.h"
+#include "core/game.h"
+#include "core/audio.h"
+#include "ui/menu.h"
 #include <string.h>
 #include <time.h>
+
+typedef enum {
+    SCENE_MENU,
+    SCENE_SETTINGS,
+    SCENE_CONTROLS,
+    SCENE_CREDITS,
+    SCENE_GAME,
+    SCENE_EXIT
+} Scene;
 
 int main(void)
 {
@@ -9,90 +20,188 @@ int main(void)
     const int screenHeight = 768;
 
     InitWindow(screenWidth, screenHeight, "Heros of Taboo - Roguelike");
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
+    SetWindowMinSize(screenWidth, screenHeight);
     SetTargetFPS(60);
-    SetExitKey(KEY_ESCAPE);
+    SetExitKey(KEY_NULL);
 
-    // Seed the RNG with current time for varied runs
     SetRandomSeed((unsigned int)time(NULL));
 
+    InitAudioSystem();
+
+    Scene scene = SCENE_MENU;
     Game game;
-    bool gameLoaded = false;
+    bool gameMenuOpen = false;
+    bool settingsMenuOpen = false;
+    bool prevEscDown = false;
+    bool prevRDown = false;
 
-    // --- Map loading: try TMX files first, then fall back to procedural generation ---
-    const char* mapFiles[] = {
-        "resources/map.tmx",
-        "resources/map.TMX",
-        "../resources/map.tmx",
-        "./map.tmx",
-        "map.tmx"
-    };
-
-    int numMaps = sizeof(mapFiles) / sizeof(mapFiles[0]);
-    for (int i = 0; i < numMaps; i++) {
-        if (FileExists(mapFiles[i])) {
-            TraceLog(LOG_INFO, "Found map: %s", mapFiles[i]);
-            gameLoaded = InitGame(&game, mapFiles[i]);
-            if (gameLoaded) break;
-        }
-    }
-
-    // Fallback: no TMX found, generate a dungeon procedurally
-    if (!gameLoaded) {
-        TraceLog(LOG_WARNING, "No TMX map found. Generating procedural map...");
-        gameLoaded = InitGame(&game, "resources/");
-    }
-
-    // If everything failed, show an error screen and exit
-    if (!gameLoaded) {
-        TraceLog(LOG_ERROR, "Could not initialize game.");
-        while (!WindowShouldClose())
-        {
-            BeginDrawing();
-            ClearBackground(BLACK);
-            DrawText("Failed to initialize game!", 200, 200, 20, RED);
-            DrawText("Press ESC to exit", 200, 500, 20, GRAY);
-            EndDrawing();
-        }
-        CloseWindow();
-        return 0;
-    }
-
-    // --- Main game loop: input → update → render ---
-    while (!WindowShouldClose())
+    while (!WindowShouldClose() && scene != SCENE_EXIT)
     {
-        // Press R to restart from scratch
-        if (IsKeyPressed(KEY_R)) {
-            CleanupGame(&game);
-            const char* mapFile = "resources/map.tmx";
-            if (!FileExists(mapFile)) mapFile = "../resources/map.tmx";
-            if (!FileExists(mapFile)) mapFile = "map.tmx";
-            if (!FileExists(mapFile)) mapFile = "resources/";
-            gameLoaded = InitGame(&game, mapFile);
-            if (!gameLoaded) break;
+        UpdateMusicSystem(scene == SCENE_GAME);
+
+        switch (scene)
+        {
+            // =================================================================
+            case SCENE_MENU:
+            {
+                MenuAction action = Menu_Update();
+                if (action == MENU_PLAY) {
+                    const char* mapFiles[] = {
+                        "resources/map.tmx", "resources/map.TMX",
+                        "../resources/map.tmx", "./map.tmx", "map.tmx"
+                    };
+                    bool loaded = false;
+                    for (int i = 0; i < 5; i++) {
+                        if (FileExists(mapFiles[i])) {
+                            loaded = InitGame(&game, mapFiles[i]);
+                            if (loaded) break;
+                        }
+                    }
+                    if (!loaded) loaded = InitGame(&game, "resources/");
+                    if (loaded) {
+                        gameMenuOpen = false;
+                        settingsMenuOpen = false;
+                        prevEscDown = false;
+                        prevRDown = false;
+                        scene = SCENE_GAME;
+                    }
+                } else if (action == MENU_SETTINGS) {
+                    Menu_ResetSettings();
+                    scene = SCENE_SETTINGS;
+                } else if (action == MENU_CONTROLS) {
+                    scene = SCENE_CONTROLS;
+                } else if (action == MENU_CREDITS) {
+                    scene = SCENE_CREDITS;
+                } else if (action == MENU_EXIT) {
+                    scene = SCENE_EXIT;
+                }
+
+                BeginDrawing();
+                Menu_Render();
+                EndDrawing();
+                break;
+            }
+
+            // =================================================================
+            case SCENE_SETTINGS:
+            {
+                BeginDrawing();
+                Menu_SettingsRender();
+                EndDrawing();
+                if (Menu_SettingsUpdate() == MENU_PLAY) scene = SCENE_MENU;
+                break;
+            }
+
+            // =================================================================
+            case SCENE_CONTROLS:
+            {
+                BeginDrawing();
+                Menu_ControlsRender();
+                EndDrawing();
+                if (Menu_ControlsUpdate() == MENU_PLAY) scene = SCENE_MENU;
+                break;
+            }
+
+            // =================================================================
+            case SCENE_CREDITS:
+            {
+                BeginDrawing();
+                Menu_CreditsRender();
+                EndDrawing();
+                if (Menu_CreditsUpdate() == MENU_PLAY) scene = SCENE_MENU;
+                break;
+            }
+
+            // =================================================================
+            case SCENE_GAME:
+            {
+                Scene nextScene = SCENE_GAME;
+                bool restartGame = false;
+
+                // ESC rising-edge
+                bool escDown = IsKeyDown(KEY_ESCAPE);
+                bool escPressed = escDown && !prevEscDown;
+                prevEscDown = escDown;
+
+                if (escPressed) {
+                    if (settingsMenuOpen) {
+                        settingsMenuOpen = false;
+                    } else if (gameMenuOpen) {
+                        gameMenuOpen = false;
+                    } else if (game.state == STATE_GAME_OVER || game.state == STATE_WIN) {
+                        nextScene = SCENE_MENU;
+                    } else {
+                        gameMenuOpen = true;
+                    }
+                }
+
+                if (settingsMenuOpen) {
+                    Menu_SettingsUpdateGame();
+                } else if (gameMenuOpen) {
+                    MenuAction gmAction = GameMenu_Update();
+                    if (gmAction == MENU_SETTINGS) { settingsMenuOpen = true; Menu_ResetSettings(); }
+                    if (gmAction == MENU_PLAY) nextScene = SCENE_MENU;
+                    if (gmAction == MENU_EXIT) nextScene = SCENE_EXIT;
+                } else {
+                    // R rising-edge
+                    bool rDown = IsKeyDown(KEY_R);
+                    if (rDown && !prevRDown) {
+                        prevRDown = rDown;
+                        restartGame = true;
+                    } else {
+                        prevRDown = rDown;
+                    }
+
+                    if (!restartGame) {
+                        HandleInput(&game);
+                        UpdateGame(&game);
+
+                        game.camera.target = (Vector2){
+                            game.player.ent.x * game.map->tileWidth + game.map->tileWidth / 2,
+                            game.player.ent.y * game.map->tileHeight + game.map->tileHeight / 2
+                        };
+                    }
+                }
+
+                // Update camera offset every frame for window resize support
+                game.camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
+
+                // Always draw the frame before handling scene transitions
+                BeginDrawing();
+                ClearBackground(BLACK);
+                RenderGame(&game);
+                if (settingsMenuOpen) {
+                    Menu_SettingsRenderGame();
+                } else if (gameMenuOpen) {
+                    GameMenu_Render();
+                }
+                EndDrawing();
+
+                // Now handle deferred scene transitions (after EndDrawing)
+                if (restartGame) {
+                    CleanupGame(&game);
+                    const char* mapFile = "resources/map.tmx";
+                    if (!FileExists(mapFile)) mapFile = "../resources/map.tmx";
+                    if (!FileExists(mapFile)) mapFile = "map.tmx";
+                    if (!FileExists(mapFile)) mapFile = "resources/";
+                    if (!InitGame(&game, mapFile)) gameMenuOpen = false;
+                }
+                if (nextScene != SCENE_GAME) {
+                    CleanupGame(&game);
+                    Menu_Reset();
+                    scene = nextScene;
+                }
+                break;
+            }
+
+            default:
+                break;
         }
-
-        // Read player input and move the player (only during player turn)
-        HandleInput(&game);
-
-        // Run monster AI and advance animation timers
-        UpdateGame(&game);
-
-        // Centre the camera on the player's current tile
-        game.camera.target = (Vector2){
-            game.player.ent.x * game.map->tileWidth + game.map->tileWidth / 2,
-            game.player.ent.y * game.map->tileHeight + game.map->tileHeight / 2
-        };
-
-        // Clear screen and draw everything
-        BeginDrawing();
-            ClearBackground(BLACK);
-            RenderGame(&game);
-        EndDrawing();
     }
 
-    // --- Clean shutdown ---
     CleanupGame(&game);
+    ShutdownAudioSystem();
     CloseWindow();
-
     return 0;
 }

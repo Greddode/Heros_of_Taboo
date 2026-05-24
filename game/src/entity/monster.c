@@ -1,5 +1,6 @@
 #include "monster.h"
-#include "game.h"
+#include "core/game.h"
+#include "core/audio.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -289,6 +290,7 @@ bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDef
                     if (dmg < 1) dmg = 1;
                     *playerHp -= dmg;
                     if (*playerHp < 0) *playerHp = 0;
+                    PlayHitSound();
                     m->hitFlashTimer = 0.15f;
                     if (playerHitFlash) *playerHitFlash = 0.15f;
                     TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",

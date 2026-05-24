@@ -1,7 +1,7 @@
 #ifndef PROCEDURAL_H
 #define PROCEDURAL_H
 
-#include "tmx.h"
+#include "tmx/tmx.h"
 
 // Tile GID constants — these match specific tiles in the gray tileset.
 // Each defines a wall orientation or floor type.

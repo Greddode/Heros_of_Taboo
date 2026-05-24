@@ -1,8 +1,8 @@
 #ifndef SPAWNER_H
 #define SPAWNER_H
 
-#include "game.h"
-#include "procedural.h"
+#include "core/game.h"
+#include "core/procedural.h"
 
 // Populate dungeon rooms with monsters and healing items.
 // Uses room data from procedural generation to place enemies and pickups

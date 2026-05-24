@@ -2,10 +2,10 @@
 #define GAME_H
 
 #include "raylib.h"
-#include "tmx.h"
-#include "entity.h"
-#include "player.h"
-#include "combat_log.h"
+#include "tmx/tmx.h"
+#include "entity/entity.h"
+#include "entity/player.h"
+#include "ui/combat_log.h"
 #include <stdbool.h>
 
 #define MAX_HEALING 32
@@ -40,6 +40,8 @@ typedef struct Game {
     int healingCount;
     int healingTiles[MAX_HEALING][2];
     bool healingCollected[MAX_HEALING];
+
+    float enemyTurnCooldown;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);
