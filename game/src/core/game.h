@@ -11,6 +11,7 @@
 #define MAX_HEALING 32
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
+#define MOVE_ANIM_DURATION 0.15f
 
 // Turn / state machine
 typedef enum {
@@ -42,6 +43,8 @@ typedef struct Game {
     bool healingCollected[MAX_HEALING];
 
     float enemyTurnCooldown;
+    float animTimer;
+    float monsterAnimTimer;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);
