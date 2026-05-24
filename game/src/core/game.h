@@ -12,6 +12,7 @@
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
 #define MOVE_ANIM_DURATION 0.15f
+#define FOG_RADIUS 7
 
 // Turn / state machine
 typedef enum {

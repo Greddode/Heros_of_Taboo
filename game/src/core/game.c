@@ -9,70 +9,30 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ---------------------------------------------------------------------------
-// Recursive shadowcasting FOV — currently unused
-// (all tiles are set to visible in InitGame instead)
-// ---------------------------------------------------------------------------
-static void CastLight(Game* game, int cx, int cy, int radius, int row,
-                      float startSlope, float endSlope,
-                      int xx, int xy, int yx, int yy) {
-    if (startSlope < endSlope) return;
-
-    for (int j = row; j <= radius; j++) {
-        bool blocked = false;
-        for (int i = -j; i <= 0; i++) {
-            int x = cx + i * xx + j * xy;
-            int y = cy + i * yx + j * yy;
-
-            float leftSlope  = (float)(i - 0.5f) / (float)(j + 0.5f);
-            float rightSlope = (float)(i + 0.5f) / (float)(j - 0.5f);
-
-            if (x < 0 || x >= game->map->width ||
-                y < 0 || y >= game->map->height) continue;
-            if ((float)(i * i + j * j) > (float)(radius * radius)) continue;
-
-            if (startSlope < rightSlope) continue;
-            if (endSlope > leftSlope) break;
-
-            if (game->visibility[y][x] == 0) game->visibility[y][x] = 1;
-
-            if (blocked) {
-                if (game->blocking[y][x]) { blocked = true; }
-                else { blocked = false; startSlope = rightSlope; }
-            } else if (game->blocking[y][x] && j < radius) {
-                blocked = true;
-                CastLight(game, cx, cy, radius, j + 1,
-                          startSlope, leftSlope, xx, xy, yx, yy);
-                startSlope = rightSlope;
-            }
-        }
-        if (blocked) break;
-    }
-}
-
-void ComputeFOV(Game* game, int px, int py, int radius) {
-    if (!game) return;
+// Simple circular radius reveal: all tiles within FOG_RADIUS are lit.
+// Previously-seen tiles are dimmed. Walls do not block sight.
+static void RevealFOW(Game* game) {
+    int px = game->player.ent.x;
+    int py = game->player.ent.y;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
-            if (game->visibility[y][x] == 1) game->visibility[y][x] = 2;
+            if (game->visibility[y][x] == 1)
+                game->visibility[y][x] = 2;
         }
     }
 
-    if (px >= 0 && px < game->map->width &&
-        py >= 0 && py < game->map->height) {
-        game->visibility[py][px] = 1;
+    int r2 = FOG_RADIUS * FOG_RADIUS;
+    for (int dy = -FOG_RADIUS; dy <= FOG_RADIUS; dy++) {
+        int ny = py + dy;
+        if (ny < 0 || ny >= game->map->height) continue;
+        for (int dx = -FOG_RADIUS; dx <= FOG_RADIUS; dx++) {
+            int nx = px + dx;
+            if (nx < 0 || nx >= game->map->width) continue;
+            if (dx * dx + dy * dy <= r2)
+                game->visibility[ny][nx] = 1;
+        }
     }
-
-    int cx = px, cy = py;
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  1, 0, 0, 1);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0, 1, 1, 0);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f, -1, 0, 0, 1);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0,-1, 1, 0);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f, -1, 0, 0,-1);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0,-1,-1, 0);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  1, 0, 0,-1);
-    CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0, 1,-1, 0);
 }
 
 // Read directional keys (arrow keys / WASD) and pass them to MoveEntity.
@@ -105,8 +65,10 @@ void HandleInput(Game* game) {
         if (moved) {
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
-            if (game->player.ent.x != oldX || game->player.ent.y != oldY)
+            if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
                 game->animTimer = MOVE_ANIM_DURATION;
+                RevealFOW(game);
+            }
             game->state = STATE_ENEMY_TURN;
         }
     }
@@ -496,12 +458,13 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->animTimer = 0.0f;
     game->monsterAnimTimer = 0.0f;
 
-    // Full visibility (no fog of war)
+    // Fog of war: start unexplored, reveal starting area
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
-            game->visibility[y][x] = 1;
+            game->visibility[y][x] = 0;
         }
     }
+    RevealFOW(game);
 
     // Setup camera
     game->camera.target = (Vector2){
