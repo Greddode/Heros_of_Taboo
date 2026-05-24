@@ -157,9 +157,14 @@ int main(void)
                         HandleInput(&game);
                         UpdateGame(&game);
 
+                        float t = (game.animTimer <= 0.0f) ? 1.0f : 1.0f - (game.animTimer / MOVE_ANIM_DURATION);
+                        float prevCX = (float)(game.player.ent.prevX * game.map->tileWidth);
+                        float curCX  = (float)(game.player.ent.x * game.map->tileWidth);
+                        float prevCY = (float)(game.player.ent.prevY * game.map->tileHeight);
+                        float curCY  = (float)(game.player.ent.y * game.map->tileHeight);
                         game.camera.target = (Vector2){
-                            game.player.ent.x * game.map->tileWidth + game.map->tileWidth / 2,
-                            game.player.ent.y * game.map->tileHeight + game.map->tileHeight / 2
+                            prevCX * (1.0f - t) + curCX * t + game.map->tileWidth / 2,
+                            prevCY * (1.0f - t) + curCY * t + game.map->tileHeight / 2
                         };
                     }
                 }

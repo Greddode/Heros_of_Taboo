@@ -99,10 +99,14 @@ void HandleInput(Game* game) {
     }
 
     if (dir != DIR_NONE) {
+        int oldX = game->player.ent.x;
+        int oldY = game->player.ent.y;
         bool moved = MoveEntity(game, &game->player.ent, dir);
         if (moved) {
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
+            if (game->player.ent.x != oldX || game->player.ent.y != oldY)
+                game->animTimer = MOVE_ANIM_DURATION;
             game->state = STATE_ENEMY_TURN;
         }
     }
@@ -112,6 +116,16 @@ void HandleInput(Game* game) {
 // and check win / loss conditions.
 void UpdateGame(Game* game) {
     if (!game) return;
+
+    // Decrement animation timers unconditionally
+    if (game->animTimer > 0.0f) {
+        game->animTimer -= GetFrameTime();
+        if (game->animTimer < 0.0f) game->animTimer = 0.0f;
+    }
+    if (game->monsterAnimTimer > 0.0f) {
+        game->monsterAnimTimer -= GetFrameTime();
+        if (game->monsterAnimTimer < 0.0f) game->monsterAnimTimer = 0.0f;
+    }
 
     // Player flash timer countdown
     if (game->player.ent.hitFlashTimer > 0.0f) {
@@ -150,6 +164,7 @@ void UpdateGame(Game* game) {
             return;
         }
 
+        game->monsterAnimTimer = MOVE_ANIM_DURATION;
         game->state = STATE_PLAYER_TURN;
     }
 }
@@ -197,13 +212,17 @@ void RenderGame(const Game* game) {
         DrawRectangle(hpos.x + pad, hpos.y + th/2 - 2, tw - 2*pad, 4, healColor);
     }
 
+    // --- Interpolation factors ------------------------------------------------
+    float playerT = (game->animTimer <= 0.0f) ? 1.0f : 1.0f - (game->animTimer / MOVE_ANIM_DURATION);
+    float monsterT = (game->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (game->monsterAnimTimer / MOVE_ANIM_DURATION);
+
     // --- Monsters ------------------------------------------------------------
-    Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, -1.0f);
+    Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, monsterT);
 
     // --- Player --------------------------------------------------------------
     if (game->player.ent.alive) {
-        float px = (float)(game->player.ent.x * tw);
-        float py = (float)(game->player.ent.y * th);
+        float px = (float)(game->player.ent.prevX * tw) * (1.0f - playerT) + (float)(game->player.ent.x * tw) * playerT;
+        float py = (float)(game->player.ent.prevY * th) * (1.0f - playerT) + (float)(game->player.ent.y * th) * playerT;
 
         if (game->player.ent.spriteSheet.id > 0) {
             int cellStride = 17; // 16px tile + 1px spacing
@@ -474,6 +493,8 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->state = STATE_PLAYER_TURN;
     game->turnCount = 0;
     game->enemyTurnCooldown = 0.0f;
+    game->animTimer = 0.0f;
+    game->monsterAnimTimer = 0.0f;
 
     // Full visibility (no fog of war)
     for (int y = 0; y < game->map->height; y++) {
