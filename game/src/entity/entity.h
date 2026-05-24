@@ -17,19 +17,19 @@ typedef enum {
 typedef struct {
     char name[32];
     int x, y;              // Current tile position
-    int prevX, prevY;      // Previous tile position (for smooth interpolation)
+    int prevX, prevY;      // Previous tile position (smooth interpolation)
     int hp, maxHp;
     int attack, defense;
     int level;
     int expValue;
     bool alive;
-    bool isPlayer;         // True for the player entity
+    bool isPlayer;
     Color color;
     bool facingRight;
-    int animFrame;         // Animation frame index (currently unused)
-    float hitFlashTimer;   // >0 when entity was just hit (draws white flash)
+    int animFrame;         // Animation frame index (spritesheet row offset)
+    float hitFlashTimer;   // >0 when entity was just hit (white flash)
     Texture2D spriteSheet; // Character spritesheet (player only)
-    int spriteRow;         // Which row in the spritesheet to draw from
+    int spriteRow;         // Row index in the spritesheet
 } Entity;
 
 // Forward declaration so entity functions can accept Game* without circular includes

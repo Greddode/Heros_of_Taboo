@@ -22,7 +22,7 @@ typedef enum {
     STATE_WIN
 } GameState;
 
-// Top-level game state (named struct so entity.h/player.h can forward-declare it)
+// Top-level game state
 typedef struct Game {
     MapData* map;
     Texture2D tilesetTexture;
@@ -34,8 +34,8 @@ typedef struct Game {
 
     Camera2D camera;
 
-    unsigned char visibility[MAP_HEIGHT][MAP_WIDTH];
-    unsigned char blocking[MAP_HEIGHT][MAP_WIDTH];
+    unsigned char visibility[MAP_HEIGHT][MAP_WIDTH]; // 0=unseen, 1=visible, 2=explored
+    unsigned char blocking[MAP_HEIGHT][MAP_WIDTH];   // 1=wall, 0=walkable
 
     CombatLog combatLog;
 
@@ -53,6 +53,5 @@ void CleanupGame(Game* game);
 void HandleInput(Game* game);
 void UpdateGame(Game* game);
 void RenderGame(const Game* game);
-void ComputeFOV(Game* game, int px, int py, int radius);
 
 #endif
