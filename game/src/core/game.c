@@ -75,6 +75,32 @@ void ComputeFOV(Game* game, int px, int py, int radius) {
     CastLight(game, cx, cy, radius, 1, 1.0f, 0.0f,  0, 1,-1, 0);
 }
 
+// Simple circular radius reveal: all tiles within FOG_RADIUS are lit.
+// Previously-seen tiles are dimmed. Walls do not block sight.
+static void RevealFOW(Game* game) {
+    int px = game->player.ent.x;
+    int py = game->player.ent.y;
+
+    for (int y = 0; y < game->map->height; y++) {
+        for (int x = 0; x < game->map->width; x++) {
+            if (game->visibility[y][x] == 1)
+                game->visibility[y][x] = 2;
+        }
+    }
+
+    int r2 = FOG_RADIUS * FOG_RADIUS;
+    for (int dy = -FOG_RADIUS; dy <= FOG_RADIUS; dy++) {
+        int ny = py + dy;
+        if (ny < 0 || ny >= game->map->height) continue;
+        for (int dx = -FOG_RADIUS; dx <= FOG_RADIUS; dx++) {
+            int nx = px + dx;
+            if (nx < 0 || nx >= game->map->width) continue;
+            if (dx * dx + dy * dy <= r2)
+                game->visibility[ny][nx] = 1;
+        }
+    }
+}
+
 // Read directional keys (arrow keys / WASD) and pass them to MoveEntity.
 // Period/space waits a turn, restoring 1 HP.
 // After any action, control passes to the enemy turn.
@@ -105,8 +131,10 @@ void HandleInput(Game* game) {
         if (moved) {
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
-            if (game->player.ent.x != oldX || game->player.ent.y != oldY)
+            if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
                 game->animTimer = MOVE_ANIM_DURATION;
+                RevealFOW(game);
+            }
             game->state = STATE_ENEMY_TURN;
         }
     }
@@ -496,12 +524,13 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->animTimer = 0.0f;
     game->monsterAnimTimer = 0.0f;
 
-    // Full visibility (no fog of war)
+    // Fog of war: start unexplored, reveal starting area
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
-            game->visibility[y][x] = 1;
+            game->visibility[y][x] = 0;
         }
     }
+    RevealFOW(game);
 
     // Setup camera
     game->camera.target = (Vector2){
