@@ -1,0 +1,87 @@
+<h1>Heroes of Taboo — A Roguelike Adventure</h1>
+
+<p><em>Current Version: ALPHA-0.0.4 (Music Update)</em></p>
+
+<p>Turn-based roguelike dungeon crawler built with C and raylib. Descend into procedurally generated dungeons, battle monsters, level up, and try to survive.</p>
+
+<hr>
+
+<h2>Gameplay</h2>
+
+<p>Each turn you move, attack, or wait. Enemies act after you. Clear every monster in the dungeon to win — die and it's game over.</p>
+
+<ul>
+  <li><strong>Move / Attack:</strong> Arrow keys or WASD</li>
+  <li><strong>Wait (rest 1 HP):</strong> Period (<code>.</code>) or Space</li>
+  <li><strong>Pause / Menu:</strong> Escape</li>
+  <li><strong>Restart:</strong> R</li>
+</ul>
+
+<h2>Features</h2>
+
+<ul>
+  <li><strong>Procedural Dungeons</strong> — Branching corridors and rooms, every run is different</li>
+  <li><strong>3 Monster Types</strong> — Floating Eye, Fungal Myconid, and Ogre, each with unique stats and animated sprites</li>
+  <li><strong>Line-of-Sight AI</strong> — Monsters detect, chase, and attack using Bresenham pathfinding</li>
+  <li><strong>Leveling System</strong> — Gain EXP from kills, level up with +5 HP, +1 ATK, +1 DEF</li>
+  <li><strong>Fog of War</strong> — 7-tile circular visibility radius, dimmed previously-seen areas</li>
+  <li><strong>Healing Pickups</strong> — Green cross items restore 8 HP, placed in larger rooms</li>
+  <li><strong>Combat Log</strong> — On-screen log of all combat events</li>
+  <li><strong>Smooth Movement</strong> — Interpolated tile-to-tile animations (0.15s)</li>
+  <li><strong>Dynamic Camera</strong> — Follows the player with 4x zoom</li>
+  <li><strong>Resizable Window</strong> — 1024x768 minimum</li>
+</ul>
+
+<h2>Audio</h2>
+
+<ul>
+  <li><strong>5 Game Music Tracks</strong> — Randomly shuffled, seamless transitions (OGG)</li>
+  <li><strong>Menu Music</strong> — Dedicated track on the main menu</li>
+  <li><strong>Sound Effects</strong> — 10 hit sounds, 4 pickup sounds</li>
+  <li><strong>Volume Controls</strong> — Independent music and SFX sliders</li>
+</ul>
+
+<h2>Monsters</h2>
+
+<table>
+  <tr>
+    <th>Monster</th><th>HP</th><th>ATK</th><th>DEF</th><th>EXP</th><th>Spawn Rate</th>
+  </tr>
+  <tr>
+    <td>Floating Eye</td><td>6</td><td>3</td><td>0</td><td>5</td><td>40%</td>
+  </tr>
+  <tr>
+    <td>Fungal Myconid</td><td>10</td><td>4</td><td>1</td><td>10</td><td>35%</td>
+  </tr>
+  <tr>
+    <td>Ogre</td><td>20</td><td>4</td><td>1</td><td>25</td><td>25%</td>
+  </tr>
+</table>
+
+<h2>Controls</h2>
+
+<table>
+  <tr><th>Action</th><th>Key</th></tr>
+  <tr><td>Move / Attack Up</td><td>Up Arrow / W</td></tr>
+  <tr><td>Move / Attack Down</td><td>Down Arrow / S</td></tr>
+  <tr><td>Move / Attack Left</td><td>Left Arrow / A</td></tr>
+  <tr><td>Move / Attack Right</td><td>Right Arrow / D</td></tr>
+  <tr><td>Wait (rest 1 HP)</td><td>Period (.) / Space</td></tr>
+  <tr><td>Pause / Game Menu</td><td>Escape</td></tr>
+  <tr><td>Restart</td><td>R</td></tr>
+</table>
+
+<h2>Credits</h2>
+
+<p>
+  <strong>Development:</strong> Greddode<br>
+  <strong>Tileset:</strong> Artisan Of Artifacts — VelmoraRealms<br>
+  <strong>Player Sprite:</strong> Kenney<br>
+  <strong>Music:</strong> Tallbeard Studios<br>
+  <strong>Sound Effects:</strong> Dabolka<br>
+  <strong>Engine:</strong> raylib
+</p>
+
+<hr>
+
+<p><em>Built with C17 and raylib. Cross-platform (Windows, Linux, macOS).</em></p>

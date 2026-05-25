@@ -19,7 +19,7 @@ int main(void)
     const int screenWidth = 1024;
     const int screenHeight = 768;
 
-    InitWindow(screenWidth, screenHeight, "Heros of Taboo - Roguelike");
+    InitWindow(screenWidth, screenHeight, "Heroes of Taboo - Roguelike");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetWindowMinSize(screenWidth, screenHeight);
     SetTargetFPS(60);

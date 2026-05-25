@@ -54,7 +54,7 @@ void Menu_Render(void) {
 
     ClearBackground((Color){ 15, 15, 25, 255 });
 
-    const char* title = "Heros of Taboo";
+    const char* title = "Heroes of Taboo";
     int titleW = MeasureText(title, 60);
     DrawText(title, (sw - titleW) / 2, sh / 4, 60, (Color){ 200, 180, 50, 255 });
 
