@@ -35,7 +35,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
 
         for (int y = rooms[r].y; y < rooms[r].y + rooms[r].h; y++)
             for (int x = rooms[r].x; x < rooms[r].x + rooms[r].w; x++)
-                if (tiles[y * w + x] == TILE_FLOOR && floorCount < ROOM_MAX_FLOORS)
+                if (IsFloorGID(tiles[y * w + x]) && floorCount < ROOM_MAX_FLOORS)
                     floorTiles[floorCount++] = y * w + x;
 
         if (floorCount < 4) continue;

@@ -366,8 +366,8 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     BuildBlockingMap(game);
 
-    // Try to load tileset texture
-    if (game->map->tilesetCount > 0) {
+    // Try to load all tileset textures
+    for (int t = 0; t < game->map->tilesetCount; t++) {
         char imgPath[512] = {0};
         if (tmxFile) {
             const char* lastSlash = strrchr(tmxFile, '/');
@@ -375,36 +375,38 @@ bool InitGame(Game* game, const char* tmxFile) {
             const char* sep = (lastSlash > lastBackslash) ? lastSlash : lastBackslash;
             if (sep) {
                 int dirLen = (int)(sep - tmxFile) + 1;
-                snprintf(imgPath, sizeof(imgPath), "%.*s%s", dirLen, tmxFile, game->map->tilesets[0].imageSource);
+                snprintf(imgPath, sizeof(imgPath), "%.*s%s", dirLen, tmxFile, game->map->tilesets[t].imageSource);
             } else {
-                snprintf(imgPath, sizeof(imgPath), "%s", game->map->tilesets[0].imageSource);
+                snprintf(imgPath, sizeof(imgPath), "%s", game->map->tilesets[t].imageSource);
             }
         }
         if (imgPath[0] == '\0' || !FileExists(imgPath)) {
-            snprintf(imgPath, sizeof(imgPath), "resources/%s", game->map->tilesets[0].imageSource);
+            snprintf(imgPath, sizeof(imgPath), "resources/%s", game->map->tilesets[t].imageSource);
         }
 
-        TraceLog(LOG_INFO, "Loading tileset image: %s", imgPath);
-        game->tilesetTexture = LoadTexture(imgPath);
+        TraceLog(LOG_INFO, "Loading tileset texture [%d]: %s", t, imgPath);
+        game->tilesetTextures[t] = LoadTexture(imgPath);
 
-        if (game->tilesetTexture.id == 0) {
+        if (game->tilesetTextures[t].id == 0) {
             TraceLog(LOG_WARNING, "Could not load tileset texture: %s", imgPath);
-            Image img = GenImageColor(game->map->tileWidth * 8, game->map->tileHeight * 8,
-                                      (Color){ 100, 100, 100, 255 });
-            for (int x = 0; x < 8; x++) {
-                for (int y = 0; y < 8; y++) {
-                    Color c = ((x + y) % 2 == 0)
-                        ? (Color){ 120, 120, 120, 255 }
-                        : (Color){ 80, 80, 80, 255 };
-                    ImageDrawRectangle(&img, x * game->map->tileWidth, y * game->map->tileHeight,
-                                       game->map->tileWidth - 1, game->map->tileHeight - 1, c);
+            if (t == 0) {
+                Image img = GenImageColor(game->map->tileWidth * 8, game->map->tileHeight * 8,
+                                          (Color){ 100, 100, 100, 255 });
+                for (int x = 0; x < 8; x++) {
+                    for (int y = 0; y < 8; y++) {
+                        Color c = ((x + y) % 2 == 0)
+                            ? (Color){ 120, 120, 120, 255 }
+                            : (Color){ 80, 80, 80, 255 };
+                        ImageDrawRectangle(&img, x * game->map->tileWidth, y * game->map->tileHeight,
+                                           game->map->tileWidth - 1, game->map->tileHeight - 1, c);
+                    }
                 }
+                game->tilesetTextures[t] = LoadTextureFromImage(img);
+                UnloadImage(img);
+                game->map->tilesets[0].columns = 8;
+                game->map->tilesets[0].imageWidth  = game->map->tileWidth * 8;
+                game->map->tilesets[0].imageHeight = game->map->tileHeight * 8;
             }
-            game->tilesetTexture = LoadTextureFromImage(img);
-            UnloadImage(img);
-            game->map->tilesets[0].columns = 8;
-            game->map->tilesets[0].imageWidth  = game->map->tileWidth * 8;
-            game->map->tilesets[0].imageHeight = game->map->tileHeight * 8;
         }
     }
 
@@ -486,8 +488,13 @@ void CleanupGame(Game* game) {
     Monster_UnloadSprites();
     Monster_ResetAll();
 
+    if (game->map) {
+        for (int t = 0; t < game->map->tilesetCount; t++) {
+            if (game->tilesetTextures[t].id > 0)
+                UnloadTexture(game->tilesetTextures[t]);
+        }
+    }
     if (game->player.ent.spriteSheet.id > 0) UnloadTexture(game->player.ent.spriteSheet);
-    if (game->tilesetTexture.id > 0) UnloadTexture(game->tilesetTexture);
     if (game->map) {
         UnloadTMX(game->map);
         game->map = NULL;

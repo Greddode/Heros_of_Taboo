@@ -138,8 +138,12 @@ void DrawTile(const Game* game, int x, int y, int layerIndex) {
     Rectangle src = GetTileSourceRect(game->map, gid);
     if (src.width <= 0 || src.height <= 0) return;
 
+    int tsIndex = FindTilesetForGID(game->map, gid);
+    if (tsIndex < 0) return;
+    Texture2D tex = game->tilesetTextures[tsIndex];
+
     Vector2 pos = TileToScreen(x, y, game->map->tileWidth, game->map->tileHeight);
     Rectangle dest = { pos.x, pos.y, (float)game->map->tileWidth, (float)game->map->tileHeight };
 
-    DrawTexturePro(game->tilesetTexture, src, dest, (Vector2){0, 0}, 0, WHITE);
+    DrawTexturePro(tex, src, dest, (Vector2){0, 0}, 0, WHITE);
 }

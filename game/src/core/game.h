@@ -25,7 +25,7 @@ typedef enum {
 // Top-level game state
 typedef struct Game {
     MapData* map;
-    Texture2D tilesetTexture;
+    Texture2D tilesetTextures[MAX_TILESETS];
 
     Player player;
 

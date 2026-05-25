@@ -3,21 +3,25 @@
 
 #include "tmx/tmx.h"
 
-// Tile GID constants — these match specific tiles in the gray tileset.
-// Each defines a wall orientation or floor type.
-#define TILE_WALL_CORNER_NW   1
-#define TILE_WALL_NORTH       2
-#define TILE_WALL_CORNER_NE   4
-#define TILE_WALL_ICORNER_SW  20
-#define TILE_WALL_ICORNER_SE  22
-#define TILE_WALL_ICORNER_NW  52
-#define TILE_WALL_ICORNER_NE  54
-#define TILE_WALL_CORNER_SW  65
-#define TILE_WALL_CORNER_SE  68
-#define TILE_WALL_EAST       26
-#define TILE_WALL_SOUTH      66
-#define TILE_WALL_WEST       17
-#define TILE_FLOOR           18
+// Tile GID constants — VelmoraRealms tileset (448×400, 28 cols, 700 tiles).
+#define TILE_WALL_CORNER_NW   14
+#define TILE_WALL_NORTH       15
+#define TILE_WALL_CORNER_NE   17
+#define TILE_WALL_ICORNER_SW  411
+#define TILE_WALL_ICORNER_SE  408
+#define TILE_WALL_ICORNER_NW  495
+#define TILE_WALL_ICORNER_NE  492
+#define TILE_WALL_CORNER_SW  98
+#define TILE_WALL_CORNER_SE  101
+#define TILE_WALL_EAST       45
+#define TILE_WALL_SOUTH      99
+#define TILE_WALL_WEST       42
+#define TILE_FLOOR           27  // VelmoraRealms tile 27
+#define FLOOR_VARIANT_COUNT 8
+static const int FLOOR_VARIANTS[FLOOR_VARIANT_COUNT] = { 23, 24, 48, 49, 50, 51, 52, 53 };
+
+// Returns 1 if the given GID is any floor variant (used for collision, wall placement, and spawning).
+int IsFloorGID(int gid);
 
 #define MAX_GENERATED_ROOMS 8
 

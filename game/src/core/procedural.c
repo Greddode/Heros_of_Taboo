@@ -42,12 +42,26 @@ static int RectFree(int* data, int mapW, int mapH, int rx, int ry, int rw, int r
     return 1;
 }
 
+// ---- Floor helpers ----
+
+int IsFloorGID(int gid) {
+    if (gid == TILE_FLOOR) return 1;
+    for (int i = 0; i < FLOOR_VARIANT_COUNT; i++)
+        if (FLOOR_VARIANTS[i] == gid) return 1;
+    return 0;
+}
+
+static int RandomFloorGID(void) {
+    if (GetRandomValue(0, 3) != 0) return TILE_FLOOR;
+    return FLOOR_VARIANTS[GetRandomValue(0, FLOOR_VARIANT_COUNT - 1)];
+}
+
 // Carve a horizontal corridor from x1 to x2 at row y
 static void CarveHLine(int* data, int mapW, int mapH, int x1, int x2, int y) {
     if (y < 0 || y >= mapH) return;
     if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
     for (int x = x1; x <= x2; x++)
-        if (x >= 0 && x < mapW) data[y * mapW + x] = TILE_FLOOR;
+        if (x >= 0 && x < mapW) data[y * mapW + x] = RandomFloorGID();
 }
 
 // Carve a vertical corridor from y1 to y2 at column x
@@ -55,7 +69,7 @@ static void CarveVLine(int* data, int mapW, int mapH, int y1, int y2, int x) {
     if (x < 0 || x >= mapW) return;
     if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
     for (int y = y1; y <= y2; y++)
-        if (y >= 0 && y < mapH) data[y * mapW + x] = TILE_FLOOR;
+        if (y >= 0 && y < mapH) data[y * mapW + x] = RandomFloorGID();
 }
 
 // Check that a rectangle is entirely void, ignoring a sub-rectangle to skip
@@ -201,7 +215,7 @@ static int GrowBranch(int* data, int mapW, int mapH,
     // Carve the room
     for (int y = roomY; y < roomY + rh; y++)
         for (int x = roomX; x < roomX + rw; x++)
-            data[y * mapW + x] = TILE_FLOOR;
+            data[y * mapW + x] = RandomFloorGID();
 
     rooms[*roomCount] = (Room){ roomX, roomY, rw, rh, roomCX, roomCY, 0 };
     (*roomCount)++;
@@ -216,28 +230,28 @@ static int GrowBranch(int* data, int mapW, int mapH,
 static void PlaceNorthWalls(int* data, int mapW, int mapH) {
     for (int y = 1; y < mapH; y++)
         for (int x = 0; x < mapW; x++)
-            if (data[y * mapW + x] == TILE_FLOOR && data[(y - 1) * mapW + x] == 0)
+            if (IsFloorGID(data[y * mapW + x]) && data[(y - 1) * mapW + x] == 0)
                 data[(y - 1) * mapW + x] = TILE_WALL_NORTH;
 }
 
 static void PlaceWestWalls(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH; y++)
         for (int x = 1; x < mapW; x++)
-            if (data[y * mapW + x] == TILE_FLOOR && data[y * mapW + (x - 1)] == 0)
+            if (IsFloorGID(data[y * mapW + x]) && data[y * mapW + (x - 1)] == 0)
                 data[y * mapW + (x - 1)] = TILE_WALL_WEST;
 }
 
 static void PlaceEastWalls(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH; y++)
         for (int x = 0; x < mapW - 1; x++)
-            if (data[y * mapW + x] == TILE_FLOOR && data[y * mapW + (x + 1)] == 0)
+            if (IsFloorGID(data[y * mapW + x]) && data[y * mapW + (x + 1)] == 0)
                 data[y * mapW + (x + 1)] = TILE_WALL_EAST;
 }
 
 static void PlaceSouthWalls(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH - 1; y++)
         for (int x = 0; x < mapW; x++)
-            if (data[y * mapW + x] == TILE_FLOOR && data[(y + 1) * mapW + x] == 0)
+            if (IsFloorGID(data[y * mapW + x]) && data[(y + 1) * mapW + x] == 0)
                 data[(y + 1) * mapW + x] = TILE_WALL_SOUTH;
 }
 
@@ -245,14 +259,14 @@ static void ClearInsideCorners(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH; y++) {
         for (int x = 0; x < mapW; x++) {
             int t = data[y * mapW + x];
-            if (t == 0 || t == TILE_FLOOR) continue;
+            if (t == 0 || IsFloorGID(t)) continue;
             if (t == TILE_WALL_CORNER_NW || t == TILE_WALL_CORNER_NE ||
                 t == TILE_WALL_CORNER_SW || t == TILE_WALL_CORNER_SE) continue;
             int fc = 0;
-            if (y > 0 && data[(y - 1) * mapW + x] == TILE_FLOOR) fc++;
-            if (y < mapH - 1 && data[(y + 1) * mapW + x] == TILE_FLOOR) fc++;
-            if (x > 0 && data[y * mapW + (x - 1)] == TILE_FLOOR) fc++;
-            if (x < mapW - 1 && data[y * mapW + (x + 1)] == TILE_FLOOR) fc++;
+            if (y > 0 && IsFloorGID(data[(y - 1) * mapW + x])) fc++;
+            if (y < mapH - 1 && IsFloorGID(data[(y + 1) * mapW + x])) fc++;
+            if (x > 0 && IsFloorGID(data[y * mapW + (x - 1)])) fc++;
+            if (x < mapW - 1 && IsFloorGID(data[y * mapW + (x + 1)])) fc++;
             if (fc >= 2) data[y * mapW + x] = 0;
         }
     }
@@ -298,8 +312,8 @@ static void PlaceICornersNE(int* data, int mapW, int mapH) {
     for (int y = 1; y < mapH; y++)
         for (int x = 0; x < mapW - 1; x++)
             if (data[y * mapW + x] == 0 &&
-                data[(y - 1) * mapW + x] == TILE_FLOOR &&
-                data[y * mapW + (x + 1)] == TILE_FLOOR)
+                IsFloorGID(data[(y - 1) * mapW + x]) &&
+                IsFloorGID(data[y * mapW + (x + 1)]))
                 data[y * mapW + x] = TILE_WALL_ICORNER_NE;
 }
 
@@ -307,8 +321,8 @@ static void PlaceICornersNW(int* data, int mapW, int mapH) {
     for (int y = 1; y < mapH; y++)
         for (int x = 1; x < mapW; x++)
             if (data[y * mapW + x] == 0 &&
-                data[(y - 1) * mapW + x] == TILE_FLOOR &&
-                data[y * mapW + (x - 1)] == TILE_FLOOR)
+                IsFloorGID(data[(y - 1) * mapW + x]) &&
+                IsFloorGID(data[y * mapW + (x - 1)]))
                 data[y * mapW + x] = TILE_WALL_ICORNER_NW;
 }
 
@@ -316,8 +330,8 @@ static void PlaceICornersSE(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH - 1; y++)
         for (int x = 0; x < mapW - 1; x++)
             if (data[y * mapW + x] == 0 &&
-                data[(y + 1) * mapW + x] == TILE_FLOOR &&
-                data[y * mapW + (x + 1)] == TILE_FLOOR)
+                IsFloorGID(data[(y + 1) * mapW + x]) &&
+                IsFloorGID(data[y * mapW + (x + 1)]))
                 data[y * mapW + x] = TILE_WALL_ICORNER_SE;
 }
 
@@ -325,8 +339,8 @@ static void PlaceICornersSW(int* data, int mapW, int mapH) {
     for (int y = 0; y < mapH - 1; y++)
         for (int x = 1; x < mapW; x++)
             if (data[y * mapW + x] == 0 &&
-                data[(y + 1) * mapW + x] == TILE_FLOOR &&
-                data[y * mapW + (x - 1)] == TILE_FLOOR)
+                IsFloorGID(data[(y + 1) * mapW + x]) &&
+                IsFloorGID(data[y * mapW + (x - 1)]))
                 data[y * mapW + x] = TILE_WALL_ICORNER_SW;
 }
 
@@ -341,10 +355,10 @@ MapData* GenerateProceduralMap(int width, int height) {
     strcpy(map->orientation, "orthogonal");
 
     TilesetDef* ts = &map->tilesets[0];
-    ts->firstGID = 1; strcpy(ts->name, "tileset_gray");
-    ts->tileWidth = 16; ts->tileHeight = 16; ts->tileCount = 80; ts->columns = 16;
-    strcpy(ts->imageSource, "tileset_gray.png");
-    ts->imageWidth = 256; ts->imageHeight = 80;
+    ts->firstGID = 1; strcpy(ts->name, "VelmoraRealms-TileSet");
+    ts->tileWidth = 16; ts->tileHeight = 16; ts->tileCount = 700; ts->columns = 28;
+    strcpy(ts->imageSource, "tilesets/VelmoraRealms-TileSet.png");
+    ts->imageWidth = 448; ts->imageHeight = 400;
     map->tilesetCount = 1;
 
     int tileCount = width * height;
@@ -374,7 +388,7 @@ MapData* GenerateProceduralMap(int width, int height) {
 
     for (int y = sy; y < sy + sh; y++)
         for (int x = sx; x < sx + sw; x++)
-            layer->data[y * width + x] = TILE_FLOOR;
+            layer->data[y * width + x] = RandomFloorGID();
 
     // ---- Grow branches like a plant: each room tries to sprout in unused directions ----
     for (int attempt = 0; attempt < MAX_ATTEMPTS && roomCount < MAX_ROOMS; attempt++) {
@@ -434,7 +448,7 @@ MapData* GenerateProceduralMap(int width, int height) {
 
     // Sync the collision layer: anything that is not void and not floor is a wall
     for (int i = 0; i < tileCount; i++)
-        collLayer->data[i] = (layer->data[i] != 0 && layer->data[i] != TILE_FLOOR) ? 1 : 0;
+        collLayer->data[i] = (layer->data[i] != 0 && !IsFloorGID(layer->data[i])) ? 1 : 0;
 
     // Store room metadata so Spawner_Populate knows where to place entities
     s_generatedRoomCount = roomCount < MAX_GENERATED_ROOMS ? roomCount : MAX_GENERATED_ROOMS;
