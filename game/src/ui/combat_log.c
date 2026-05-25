@@ -15,8 +15,7 @@ void CombatLog_Add(CombatLog* log, const char* fmt, ...) {
     log->count++;
 }
 
-// Draw the last maxLines entries anchored at bottom-right.
-// x = left edge of the log area, y = Y position of the bottom line (newest message).
+// Draw the last maxLines entries anchored at bottom-right (y = bottom line)
 void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize) {
     if (!log) return;
     int total = log->count;
@@ -29,10 +28,8 @@ void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int font
     int logH = visible * lineH + 4;
     int bgY = y - logH;
 
-    // Background
     DrawRectangle(x - 4, bgY, logW, logH, (Color){ 0, 0, 0, 180 });
 
-    // Messages, newest at the bottom
     int firstVirtual = total - visible;
     for (int i = 0; i < visible; i++) {
         int idx = (firstVirtual + i) % COMBAT_LOG_MAX;

@@ -10,7 +10,7 @@
 #include <string.h>
 
 // Simple circular radius reveal: all tiles within FOG_RADIUS are lit.
-// Previously-seen tiles are dimmed. Walls do not block sight.
+// Previously-seen tiles are dimmed.
 static void RevealFOW(Game* game) {
     int px = game->player.ent.x;
     int py = game->player.ent.y;
@@ -35,7 +35,7 @@ static void RevealFOW(Game* game) {
     }
 }
 
-// Read directional keys (arrow keys / WASD) and pass them to MoveEntity.
+// Read directional keys (arrow/WASD) and pass them to MoveEntity.
 // Period/space waits a turn, restoring 1 HP.
 // After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
@@ -74,12 +74,11 @@ void HandleInput(Game* game) {
     }
 }
 
-// Advance flash timers, run monster AI if it is the enemy turn,
-// and check win / loss conditions.
+// Advance flash timers, run monster AI during the enemy turn,
+// and check win/loss conditions.
 void UpdateGame(Game* game) {
     if (!game) return;
 
-    // Decrement animation timers unconditionally
     if (game->animTimer > 0.0f) {
         game->animTimer -= GetFrameTime();
         if (game->animTimer < 0.0f) game->animTimer = 0.0f;
@@ -89,7 +88,6 @@ void UpdateGame(Game* game) {
         if (game->monsterAnimTimer < 0.0f) game->monsterAnimTimer = 0.0f;
     }
 
-    // Player flash timer countdown
     if (game->player.ent.hitFlashTimer > 0.0f) {
         game->player.ent.hitFlashTimer -= GetFrameTime();
         if (game->player.ent.hitFlashTimer < 0.0f) game->player.ent.hitFlashTimer = 0.0f;
@@ -99,9 +97,7 @@ void UpdateGame(Game* game) {
 
     if (game->state == STATE_GAME_OVER || game->state == STATE_WIN) return;
 
-    // --- Enemy turn -----------------------------------------------------------
     if (game->state == STATE_ENEMY_TURN) {
-        // Brief pause before monsters act so the player's hit sound plays first
         if (game->enemyTurnCooldown > 0.0f) {
             game->enemyTurnCooldown -= GetFrameTime();
             return;
@@ -131,8 +127,7 @@ void UpdateGame(Game* game) {
     }
 }
 
-// Render all visible tiles, healing items, monsters, the player,
-// and the HUD overlay.
+// Render the map, entities, and HUD.
 void RenderGame(const Game* game) {
     if (!game || !game->map) return;
 
@@ -141,7 +136,6 @@ void RenderGame(const Game* game) {
 
     BeginMode2D(game->camera);
 
-    // --- Tile layers ---------------------------------------------------------
     for (int layer = 0; layer < game->map->layerCount; layer++) {
         if (!game->map->layers[layer].visible) continue;
 
@@ -160,7 +154,6 @@ void RenderGame(const Game* game) {
         }
     }
 
-    // --- Healing items -------------------------------------------------------
     for (int i = 0; i < game->healingCount; i++) {
         if (game->healingCollected[i]) continue;
         int hx = game->healingTiles[i][0];
@@ -410,7 +403,7 @@ bool InitGame(Game* game, const char* tmxFile) {
         }
     }
 
-    // Initialize player defaults (overridden by map objects below)
+    // Player defaults (overridden by map objects below)
     game->player.ent.x = 1;
     game->player.ent.y = 1;
     game->player.ent.prevX = 1;
@@ -427,23 +420,18 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.ent.color = (Color){ 50, 200, 255, 255 };
     game->player.ent.spriteRow = 6;
 
-    // Load player character spritesheet
     game->player.ent.spriteSheet = LoadTexture("resources/roguelikeChar_transparent.png");
     if (game->player.ent.spriteSheet.id == 0) {
         TraceLog(LOG_WARNING, "Could not load player spritesheet, using fallback rendering");
     }
 
-    // Player-specific fields (exp / leveling)
     game->player.exp = 0;
     game->player.expToNext = ExpForLevel(1);
 
-    // Initialize monster templates (must be ready before spawning)
     Monster_InitTemplates();
 
-    // Spawn entities from map objects
     SpawnEntitiesFromObjects(game);
 
-    // Populate procedural maps with monsters and items
     ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
     int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
     if (spawnRoomCount > 0) {
@@ -453,14 +441,12 @@ bool InitGame(Game* game, const char* tmxFile) {
     // Load monster sprite sheets
     Monster_LoadSprites();
 
-    // Game state
     game->state = STATE_PLAYER_TURN;
     game->turnCount = 0;
     game->enemyTurnCooldown = 0.0f;
     game->animTimer = 0.0f;
     game->monsterAnimTimer = 0.0f;
 
-    // Fog of war: start unexplored, reveal starting area
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
             game->visibility[y][x] = 0;
@@ -468,7 +454,6 @@ bool InitGame(Game* game, const char* tmxFile) {
     }
     RevealFOW(game);
 
-    // Setup camera
     game->camera.target = (Vector2){
         game->player.ent.x * game->map->tileWidth  + game->map->tileWidth  / 2,
         game->player.ent.y * game->map->tileHeight + game->map->tileHeight / 2

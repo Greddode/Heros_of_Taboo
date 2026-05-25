@@ -6,7 +6,6 @@
 #include "ui/combat_log.h"
 #include <stdio.h>
 
-// Convert tile grid coordinates to pixel position (top-left corner of the tile)
 Vector2 TileToScreen(int x, int y, int tileWidth, int tileHeight) {
     return (Vector2){ (float)(x * tileWidth), (float)(y * tileHeight) };
 }
@@ -51,11 +50,9 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
         default: return false;
     }
 
-    // Bounds check
     if (newX < 0 || newX >= game->map->width ||
         newY < 0 || newY >= game->map->height) return false;
 
-    // Check if there's an entity at the target
     Entity* target = GetEntityAt(game, newX, newY, entity);
     if (target) {
         int damage = entity->attack - target->defense;
@@ -74,7 +71,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
         return true;
     }
 
-    // Player attacking a monster
+    // Player attacks a monster at the target tile
     if (entity->isPlayer) {
         Monster* mon = Monster_GetAt(newX, newY, NULL);
         if (mon && mon->alive) {
@@ -97,16 +94,13 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
         }
     }
 
-    // Blocked by wall
     if (game->blocking[newY][newX]) return false;
 
-    // Move
     entity->prevX = entity->x;
     entity->prevY = entity->y;
     entity->x = newX;
     entity->y = newY;
 
-    // Healing pickup (player only)
     if (entity->isPlayer) {
         for (int h = 0; h < game->healingCount; h++) {
             if (!game->healingCollected[h] &&
@@ -128,7 +122,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     return true;
 }
 
-// Look up the GID at (x, y) on the given layer and draw it to screen
+// Draw a single tile from the tileset at (x, y) on the given layer
 void DrawTile(const Game* game, int x, int y, int layerIndex) {
     if (!game->map || !game->map->layers) return;
 

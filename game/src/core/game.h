@@ -22,7 +22,6 @@ typedef enum {
     STATE_WIN
 } GameState;
 
-// Top-level game state
 typedef struct Game {
     MapData* map;
     Texture2D tilesetTextures[MAX_TILESETS];
@@ -34,8 +33,8 @@ typedef struct Game {
 
     Camera2D camera;
 
-    unsigned char visibility[MAP_HEIGHT][MAP_WIDTH]; // 0=unseen, 1=visible, 2=explored
-    unsigned char blocking[MAP_HEIGHT][MAP_WIDTH];   // 1=wall, 0=walkable
+    unsigned char visibility[MAP_HEIGHT][MAP_WIDTH];
+    unsigned char blocking[MAP_HEIGHT][MAP_WIDTH];
 
     CombatLog combatLog;
 

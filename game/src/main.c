@@ -119,7 +119,6 @@ int main(void)
                 Scene nextScene = SCENE_GAME;
                 bool restartGame = false;
 
-                // ESC rising-edge
                 bool escDown = IsKeyDown(KEY_ESCAPE);
                 bool escPressed = escDown && !prevEscDown;
                 prevEscDown = escDown;
@@ -144,7 +143,6 @@ int main(void)
                     if (gmAction == MENU_PLAY) nextScene = SCENE_MENU;
                     if (gmAction == MENU_EXIT) nextScene = SCENE_EXIT;
                 } else {
-                    // R rising-edge
                     bool rDown = IsKeyDown(KEY_R);
                     if (rDown && !prevRDown) {
                         prevRDown = rDown;

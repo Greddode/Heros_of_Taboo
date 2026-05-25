@@ -5,7 +5,6 @@
 // Minimum squared distance from the player's spawn for newly placed entities
 #define MIN_PLAYER_DIST 5
 
-// Squared distance helper (avoids sqrt for performance)
 static int DistSq(int ax, int ay, int bx, int by) {
     int dx = ax - bx;
     int dy = ay - by;
@@ -51,7 +50,6 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
         if (floorCount >= 20) monsterCount = 2;
         if (floorCount >= 40) monsterCount = 3;
 
-        // Clamp to available tiles (safety)
         if (monsterCount > floorCount) monsterCount = floorCount;
 
         for (int m = 0; m < monsterCount; m++) {

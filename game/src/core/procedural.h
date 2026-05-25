@@ -16,7 +16,7 @@
 #define TILE_WALL_EAST       45
 #define TILE_WALL_SOUTH      99
 #define TILE_WALL_WEST       42
-#define TILE_FLOOR           27  // VelmoraRealms tile 27
+#define TILE_FLOOR           27 
 #define FLOOR_VARIANT_COUNT 8
 static const int FLOOR_VARIANTS[FLOOR_VARIANT_COUNT] = { 23, 24, 48, 49, 50, 51, 52, 53 };
 
