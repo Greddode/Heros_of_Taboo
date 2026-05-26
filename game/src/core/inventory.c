@@ -32,33 +32,33 @@ static const char* ITEM_SPRITES[ITEM_COUNT] = {
 // ---- Equipment data table --------------------------------------------------
 static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     // NONE
-    { EQUIP_NONE,           "",                  EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 0, 0 },
+    { EQUIP_NONE,           "", "",                             EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 0, 0 },
 
     // Armor - Head
-    { EQUIP_LEATHER_CAP,    "Leather Cap",       EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 1, 2 },
-    { EQUIP_IRON_HELM,      "Iron Helm",         EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 2, 4 },
-    { EQUIP_STEEL_HELM,     "Steel Helm",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 3, 6 },
+    { EQUIP_LEATHER_CAP,    "Leather Cap",     "A simple leather cap.\n+1 DEF, +2 HP",       EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 1, 2 },
+    { EQUIP_IRON_HELM,      "Iron Helm",       "An iron helmet forged for battle.\n+2 DEF, +4 HP", EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 2, 4 },
+    { EQUIP_STEEL_HELM,     "Steel Helm",      "A sturdy steel helm.\n+3 DEF, +6 HP",         EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 3, 6 },
 
     // Armor - Chest
-    { EQUIP_LEATHER_VEST,   "Leather Vest",      EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 2, 4 },
-    { EQUIP_CHAIN_MAIL,     "Chain Mail",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 4, 8 },
-    { EQUIP_PLATE_MAIL,     "Plate Mail",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 6, 12 },
+    { EQUIP_LEATHER_VEST,   "Leather Vest",    "A flexible leather vest.\n+2 DEF, +4 HP",     EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 2, 4 },
+    { EQUIP_CHAIN_MAIL,     "Chain Mail",      "Interlocking rings of steel.\n+4 DEF, +8 HP", EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 4, 8 },
+    { EQUIP_PLATE_MAIL,     "Plate Mail",      "Full plate armour.\n+6 DEF, +12 HP",          EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 6, 12 },
 
     // Weapons
-    { EQUIP_SURVIVAL_KNIFE,"Survival Knife",     EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   2, 0, 0 },
-    { EQUIP_IRON_SWORD,     "Iron Sword",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   5, 0, 0 },
-    { EQUIP_STEEL_SWORD,    "Steel Sword",       EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   8, 0, 0 },
-    { EQUIP_WAR_HAMMER,     "War Hammer",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,  10, 1, 0 },
+    { EQUIP_SURVIVAL_KNIFE,"Survival Knife",   "A trusty blade for the dungeon.\n+2 ATK",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 2, 0, 0 },
+    { EQUIP_IRON_SWORD,     "Iron Sword",      "A well-balanced iron blade.\n+5 ATK",        EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 5, 0, 0 },
+    { EQUIP_STEEL_SWORD,    "Steel Sword",     "A razor-sharp steel longsword.\n+8 ATK",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 8, 0, 0 },
+    { EQUIP_WAR_HAMMER,     "War Hammer",      "A heavy hammer that crushes armor.\n+10 ATK, +1 DEF", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 10, 1, 0 },
 
     // Off-hand
-    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",     EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 2, 0 },
-    { EQUIP_IRON_SHIELD,    "Iron Shield",       EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 4, 0 },
-    { EQUIP_STEEL_SHIELD,   "Steel Shield",      EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 6, 0 },
+    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",   "A light wooden shield.\n+2 DEF",             EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 2, 0 },
+    { EQUIP_IRON_SHIELD,    "Iron Shield",     "A sturdy iron shield.\n+4 DEF",               EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 4, 0 },
+    { EQUIP_STEEL_SHIELD,   "Steel Shield",    "A heavy steel tower shield.\n+6 DEF",        EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 6, 0 },
 
     // Accessories
-    { EQUIP_RING_OF_STRENGTH,  "Ring of Strength",   EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 3, 0, 0 },
-    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 2, 8 },
-    { EQUIP_BOOTS_OF_SWIFTNESS,"Boots of Swiftness", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 1, 1, 4 },
+    { EQUIP_RING_OF_STRENGTH,  "Ring of Strength",   "A ring pulsing with power.\n+3 ATK",           EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 3, 0, 0 },
+    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  "An enchanted amulet.\n+2 DEF, +8 HP",           EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 2, 8 },
+    { EQUIP_BOOTS_OF_SWIFTNESS,"Boots of Swiftness","Light boots that aid movement.\n+1 ATK, +1 DEF, +4 HP", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 1, 1, 4 },
 };
 
 // ---- Helpers ---------------------------------------------------------------
@@ -148,12 +148,10 @@ void EquipItem(Game* game, EquipType type) {
 
     int slotIdx = (int)data->slot;
 
-    // Unequip whatever is currently in that slot
     if (game->equipped[slotIdx] != EQUIP_NONE) {
         UnequipSlot(game, data->slot);
     }
 
-    // Apply bonuses
     game->player.ent.attack   += data->bonusAttack;
     game->player.ent.defense  += data->bonusDefense;
     game->player.ent.maxHp    += data->bonusMaxHp;
@@ -164,6 +162,35 @@ void EquipItem(Game* game, EquipType type) {
     CombatLog_Add(&game->combatLog, BLACK, "Equipped %s", data->name);
 }
 
+// Same as EquipItem but doesn't log to combat log (for initial game setup)
+void EquipItemSilent(Game* game, EquipType type) {
+    if (type == EQUIP_NONE) return;
+    const EquipData* data = GetEquipData(type);
+    if (!data) return;
+
+    int slotIdx = (int)data->slot;
+
+    // Remove existing item from that slot silently, reverting its bonuses
+    if (game->equipped[slotIdx] != EQUIP_NONE) {
+        const EquipData* old = GetEquipData(game->equipped[slotIdx]);
+        if (old) {
+            game->player.ent.attack   -= old->bonusAttack;
+            game->player.ent.defense  -= old->bonusDefense;
+            game->player.ent.maxHp    -= old->bonusMaxHp;
+            if (game->player.ent.hp > game->player.ent.maxHp)
+                game->player.ent.hp = game->player.ent.maxHp;
+        }
+        game->equipped[slotIdx] = EQUIP_NONE;
+    }
+
+    game->player.ent.attack   += data->bonusAttack;
+    game->player.ent.defense  += data->bonusDefense;
+    game->player.ent.maxHp    += data->bonusMaxHp;
+    game->player.ent.hp       += data->bonusMaxHp;
+
+    game->equipped[slotIdx] = type;
+}
+
 void UnequipSlot(Game* game, EquipSlot slot) {
     int slotIdx = (int)slot;
     EquipType oldType = game->equipped[slotIdx];
@@ -172,7 +199,6 @@ void UnequipSlot(Game* game, EquipSlot slot) {
     const EquipData* data = GetEquipData(oldType);
     if (!data) return;
 
-    // Remove bonuses
     game->player.ent.attack   -= data->bonusAttack;
     game->player.ent.defense  -= data->bonusDefense;
     game->player.ent.maxHp    -= data->bonusMaxHp;
@@ -228,6 +254,25 @@ static void DrawTabBar(const Game* game, int ix, int iy, int iw) {
     DrawLine(ix, iy + tabH, ix + iw, iy + tabH, LIGHTGRAY);
 }
 
+// ---- Draw a multi-line description wrapped at a given width -----------------
+static void DrawDescription(const char* desc, int x, int y, int maxWidth, int fontSize, Color color) {
+    char buf[512];
+    strncpy(buf, desc, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    char* line = buf;
+    char* nl;
+    while ((nl = strchr(line, '\n')) != NULL) {
+        *nl = '\0';
+        DrawText(line, x, y, fontSize, color);
+        y += fontSize + 4;
+        line = nl + 1;
+    }
+    if (*line) {
+        DrawText(line, x, y, fontSize, color);
+    }
+}
+
 // ---- Inventory tab content --------------------------------------------------
 static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
     int tabH = 24;
@@ -274,21 +319,11 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
         infoY += 24;
 
         const char* desc = GetItemDescription(selType);
-        char descCopy[256];
-        strncpy(descCopy, desc, sizeof(descCopy) - 1);
-        descCopy[sizeof(descCopy) - 1] = '\0';
-        char* line = descCopy;
-        char* nl;
-        while ((nl = strchr(line, '\n')) != NULL) {
-            *nl = '\0';
-            DrawText(line, rx + 10, infoY, 14, DARKGRAY);
-            infoY += 18;
-            line = nl + 1;
-        }
-        if (*line) {
-            DrawText(line, rx + 10, infoY, 14, DARKGRAY);
-            infoY += 18;
-        }
+        DrawDescription(desc, rx + 10, infoY, rw - 20, 14, DARKGRAY);
+        // Count lines for infoY offset
+        int lines = 1;
+        for (const char* p = desc; *p; p++) if (*p == '\n') lines++;
+        infoY += lines * 18 + 4;
 
         char qty[64];
         snprintf(qty, sizeof(qty), "Qty: %d", game->inventory[game->inventorySelection].quantity);
@@ -344,7 +379,6 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
         int sy = slotStartY + s * (slotH + slotGap);
         int sx = cx - slotW / 2;
 
-        // Slot background
         if (game->texUiSlot.id > 0)
             Draw9Slice(game->texUiSlot, (Rectangle){ (float)sx, (float)sy, (float)slotW, (float)slotH }, 8, 8, 8, 8);
         else {
@@ -352,15 +386,12 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
             DrawRectangleLines(sx, sy, slotW, slotH, DARKGRAY);
         }
 
-        // Selection indicator
         Color labelColor = (s == game->inventorySelection) ? YELLOW : LIGHTGRAY;
         if (s == game->inventorySelection)
             DrawText(">", sx - 18, sy + 8, 16, YELLOW);
 
-        // Slot label
         DrawText(EQUIP_SLOT_LABELS[s], sx + 10, sy + 8, 16, labelColor);
 
-        // Equipped item or empty
         EquipType eType = game->equipped[s];
         if (eType != EQUIP_NONE) {
             const EquipData* data = GetEquipData(eType);
@@ -370,7 +401,6 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
                 int tw = MeasureText(itemStr, 14);
                 DrawText(itemStr, sx + slotW - tw - 10, sy + 5, 14, YELLOW);
 
-                // Bonus stats
                 int bonusY = sy + 22;
                 if (data->bonusAttack > 0) {
                     char atkStr[32];
@@ -392,6 +422,33 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
             }
         } else {
             DrawText("(empty)", sx + slotW - 80, sy + 8, 14, (Color){ 80, 80, 80, 255 });
+        }
+    }
+
+    // Equipment action menu
+    if (game->invSubState == INV_ACTION_MENU && game->equipped[game->inventorySelection] != EQUIP_NONE) {
+        static const char* actions[] = { "Unequip", "Drop", "Back" };
+        int selSlot = game->inventorySelection;
+        int sy = slotStartY + selSlot * (slotH + slotGap);
+        int sx = cx - slotW / 2;
+        int mx = sx + slotW + 4;
+        int my = sy;
+        if (my + 80 > iy + ih - 30) my = iy + ih - 30 - 80;
+        int mw = 130;
+        int mh = 90;
+
+        if (game->texUiSlot.id > 0)
+            Draw9Slice(game->texUiSlot, (Rectangle){ (float)mx, (float)my, (float)mw, (float)mh }, 8, 8, 8, 8);
+        else {
+            DrawRectangle(mx, my, mw, mh, (Color){ 20, 20, 30, 240 });
+            DrawRectangleLines(mx, my, mw, mh, YELLOW);
+        }
+
+        for (int a = 0; a < 3; a++) {
+            Color ac = (a == game->invActionSelection) ? YELLOW : BLACK;
+            if (a == game->invActionSelection)
+                DrawText(">", mx + 6, my + 6 + a * 26, 16, YELLOW);
+            DrawText(actions[a], mx + 22, my + 6 + a * 26, 16, ac);
         }
     }
 
@@ -421,7 +478,6 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
     snprintf(buf, sizeof(buf), "HP:       %d / %d", p->hp, p->maxHp);
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
-    // Show base attack/defense with equipment contribution
     int baseAtk = p->attack;
     int baseDef = p->defense;
     for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
@@ -485,6 +541,7 @@ void Inventory_Render(const Game* game) {
             break;
     }
 
+    // Footer
     if (game->inventoryTab == INV_TAB_INVENTORY) {
         char footer[128];
         if (game->inventorySlotCount == 0) {

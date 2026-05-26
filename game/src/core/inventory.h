@@ -63,6 +63,7 @@ typedef enum {
 typedef struct {
     EquipType type;
     char name[32];
+    const char* description;
     EquipCategory category;
     EquipSlot slot;
     int bonusAttack;
@@ -99,6 +100,7 @@ bool InventoryUse(Game* game, int slot);
 
 // Equipment management
 void EquipItem(Game* game, EquipType type);
+void EquipItemSilent(Game* game, EquipType type);
 void UnequipSlot(Game* game, EquipSlot slot);
 bool IsEquipSlotOccupied(const Game* game, EquipSlot slot);
 

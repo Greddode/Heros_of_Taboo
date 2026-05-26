@@ -44,13 +44,57 @@ void HandleInput(Game* game) {
             }
         }
 
-        // Equipment tab item selection (UP/DOWN to cycle through slots)
+        // Equipment tab item selection and action menu
         if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_EQUIPMENT) {
             int maxSel = EQUIP_SLOT_COUNT - 1;
             if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
                 game->inventorySelection--;
             if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < maxSel)
                 game->inventorySelection++;
+            if ((IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) &&
+                game->equipped[game->inventorySelection] != EQUIP_NONE) {
+                game->invSubState = INV_ACTION_MENU;
+                game->invActionSelection = 0;
+            }
+            return;
+        }
+
+        // Equipment action menu handling (Unequip / Drop / Back)
+        if (game->invSubState == INV_ACTION_MENU && game->inventoryTab == INV_TAB_EQUIPMENT) {
+            if (IsKeyPressed(KEY_UP) && game->invActionSelection > 0)
+                game->invActionSelection--;
+            if (IsKeyPressed(KEY_DOWN) && game->invActionSelection < 2)
+                game->invActionSelection++;
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                EquipSlot slot = (EquipSlot)game->inventorySelection;
+                if (game->invActionSelection == 0) {
+                    // Unequip
+                    UnequipSlot(game, slot);
+                    game->invSubState = INV_BROWSE;
+                } else if (game->invActionSelection == 1) {
+                    // Drop (unequip without log — dropping means it's gone)
+                    EquipType oldType = game->equipped[(int)slot];
+                    if (oldType != EQUIP_NONE) {
+                        const EquipData* data = GetEquipData(oldType);
+                        if (data) {
+                            game->player.ent.attack   -= data->bonusAttack;
+                            game->player.ent.defense  -= data->bonusDefense;
+                            game->player.ent.maxHp    -= data->bonusMaxHp;
+                            if (game->player.ent.hp > game->player.ent.maxHp)
+                                game->player.ent.hp = game->player.ent.maxHp;
+                        }
+                        game->equipped[(int)slot] = EQUIP_NONE;
+                        CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", data ? data->name : "item");
+                    }
+                    game->invSubState = INV_BROWSE;
+                } else {
+                    // Back
+                    game->invSubState = INV_BROWSE;
+                }
+            }
+            if (IsKeyPressed(KEY_ESCAPE)) {
+                game->invSubState = INV_BROWSE;
+            }
             return;
         }
 
@@ -704,9 +748,9 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     LoadPotionTextures(game);
 
-    // Default starting equipment
+    // Default starting equipment (silent — no combat log)
     memset(game->equipped, 0, sizeof(game->equipped));
-    EquipItem(game, EQUIP_SURVIVAL_KNIFE);
+    EquipItemSilent(game, EQUIP_SURVIVAL_KNIFE);
     InventoryAdd(game, ITEM_SMALL_HP_POTION);
 
     game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
