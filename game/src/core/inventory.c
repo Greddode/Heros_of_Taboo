@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// ---- Potion data -----------------------------------------------------------
 static const char* ITEM_NAMES[ITEM_COUNT] = {
     "",
     "Small HP Potion",
@@ -28,6 +29,44 @@ static const char* ITEM_SPRITES[ITEM_COUNT] = {
     "resources/sprites/items/health_potions/large_health_potion.png"
 };
 
+// ---- Equipment data table --------------------------------------------------
+static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
+    // NONE
+    { EQUIP_NONE,           "",                  EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 0, 0 },
+
+    // Armor - Head
+    { EQUIP_LEATHER_CAP,    "Leather Cap",       EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 1, 2 },
+    { EQUIP_IRON_HELM,      "Iron Helm",         EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 2, 4 },
+    { EQUIP_STEEL_HELM,     "Steel Helm",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 3, 6 },
+
+    // Armor - Chest
+    { EQUIP_LEATHER_VEST,   "Leather Vest",      EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 2, 4 },
+    { EQUIP_CHAIN_MAIL,     "Chain Mail",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 4, 8 },
+    { EQUIP_PLATE_MAIL,     "Plate Mail",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 6, 12 },
+
+    // Weapons
+    { EQUIP_WOODEN_SWORD,   "Wooden Sword",      EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   3, 0, 0 },
+    { EQUIP_IRON_SWORD,     "Iron Sword",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   5, 0, 0 },
+    { EQUIP_STEEL_SWORD,    "Steel Sword",       EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   8, 0, 0 },
+    { EQUIP_WAR_HAMMER,     "War Hammer",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,  10, 1, 0 },
+
+    // Off-hand
+    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",     EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 2, 0 },
+    { EQUIP_IRON_SHIELD,    "Iron Shield",       EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 4, 0 },
+    { EQUIP_STEEL_SHIELD,   "Steel Shield",      EQUIP_CAT_ARMOR,    EQUIP_SLOT_OFF_HAND, 0, 6, 0 },
+
+    // Accessories
+    { EQUIP_RING_OF_STRENGTH,  "Ring of Strength",   EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 3, 0, 0 },
+    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 2, 8 },
+    { EQUIP_BOOTS_OF_SWIFTNESS,"Boots of Swiftness", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 1, 1, 4 },
+};
+
+// ---- Helpers ---------------------------------------------------------------
+const EquipData* GetEquipData(EquipType type) {
+    if (type < 0 || type >= EQUIP_COUNT) return NULL;
+    return &EQUIP_TABLE[type];
+}
+
 const char* GetItemName(ItemType type) {
     if (type < 0 || type >= ITEM_COUNT) return "";
     return ITEM_NAMES[type];
@@ -43,6 +82,7 @@ const char* GetItemDescription(ItemType type) {
     return ITEM_DESCS[type];
 }
 
+// ---- Inventory (potions) ---------------------------------------------------
 bool InventoryAdd(Game* game, ItemType type) {
     if (type == ITEM_NONE) return false;
     for (int i = 0; i < game->inventorySlotCount; i++) {
@@ -100,14 +140,62 @@ void UnloadPotionTextures(Game* game) {
     if (game->texUiSlot.id > 0)  UnloadTexture(game->texUiSlot);
 }
 
-// ---- Tab label strings ----------------------------------------------------
+// ---- Equipment management --------------------------------------------------
+void EquipItem(Game* game, EquipType type) {
+    if (type == EQUIP_NONE) return;
+    const EquipData* data = GetEquipData(type);
+    if (!data) return;
+
+    int slotIdx = (int)data->slot;
+
+    // Unequip whatever is currently in that slot
+    if (game->equipped[slotIdx] != EQUIP_NONE) {
+        UnequipSlot(game, data->slot);
+    }
+
+    // Apply bonuses
+    game->player.ent.attack   += data->bonusAttack;
+    game->player.ent.defense  += data->bonusDefense;
+    game->player.ent.maxHp    += data->bonusMaxHp;
+    game->player.ent.hp       += data->bonusMaxHp;
+
+    game->equipped[slotIdx] = type;
+
+    CombatLog_Add(&game->combatLog, BLACK, "Equipped %s", data->name);
+}
+
+void UnequipSlot(Game* game, EquipSlot slot) {
+    int slotIdx = (int)slot;
+    EquipType oldType = game->equipped[slotIdx];
+    if (oldType == EQUIP_NONE) return;
+
+    const EquipData* data = GetEquipData(oldType);
+    if (!data) return;
+
+    // Remove bonuses
+    game->player.ent.attack   -= data->bonusAttack;
+    game->player.ent.defense  -= data->bonusDefense;
+    game->player.ent.maxHp    -= data->bonusMaxHp;
+    if (game->player.ent.hp > game->player.ent.maxHp)
+        game->player.ent.hp = game->player.ent.maxHp;
+
+    game->equipped[slotIdx] = EQUIP_NONE;
+
+    CombatLog_Add(&game->combatLog, BLACK, "Unequipped %s", data->name);
+}
+
+bool IsEquipSlotOccupied(const Game* game, EquipSlot slot) {
+    return game->equipped[(int)slot] != EQUIP_NONE;
+}
+
+// ---- Tab rendering ---------------------------------------------------------
+
 static const char* TAB_LABELS[INV_TAB_COUNT] = {
     "Inventory",
     "Equipment",
     "Stats"
 };
 
-// ---- Equipment slot labels (placeholder for now) --------------------------
 static const char* EQUIP_SLOT_LABELS[EQUIP_SLOT_COUNT] = {
     "Head",
     "Chest",
@@ -125,24 +213,18 @@ static void DrawTabBar(const Game* game, int ix, int iy, int iw) {
         int tx = ix + t * tabW;
         int ty = iy;
 
-        // Background
         Color bg = (t == (int)game->inventoryTab)
             ? (Color){ 50, 50, 70, 255 }
             : (Color){ 30, 30, 40, 255 };
         DrawRectangle(tx, ty, tabW, tabH, bg);
 
-        // Border line: highlight active tab top
-        if (t == (int)game->inventoryTab) {
+        if (t == (int)game->inventoryTab)
             DrawRectangle(tx, ty, tabW, 2, YELLOW);
-        }
 
-        // Label
         int tw = MeasureText(TAB_LABELS[t], 16);
         DrawText(TAB_LABELS[t], tx + (tabW - tw) / 2, ty + 4, 16,
                  (t == (int)game->inventoryTab) ? YELLOW : LIGHTGRAY);
     }
-
-    // Separator line below tabs
     DrawLine(ix, iy + tabH, ix + iw, iy + tabH, LIGHTGRAY);
 }
 
@@ -170,7 +252,6 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
         }
     }
 
-    // Right column: info panel
     int rx = ix + lw + 24;
     int rw = iw - lw - 40;
     int rtop = iy + tabH + 40;
@@ -254,7 +335,7 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
     int cx = ix + iw / 2;
     int slotStartY = iy + tabH + 40;
     int slotH = 36;
-    int slotW = 200;
+    int slotW = 360;
     int slotGap = 8;
 
     DrawText("EQUIPMENT", ix + 16, iy + tabH + 12, 20, YELLOW);
@@ -271,15 +352,47 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
             DrawRectangleLines(sx, sy, slotW, slotH, DARKGRAY);
         }
 
-        // Slot label
+        // Selection indicator
         Color labelColor = (s == game->inventorySelection) ? YELLOW : LIGHTGRAY;
         if (s == game->inventorySelection)
             DrawText(">", sx - 18, sy + 8, 16, YELLOW);
 
-        // Check if there's an equipped item
-        // Currently no equipment system — show empty state
+        // Slot label
         DrawText(EQUIP_SLOT_LABELS[s], sx + 10, sy + 8, 16, labelColor);
-        DrawText("(empty)", sx + slotW - 80, sy + 8, 14, (Color){ 80, 80, 80, 255 });
+
+        // Equipped item or empty
+        EquipType eType = game->equipped[s];
+        if (eType != EQUIP_NONE) {
+            const EquipData* data = GetEquipData(eType);
+            if (data) {
+                char itemStr[128];
+                snprintf(itemStr, sizeof(itemStr), "%s", data->name);
+                int tw = MeasureText(itemStr, 14);
+                DrawText(itemStr, sx + slotW - tw - 10, sy + 5, 14, YELLOW);
+
+                // Bonus stats
+                int bonusY = sy + 22;
+                if (data->bonusAttack > 0) {
+                    char atkStr[32];
+                    snprintf(atkStr, sizeof(atkStr), "ATK+%d", data->bonusAttack);
+                    DrawText(atkStr, sx + slotW - tw - 10, bonusY, 10, GREEN);
+                    bonusY += 12;
+                }
+                if (data->bonusDefense > 0) {
+                    char defStr[32];
+                    snprintf(defStr, sizeof(defStr), "DEF+%d", data->bonusDefense);
+                    DrawText(defStr, sx + slotW - tw - 10, bonusY, 10, (Color){ 100, 150, 255, 255 });
+                    bonusY += 12;
+                }
+                if (data->bonusMaxHp > 0) {
+                    char hpStr[32];
+                    snprintf(hpStr, sizeof(hpStr), "HP+%d", data->bonusMaxHp);
+                    DrawText(hpStr, sx + slotW - tw - 10, bonusY, 10, RED);
+                }
+            }
+        } else {
+            DrawText("(empty)", sx + slotW - 80, sy + 8, 14, (Color){ 80, 80, 80, 255 });
+        }
     }
 
     DrawText("< Q / E to switch tabs >", cx - MeasureText("< Q / E to switch tabs >", 14) / 2,
@@ -308,10 +421,21 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
     snprintf(buf, sizeof(buf), "HP:       %d / %d", p->hp, p->maxHp);
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
-    snprintf(buf, sizeof(buf), "Attack:   %d", p->attack);
+    // Show base attack/defense with equipment contribution
+    int baseAtk = p->attack;
+    int baseDef = p->defense;
+    for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
+        const EquipData* d = GetEquipData(game->equipped[i]);
+        if (d) {
+            baseAtk   -= d->bonusAttack;
+            baseDef   -= d->bonusDefense;
+        }
+    }
+
+    snprintf(buf, sizeof(buf), "Attack:   %d (base %d)", p->attack, baseAtk);
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
-    snprintf(buf, sizeof(buf), "Defense:  %d", p->defense);
+    snprintf(buf, sizeof(buf), "Defense:  %d (base %d)", p->defense, baseDef);
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
     sy += 8;
@@ -332,7 +456,7 @@ void Inventory_Render(const Game* game) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
     int iw = 640;
-    int ih = 360;
+    int ih = 400;
     int ix = (sw - iw) / 2;
     int iy = (sh - ih) / 2;
     int tabH = 24;
@@ -345,10 +469,8 @@ void Inventory_Render(const Game* game) {
         DrawRectangleLines(ix, iy, iw, ih, LIGHTGRAY);
     }
 
-    // Draw tabs
     DrawTabBar(game, ix, iy, iw);
 
-    // Draw active tab content
     switch (game->inventoryTab) {
         case INV_TAB_INVENTORY:
             DrawInventoryTab(game, ix, iy, iw, ih);
@@ -363,7 +485,6 @@ void Inventory_Render(const Game* game) {
             break;
     }
 
-    // Context-sensitive footer (only for inventory tab)
     if (game->inventoryTab == INV_TAB_INVENTORY) {
         char footer[128];
         if (game->inventorySlotCount == 0) {

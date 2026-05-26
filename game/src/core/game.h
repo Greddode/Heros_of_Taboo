@@ -76,6 +76,8 @@ typedef struct Game {
     int invActionSelection;
     InventoryTab inventoryTab;
 
+    EquipType equipped[EQUIP_SLOT_COUNT];
+
     int currentFloor;
     int maxFloors;
     int stairX;
