@@ -488,6 +488,8 @@ void DescendFloor(Game* game) {
     InventorySlot savedInventory[MAX_INVENTORY_SLOTS];
     memcpy(savedInventory, game->inventory, sizeof(savedInventory));
     int savedInvCount = game->inventorySlotCount;
+    EquipType savedEquipped[EQUIP_SLOT_COUNT];
+    memcpy(savedEquipped, game->equipped, sizeof(savedEquipped));
 
     Monster_UnloadSprites();
     Monster_ResetAll();
@@ -516,6 +518,20 @@ void DescendFloor(Game* game) {
     }
 
     LoadPotionTextures(game);
+
+    // Restore equipped items (re-apply stat bonuses after memset)
+    memcpy(game->equipped, savedEquipped, sizeof(savedEquipped));
+    for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
+        if (game->equipped[i] != EQUIP_NONE) {
+            const EquipData* d = GetEquipData(game->equipped[i]);
+            if (d) {
+                game->player.ent.attack  += d->bonusAttack;
+                game->player.ent.defense += d->bonusDefense;
+                game->player.ent.maxHp   += d->bonusMaxHp;
+                game->player.ent.hp      += d->bonusMaxHp;
+            }
+        }
+    }
 
     game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
     if (game->magicAttacksTexture.id == 0) {
@@ -687,6 +703,11 @@ bool InitGame(Game* game, const char* tmxFile) {
     }
 
     LoadPotionTextures(game);
+
+    // Default starting equipment
+    memset(game->equipped, 0, sizeof(game->equipped));
+    EquipItem(game, EQUIP_SURVIVAL_KNIFE);
+    InventoryAdd(game, ITEM_SMALL_HP_POTION);
 
     game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
     if (game->magicAttacksTexture.id == 0) {

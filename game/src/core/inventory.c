@@ -45,7 +45,7 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     { EQUIP_PLATE_MAIL,     "Plate Mail",        EQUIP_CAT_ARMOR,    EQUIP_SLOT_CHEST,    0, 6, 12 },
 
     // Weapons
-    { EQUIP_WOODEN_SWORD,   "Wooden Sword",      EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   3, 0, 0 },
+    { EQUIP_SURVIVAL_KNIFE,"Survival Knife",     EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   2, 0, 0 },
     { EQUIP_IRON_SWORD,     "Iron Sword",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   5, 0, 0 },
     { EQUIP_STEEL_SWORD,    "Steel Sword",       EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,   8, 0, 0 },
     { EQUIP_WAR_HAMMER,     "War Hammer",        EQUIP_CAT_WEAPON,   EQUIP_SLOT_WEAPON,  10, 1, 0 },
