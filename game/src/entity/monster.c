@@ -83,6 +83,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 1,
         .spawnWeight     = 14,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_SKELETON] = (MonsterTemplate){
@@ -306,12 +308,15 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->attack      = tpl->attack;
     m->defense     = tpl->defense;
     m->level       = tpl->level;
+    m->expValue    = tpl->expValue;
     m->attackType  = tpl->attackType;
     m->attackRange = tpl->attackRange;
-    m->expValue = tpl->expValue;
-    m->alive    = true;
-    m->active   = true;
+    m->alive       = true;
+    m->active      = true;
     m->facingRight = true;
+    m->lastSeenX   = -1;
+    m->lastSeenY   = -1;
+    m->huntTurns   = 0;
     strncpy(m->name, tpl->name, MONSTER_NAME_LEN - 1);
     m->name[MONSTER_NAME_LEN - 1] = '\0';
 
@@ -432,6 +437,42 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
 //  AI  –  processes all living monsters in one batch
 // ============================================================================
 
+// Evaluate movement toward a target tile, returns best direction or DIR_NONE.
+static Direction MoveToward(Monster* m, int targetX, int targetY,
+                            const unsigned char blocking[][MAP_WIDTH],
+                            int mapWidth, int mapHeight) {
+    Direction bestDir = DIR_NONE;
+    int bestDist = abs(targetX - m->x) + abs(targetY - m->y);
+    Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
+    for (int d = 0; d < 4; d++) {
+        int tx = m->x, ty = m->y;
+        switch (dirs[d]) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
+            !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
+            int nd = abs(targetX - tx) + abs(targetY - ty);
+            if (nd < bestDist) { bestDist = nd; bestDir = dirs[d]; }
+        }
+    }
+    return bestDir;
+}
+
+// Apply a directional move to the monster, updating facing.
+static void ApplyMove(Monster* m, Direction dir) {
+    switch (dir) {
+        case DIR_UP:    m->y--; break;
+        case DIR_DOWN:  m->y++; break;
+        case DIR_LEFT:  m->x--; m->facingRight = false; break;
+        case DIR_RIGHT: m->x++; m->facingRight = true;  break;
+        default: break;
+    }
+}
+
 // Process a single monster's AI (chase/attack/wander).
 // Does NOT snapshot prevX/prevY — that is done by the caller.
 static void ProcessMonsterAI(Monster* m, Game* game) {
@@ -446,12 +487,17 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
     int mapWidth = game->map->width;
     int mapHeight = game->map->height;
     const unsigned char(*blocking)[MAP_WIDTH] = game->blocking;
+    bool hasLOS = MonsterLineOfSight(m->x, m->y, playerX, playerY,
+                                     blocking, tpl->detectionRange);
 
-    // --- chase / attack ----------------------------------------------------
-    if (dist <= tpl->detectionRange &&
-        MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, tpl->detectionRange)) {
+    // --- chase / attack (player in LOS) -----------------------------------
+    if (dist <= tpl->detectionRange && hasLOS) {
+        // Remember where we last saw the player
+        m->lastSeenX = playerX;
+        m->lastSeenY = playerY;
+        m->huntTurns = 4;
 
-        // Check for ranged/magic attack: attack from distance if in range
+        // Ranged / magic attack check
         if (m->attackType != ATTACK_MELEE && dist <= m->attackRange &&
             (dx == 0 || dy == 0) &&
             MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, m->attackRange)) {
@@ -495,25 +541,14 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
             TraceLog(LOG_INFO, "%s %s you for %d damage (HP: %d)!",
                      m->name, verb, dmg, game->player.ent.hp);
             CombatLog_Add(&game->combatLog, BLACK, "%s %s you for %d!", m->name, verb, dmg);
-            return;  // skip movement — we attacked from range
+            return;
         }
 
-        Direction bestDir = DIR_NONE;
-        int bestDist = dist;
-        Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
-
-        for (int d = 0; d < 4; d++) {
-            int tx = m->x, ty = m->y;
-            switch (dirs[d]) {
-                case DIR_UP:    ty--; break;
-                case DIR_DOWN:  ty++; break;
-                case DIR_LEFT:  tx--; break;
-                case DIR_RIGHT: tx++; break;
-                default: break;
-            }
-
-            // can attack the player?
-            if (tx == playerX && ty == playerY) {
+        // Melee attack check (check if any adjacent tile has the player)
+        int neighborX[] = { m->x, m->x, m->x - 1, m->x + 1 };
+        int neighborY[] = { m->y - 1, m->y + 1, m->y, m->y };
+        for (int i = 0; i < 4; i++) {
+            if (neighborX[i] == playerX && neighborY[i] == playerY) {
                 int dmg = m->attack - game->player.ent.defense;
                 if (dmg < 1) dmg = 1;
                 game->player.ent.hp -= dmg;
@@ -524,46 +559,61 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          m->name, dmg, game->player.ent.hp);
                 CombatLog_Add(&game->combatLog, BLACK, "%s hits you for %d!", m->name, dmg);
-                return;  // skip movement — we attacked
-            }
-
-            if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
-                !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
-                int newDist = abs(playerX - tx) + abs(playerY - ty);
-                if (newDist < bestDist) {
-                    bestDist = newDist;
-                    bestDir = dirs[d];
-                }
+                return;
             }
         }
 
-        if (bestDir != DIR_NONE) {
-            switch (bestDir) {
-                case DIR_UP:    m->y--; break;
-                case DIR_DOWN:  m->y++; break;
-                case DIR_LEFT:  m->x--; m->facingRight = false; break;
-                case DIR_RIGHT: m->x++; m->facingRight = true;  break;
-                default: break;
+        // Move toward player
+        Direction bestDir = MoveToward(m, playerX, playerY, blocking, mapWidth, mapHeight);
+        if (bestDir != DIR_NONE) ApplyMove(m, bestDir);
+    }
+    // --- hunt: chase last known position when LOS is lost ------------------
+    else if (m->huntTurns > 0 && m->lastSeenX >= 0) {
+        m->huntTurns--;
+
+        // If we stumble back onto the player, melee
+        int neighborX[] = { m->x, m->x, m->x - 1, m->x + 1 };
+        int neighborY[] = { m->y - 1, m->y + 1, m->y, m->y };
+        for (int i = 0; i < 4; i++) {
+            if (neighborX[i] == playerX && neighborY[i] == playerY) {
+                int dmg = m->attack - game->player.ent.defense;
+                if (dmg < 1) dmg = 1;
+                game->player.ent.hp -= dmg;
+                if (game->player.ent.hp < 0) game->player.ent.hp = 0;
+                PlayHitSound();
+                m->hitFlashTimer = 0.15f;
+                game->player.ent.hitFlashTimer = 0.15f;
+                TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
+                         m->name, dmg, game->player.ent.hp);
+                CombatLog_Add(&game->combatLog, BLACK, "%s hits you for %d!", m->name, dmg);
+                return;
             }
         }
+
+        Direction bestDir = MoveToward(m, m->lastSeenX, m->lastSeenY,
+                                       blocking, mapWidth, mapHeight);
+        if (bestDir != DIR_NONE) ApplyMove(m, bestDir);
     }
     // --- wander ------------------------------------------------------------
-    else if (dist <= tpl->detectionRange + 4) {
-        Direction dir = (Direction)(GetRandomValue(DIR_UP, DIR_RIGHT));
-        int tx = m->x, ty = m->y;
-        switch (dir) {
-            case DIR_UP:    ty--; break;
-            case DIR_DOWN:  ty++; break;
-            case DIR_LEFT:  tx--; break;
-            case DIR_RIGHT: tx++; break;
-            default: break;
-        }
-        if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
-            !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
-            m->x = tx;
-            m->y = ty;
-            if (dir == DIR_LEFT)  m->facingRight = false;
-            if (dir == DIR_RIGHT) m->facingRight = true;
+    else if (dist <= tpl->detectionRange + 8) {
+        for (int attempt = 0; attempt < 4; attempt++) {
+            Direction dir = (Direction)(GetRandomValue(DIR_UP, DIR_RIGHT));
+            int tx = m->x, ty = m->y;
+            switch (dir) {
+                case DIR_UP:    ty--; break;
+                case DIR_DOWN:  ty++; break;
+                case DIR_LEFT:  tx--; break;
+                case DIR_RIGHT: tx++; break;
+                default: break;
+            }
+            if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
+                !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
+                m->x = tx;
+                m->y = ty;
+                if (dir == DIR_LEFT)  m->facingRight = false;
+                if (dir == DIR_RIGHT) m->facingRight = true;
+                break;
+            }
         }
     }
 }

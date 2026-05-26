@@ -78,6 +78,8 @@ typedef struct {
     int shadowTurnCounter;
     AttackType attackType;
     int attackRange;
+    int lastSeenX, lastSeenY;   // last known player position (-1 = unknown)
+    int huntTurns;               // turns remaining to chase last known position
 } Monster;
 
 // ============================================================================

@@ -5,6 +5,7 @@
 #include "entity/spawner.h"
 #include "ui/combat_log.h"
 #include "ui/monster_info.h"
+#include "core/audio.h"
 #include "procedural.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -248,6 +249,27 @@ void HandleInput(Game* game) {
                     if (!alive) {
                         game->state = STATE_GAME_OVER;
                         return;
+                    }
+
+                    // Pick up any potion at the current tile
+                    for (int h = 0; h < game->potionCount; h++) {
+                        if (!game->potionCollected[h] &&
+                            game->potionTiles[h][0] == game->player.ent.x &&
+                            game->potionTiles[h][1] == game->player.ent.y) {
+                            game->potionCollected[h] = true;
+                            ItemType ptype = game->potionTypes[h];
+                            int qty = game->potionQuantities[h];
+                            int picked = 0;
+                            for (int i = 0; i < qty; i++) {
+                                if (InventoryAdd(game, ptype)) picked++;
+                                else break;
+                            }
+                            if (picked > 0) {
+                                TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(ptype));
+                                CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(ptype));
+                                PlayPickupSound();
+                            }
+                        }
                     }
                 }
 
