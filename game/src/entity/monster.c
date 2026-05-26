@@ -435,7 +435,7 @@ static void ProcessMonsterAI(Monster* m,
                 if (playerHitFlash) *playerHitFlash = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          m->name, dmg, *playerHp);
-                CombatLog_Add(combatLog, LIGHTGRAY, "%s hits you for %d!", m->name, dmg);
+                CombatLog_Add(combatLog, BLACK, "%s hits you for %d!", m->name, dmg);
                 return;  // skip movement — we attacked
             }
 

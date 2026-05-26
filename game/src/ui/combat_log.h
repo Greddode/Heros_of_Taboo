@@ -17,6 +17,8 @@ typedef struct {
 void CombatLog_Add(CombatLog* log, Color color, const char* fmt, ...);
 
 // Draw the last maxLines entries from the log, oldest at top, newest at bottom
-void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize);
+// Optionally render on a 9-sliced texture background (pass tex.id=0 to skip).
+void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize,
+                      Texture2D bgTex, int sliceMargin);
 
 #endif

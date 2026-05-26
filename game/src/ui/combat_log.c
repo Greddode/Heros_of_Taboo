@@ -1,4 +1,5 @@
 #include "combat_log.h"
+#include "core/game.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -17,7 +18,8 @@ void CombatLog_Add(CombatLog* log, Color color, const char* fmt, ...) {
 }
 
 // Draw the last maxLines entries anchored at bottom-right (y = bottom line)
-void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize) {
+void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize,
+                      Texture2D bgTex, int sliceMargin) {
     if (!log) return;
     int total = log->count;
     int available = (total < COMBAT_LOG_MAX) ? total : COMBAT_LOG_MAX;
@@ -29,7 +31,10 @@ void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int font
     int logH = visible * lineH + 4;
     int bgY = y - logH;
 
-    DrawRectangle(x - 4, bgY, logW, logH, (Color){ 0, 0, 0, 180 });
+    if (bgTex.id > 0)
+        Draw9Slice(bgTex, (Rectangle){ (float)(x - 4), (float)bgY, (float)logW, (float)logH }, sliceMargin, sliceMargin, sliceMargin, sliceMargin);
+    else
+        DrawRectangle(x - 4, bgY, logW, logH, (Color){ 0, 0, 0, 180 });
 
     int firstVirtual = total - visible;
     for (int i = 0; i < visible; i++) {

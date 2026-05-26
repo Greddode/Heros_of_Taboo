@@ -1,115 +1,17 @@
 #include "game.h"
 #include "entity/entity.h"
 #include "entity/player.h"
+#include "entity/monster.h"
+#include "entity/spawner.h"
 #include "ui/combat_log.h"
 #include "ui/monster_info.h"
-#include "entity/monster.h"
 #include "procedural.h"
-#include "entity/spawner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Check if a tile lies within any generated room's bounds.
-static bool IsInRoom(int x, int y) {
-    ProceduralRoom rooms[MAX_GENERATED_ROOMS];
-    int count = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
-    for (int i = 0; i < count; i++) {
-        if (x >= rooms[i].x && x < rooms[i].x + rooms[i].w &&
-            y >= rooms[i].y && y < rooms[i].y + rooms[i].h)
-            return true;
-    }
-    return false;
-}
-
-// Simple circular radius reveal: all tiles within FOG_RADIUS are lit.
-// Previously-seen tiles are dimmed.
-static void RevealFOW(Game* game) {
-    int px = game->player.ent.x;
-    int py = game->player.ent.y;
-
-    for (int y = 0; y < game->map->height; y++) {
-        for (int x = 0; x < game->map->width; x++) {
-            if (game->visibility[y][x] == 1)
-                game->visibility[y][x] = 2;
-        }
-    }
-
-    int r2 = FOG_RADIUS * FOG_RADIUS;
-    for (int dy = -FOG_RADIUS; dy <= FOG_RADIUS; dy++) {
-        int ny = py + dy;
-        if (ny < 0 || ny >= game->map->height) continue;
-        for (int dx = -FOG_RADIUS; dx <= FOG_RADIUS; dx++) {
-            int nx = px + dx;
-            if (nx < 0 || nx >= game->map->width) continue;
-            if (dx * dx + dy * dy <= r2)
-                game->visibility[ny][nx] = 1;
-        }
-    }
-}
-
-// Place the escape teleport tile on a random floor tile when all monsters on floor 10 are dead.
-static void SpawnEscapeTile(Game* game) {
-    int w = game->map->width;
-    int h = game->map->height;
-    int* data = game->map->layers[0].data;
-
-    for (int attempt = 0; attempt < 200; attempt++) {
-        int tx = GetRandomValue(3, w - 4);
-        int ty = GetRandomValue(3, h - 4);
-        if (IsFloorGID(data[ty * w + tx])) {
-            data[ty * w + tx] = TILE_ESCAPE;
-            game->escapeX = tx;
-            game->escapeY = ty;
-            TraceLog(LOG_INFO, "Escape tile placed at (%d,%d)", tx, ty);
-            return;
-        }
-    }
-    TraceLog(LOG_WARNING, "Escape tile: could not find valid position");
-}
-
-// Locate a walkable tile away from the player and spawn the shadow monster,
-// scaled to twice the player's level.
-static void SpawnShadow(Game* game) {
-    int px = game->player.ent.x;
-    int py = game->player.ent.y;
-    int w = game->map->width;
-    int h = game->map->height;
-
-    for (int attempt = 0; attempt < 100; attempt++) {
-        int tx = GetRandomValue(3, w - 4);
-        int ty = GetRandomValue(3, h - 4);
-        int dx = tx - px;
-        int dy = ty - py;
-        if (dx * dx + dy * dy >= 25 && !game->blocking[ty][tx] && IsFloorGID(GetTileGID(game->map, 0, tx, ty))) {
-            Monster* shadow = Monster_Spawn(MONSTER_SHADOW, tx, ty, 1);
-            if (shadow) {
-                int targetLevel = game->player.ent.level * 2;
-                if (targetLevel < 10) targetLevel = 10;
-                int extra = targetLevel - 1;
-                if (extra > 0) {
-                    shadow->level    = targetLevel;
-                    shadow->maxHp   += extra * 2;
-                    shadow->hp       = shadow->maxHp;
-                    shadow->attack  += extra;
-                    shadow->defense += extra / 2;
-                    shadow->expValue += extra * 5;
-                }
-                shadow->shadowTurnCounter = 0;
-                TraceLog(LOG_INFO, "Shadow spawned at (%d,%d) level %d", tx, ty, targetLevel);
-            }
-            return;
-        }
-    }
-    TraceLog(LOG_WARNING, "Shadow: could not find valid spawn position");
-}
-
-// Read directional keys (arrow/WASD) and pass them to MoveEntity.
-// Period/space waits a turn, restoring 1 HP.
-// After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
     if (game->state == STATE_INVENTORY) {
-        // I always closes; ESC closes from BROWSE, goes back from action menu
         if (IsKeyPressed(KEY_I)) {
             game->state = STATE_PLAYER_TURN;
             return;
@@ -139,20 +41,18 @@ void HandleInput(Game* game) {
             if (IsKeyPressed(KEY_DOWN) && game->invActionSelection < 3)
                 game->invActionSelection++;
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                if (game->invActionSelection == 0) { // Use
+                if (game->invActionSelection == 0) {
                     if (InventoryUse(game, game->inventorySelection)) {
-                        // Using an item costs a turn
                         game->turnCount++;
                         game->enemyTurnCooldown = 0.15f;
                         game->state = STATE_ENEMY_TURN;
                     } else {
                         game->invSubState = INV_BROWSE;
                     }
-                } else if (game->invActionSelection == 1) { // Drop (one at a time)
+                } else if (game->invActionSelection == 1) {
                     InventorySlot* slot = &game->inventory[game->inventorySelection];
                     ItemType type = slot->type;
                     slot->quantity--;
-                    // Stack on an existing pile of the same type at this position
                     bool stacked = false;
                     for (int p = 0; p < game->potionCount; p++) {
                         if (game->potionCollected[p]) continue;
@@ -172,8 +72,7 @@ void HandleInput(Game* game) {
                         game->potionQuantities[game->potionCount] = 1;
                         game->potionCount++;
                     }
-                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Dropped %s", GetItemName(type));
-                    // Remove empty slot
+                    CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", GetItemName(type));
                     if (slot->quantity <= 0) {
                         for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
                             game->inventory[i] = game->inventory[i + 1];
@@ -182,12 +81,11 @@ void HandleInput(Game* game) {
                             game->inventorySelection = game->inventorySlotCount - 1;
                     }
                     game->invSubState = INV_BROWSE;
-                } else if (game->invActionSelection == 2) { // Drop All
+                } else if (game->invActionSelection == 2) {
                     InventorySlot* slot = &game->inventory[game->inventorySelection];
                     ItemType type = slot->type;
                     int total = slot->quantity;
                     slot->quantity = 0;
-                    // Stack on an existing pile of the same type at this position
                     bool stacked = false;
                     for (int p = 0; p < game->potionCount; p++) {
                         if (game->potionCollected[p]) continue;
@@ -207,15 +105,14 @@ void HandleInput(Game* game) {
                         game->potionQuantities[game->potionCount] = total;
                         game->potionCount++;
                     }
-                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Dropped %d x %s", total, GetItemName(type));
-                    // Remove empty slot
+                    CombatLog_Add(&game->combatLog, BLACK, "Dropped %d x %s", total, GetItemName(type));
                     for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
                         game->inventory[i] = game->inventory[i + 1];
                     game->inventorySlotCount--;
                     if (game->inventorySelection >= game->inventorySlotCount)
                         game->inventorySelection = game->inventorySlotCount - 1;
                     game->invSubState = INV_BROWSE;
-                } else { // Back
+                } else {
                     game->invSubState = INV_BROWSE;
                 }
             }
@@ -251,7 +148,6 @@ void HandleInput(Game* game) {
                 }
                 game->selectedPotionTileActive = false;
             } else {
-                // Check for potions at this tile
                 game->selectedMonsterIdx = -1;
                 game->selectedPotionTileActive = false;
                 for (int p = 0; p < game->potionCount; p++) {
@@ -271,7 +167,7 @@ void HandleInput(Game* game) {
         }
     }
 
-    // Sprint: hold SHIFT + direction to slide to nearest obstacle
+    // Sprint: hold SHIFT + direction
     if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
         Direction sprintDir = DIR_NONE;
         if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) sprintDir = DIR_UP;
@@ -306,7 +202,6 @@ void HandleInput(Game* game) {
 
             int steps = abs(endX - startX) + abs(endY - startY);
             if (steps > 0) {
-                // Snapshot monster positions so sprite interpolation works smoothly
                 Monster* monArray = Monster_GetArray();
                 int monCount = Monster_GetCount();
                 typedef struct { int x, y; float hitFlash; } MonSnap;
@@ -330,12 +225,10 @@ void HandleInput(Game* game) {
                     int nx = game->player.ent.x + dx;
                     int ny = game->player.ent.y + dy;
 
-                    // Re-check obstacles (a monster may have moved into the path)
                     if (nx < 0 || nx >= game->map->width || ny < 0 || ny >= game->map->height) break;
                     if (game->blocking[ny][nx]) break;
                     if (Monster_GetAt(nx, ny, NULL)) break;
 
-                    // Stop when crossing between room and hallway; sprint again to bypass
                     if (IsInRoom(game->player.ent.x, game->player.ent.y) != IsInRoom(nx, ny)) {
                         if (game->sprintBypassRoom) {
                             game->sprintBypassRoom = false;
@@ -365,7 +258,6 @@ void HandleInput(Game* game) {
 
                 if (!stoppedAtRoom) game->sprintBypassRoom = false;
 
-                // Restore original positions as prev for smooth interpolation
                 for (int i = 0; i < snapCount; i++) {
                     monArray[i].prevX = monSnap[i].x;
                     monArray[i].prevY = monSnap[i].y;
@@ -406,8 +298,11 @@ void HandleInput(Game* game) {
             CombatLog_Add(&game->combatLog, RED, "You feel a presence come to this floor");
         }
         if (game->player.ent.hp < game->player.ent.maxHp) {
-            game->player.ent.hp++;
-            CombatLog_Add(&game->combatLog, LIGHTGRAY, "Wait heals 1 HP");
+            int waitHeal = 1 + (game->player.ent.level / 5) * 2;
+            game->player.ent.hp += waitHeal;
+            if (game->player.ent.hp > game->player.ent.maxHp)
+                game->player.ent.hp = game->player.ent.maxHp;
+            CombatLog_Add(&game->combatLog, BLACK, "Wait heals %d HP", waitHeal);
         }
         game->enemyTurnCooldown = 0.08f;
         game->state = STATE_ENEMY_TURN;
@@ -432,7 +327,6 @@ void HandleInput(Game* game) {
         }
     }
 
-    // Open inventory
     if (IsKeyPressed(KEY_I)) {
         game->state = STATE_INVENTORY;
         game->invSubState = INV_BROWSE;
@@ -441,21 +335,17 @@ void HandleInput(Game* game) {
         return;
     }
 
-    // Check if player is on the stair tile after movement
     if (game->player.ent.x == game->stairX && game->player.ent.y == game->stairY &&
         game->stairX >= 0 && game->stairY >= 0) {
         DescendFloor(game);
     }
 
-    // Check if player is on the escape tile
     if (game->escapeSpawned &&
         game->player.ent.x == game->escapeX && game->player.ent.y == game->escapeY) {
         game->state = STATE_WIN;
     }
 }
 
-// Advance flash timers, run monster AI during the enemy turn,
-// and check win/loss conditions.
 void UpdateGame(Game* game) {
     if (!game) return;
 
@@ -483,7 +373,6 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        // Process all monster AI
         bool playerAlive = Monster_ProcessAllAI(
             game->player.ent.x, game->player.ent.y, &game->player.ent.hp, game->player.ent.defense,
             &game->player.ent.hitFlashTimer,
@@ -516,415 +405,6 @@ void UpdateGame(Game* game) {
     }
 }
 
-// Render the map, entities, and HUD.
-void RenderGame(const Game* game) {
-    if (!game || !game->map) return;
-
-    int tw = game->map->tileWidth;
-    int th = game->map->tileHeight;
-
-    BeginMode2D(game->camera);
-
-    for (int layer = 0; layer < game->map->layerCount; layer++) {
-        if (!game->map->layers[layer].visible) continue;
-
-        for (int y = 0; y < game->map->height; y++) {
-            for (int x = 0; x < game->map->width; x++) {
-                unsigned char vis = game->visibility[y][x];
-                if (vis == 0) continue;
-
-                DrawTile(game, x, y, layer);
-
-                if (vis == 2) {
-                    Vector2 pos = TileToScreen(x, y, tw, th);
-                    DrawRectangle(pos.x, pos.y, tw, th, (Color){ 0, 0, 0, 180 });
-                }
-            }
-        }
-    }
-
-    for (int i = 0; i < game->potionCount; i++) {
-        if (game->potionCollected[i]) continue;
-        int hx = game->potionTiles[i][0];
-        int hy = game->potionTiles[i][1];
-        if (game->visibility[hy][hx] != 1) continue;
-
-        int texIdx = game->potionTypes[i] - 1; // ITEM_SMALL=1 → 0, etc.
-        if (texIdx >= 0 && texIdx < 3 && game->potionTextures[texIdx].id > 0) {
-            Vector2 hpos = TileToScreen(hx, hy, tw, th);
-            Rectangle dest = { hpos.x, hpos.y, (float)tw, (float)th };
-            DrawTexturePro(game->potionTextures[texIdx],
-                           (Rectangle){ 0, 0, (float)game->potionTextures[texIdx].width, (float)game->potionTextures[texIdx].height },
-                           dest, (Vector2){ 0, 0 }, 0, WHITE);
-            // Quantity badge
-            if (game->potionQuantities[i] > 1) {
-                char qty[8];
-                snprintf(qty, sizeof(qty), "x%d", game->potionQuantities[i]);
-                DrawText(qty, hpos.x + 2, hpos.y + 2, 10, YELLOW);
-            }
-        }
-    }
-
-    // --- Interpolation factors ------------------------------------------------
-    float pd = (game->animDuration > 0.0f) ? game->animDuration : MOVE_ANIM_DURATION;
-    float md = (game->monsterAnimDuration > 0.0f) ? game->monsterAnimDuration : MOVE_ANIM_DURATION;
-    float playerT = (game->animTimer <= 0.0f) ? 1.0f : 1.0f - (game->animTimer / pd);
-    float monsterT = (game->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (game->monsterAnimTimer / md);
-
-    // --- Monsters ------------------------------------------------------------
-    Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, monsterT);
-
-    // --- Player --------------------------------------------------------------
-    if (game->player.ent.alive) {
-        float px = (float)(game->player.ent.prevX * tw) * (1.0f - playerT) + (float)(game->player.ent.x * tw) * playerT;
-        float py = (float)(game->player.ent.prevY * th) * (1.0f - playerT) + (float)(game->player.ent.y * th) * playerT;
-
-        if (game->player.ent.spriteSheet.id > 0) {
-            int cellStride = 17; // 16px tile + 1px spacing
-            Rectangle src = {
-                (float)(game->player.ent.animFrame * cellStride),
-                (float)(game->player.ent.spriteRow * cellStride),
-                16.0f, 16.0f
-            };
-            Rectangle dest = { px, py, (float)tw, (float)th };
-            Color tint = (game->player.ent.hitFlashTimer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;
-            DrawTexturePro(game->player.ent.spriteSheet, src, dest, (Vector2){ 0, 0 }, 0, tint);
-        } else {
-            // Fallback: coloured rectangle with face
-            int pad = tw / 6;
-            Color playerColor = (game->player.ent.hitFlashTimer > 0.0f) ? WHITE : game->player.ent.color;
-            DrawRectangle(px + pad, py + pad, tw - 2*pad, th - 2*pad, playerColor);
-
-            int cx = px + tw / 2;
-            int cy = py + th / 2;
-            DrawCircle(cx - 3, cy - 2, 2, WHITE);
-            DrawCircle(cx + 3, cy - 2, 2, WHITE);
-
-            if (game->player.ent.facingRight) {
-                DrawCircle(cx + 5, cy + 4, 1, WHITE);
-            } else {
-                DrawCircle(cx - 5, cy + 4, 1, WHITE);
-            }
-        }
-    }
-
-    EndMode2D();
-
-    // --- HUD (screen space) --------------------------------------------------
-
-    // Stats panel (bottom-left)
-    int panelX = 10;
-    int panelW = 260;
-    int barW = panelW - 20;
-    int barH = 16;
-    int textY = 0;
-
-    // Level
-    char levelText[64];
-    snprintf(levelText, sizeof(levelText), "Lv %d", game->player.ent.level);
-    int panelH = 100;
-    int panelY = GetScreenHeight() - 10 - panelH;
-    DrawRectangle(panelX - 4, panelY, panelW, panelH, (Color){ 0, 0, 0, 180 });
-    textY = panelY + 4;
-    DrawText(levelText, panelX, textY, 18, WHITE);
-
-    // HP bar
-    textY += 24;
-    float hpRatio = (float)game->player.ent.hp / (float)game->player.ent.maxHp;
-    if (hpRatio < 0) hpRatio = 0;
-    DrawRectangle(panelX, textY, barW, barH, (Color){ 60, 0, 0, 255 });
-    DrawRectangle(panelX, textY, (int)(barW * hpRatio), barH, RED);
-    char hpText[64];
-    snprintf(hpText, sizeof(hpText), "HP: %d/%d", game->player.ent.hp, game->player.ent.maxHp);
-    DrawText(hpText, panelX + 4, textY + 1, 14, WHITE);
-
-    // EXP bar
-    textY += barH + 6;
-    float expRatio = (float)game->player.exp / (float)game->player.expToNext;
-    if (expRatio < 0) expRatio = 0;
-    DrawRectangle(panelX, textY, barW, barH, (Color){ 0, 0, 60, 255 });
-    DrawRectangle(panelX, textY, (int)(barW * expRatio), barH, (Color){ 80, 80, 255, 255 });
-    char expText[64];
-    snprintf(expText, sizeof(expText), "EXP: %d/%d", game->player.exp, game->player.expToNext);
-    DrawText(expText, panelX + 4, textY + 1, 14, WHITE);
-
-    // Floor + enemies
-    textY += barH + 6;
-    char infoText[64];
-    snprintf(infoText, sizeof(infoText), "Floor: %d/%d", game->currentFloor, game->maxFloors);
-    DrawText(infoText, panelX, textY, 14, LIGHTGRAY);
-
-    // Combat log (bottom-right)
-    CombatLog_Render(&game->combatLog, GetScreenWidth() - 370, GetScreenHeight() - 10, 14, 18);
-
-    MonsterInfo_Render(game);
-
-    // --- Potion tile info (top-right, below monster info) ---
-    if (game->selectedPotionTileActive) {
-        // Collect items at this tile
-        int ptx = game->selectedPotionTileX;
-        int pty = game->selectedPotionTileY;
-        ItemType tileTypes[MAX_POTIONS];
-        int tileQtys[MAX_POTIONS];
-        int tileCount = 0;
-        for (int p = 0; p < game->potionCount; p++) {
-            if (game->potionCollected[p]) continue;
-            if (game->potionTiles[p][0] == ptx && game->potionTiles[p][1] == pty) {
-                tileTypes[tileCount] = game->potionTypes[p];
-                tileQtys[tileCount] = game->potionQuantities[p];
-                tileCount++;
-                if (tileCount >= MAX_POTIONS) break;
-            }
-        }
-
-        if (tileCount > 0) {
-            int pX = GetScreenWidth() - 200;
-            int pY = 180; // below monster info
-            int pW = 190;
-            int pH = 40 + tileCount * 50;
-            if (pH > GetScreenHeight() - pY - 10) pH = GetScreenHeight() - pY - 10;
-            int ly = pY + 6;
-            int fs = 14;
-            int lh = fs + 4;
-            char buf[128];
-
-            DrawRectangle(pX, pY, pW, pH, (Color){ 0, 0, 0, 200 });
-            DrawRectangleLines(pX, pY, pW, pH, (Color){ 80, 80, 80, 255 });
-
-            for (int i = 0; i < tileCount; i++) {
-                const char* name = GetItemName(tileTypes[i]);
-                int heal = GetItemHealAmount(tileTypes[i]);
-                int qty = tileQtys[i];
-
-                snprintf(buf, sizeof(buf), "%s x%d", name, qty);
-                DrawText(buf, pX + 6, ly, fs, YELLOW); ly += lh;
-
-                snprintf(buf, sizeof(buf), "Heals %d HP", heal);
-                DrawText(buf, pX + 6, ly, fs, (Color){ 100, 255, 100, 255 }); ly += lh;
-
-                ly += 4; // spacing between stacks
-            }
-        }
-    }
-
-    // State text (bottom center)
-    const char* stateText = "";
-    if (game->state == STATE_GAME_OVER) stateText = "GAME OVER - Press R to restart";
-    else if (game->state == STATE_WIN) stateText = "YOU WIN! - Press R to restart";
-    else if (game->state == STATE_PLAYER_TURN) stateText = "Your turn";
-    else if (game->state == STATE_ENEMY_TURN) stateText = "Enemy turn...";
-
-    if (stateText[0]) {
-        int textWidth = MeasureText(stateText, 20);
-        DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - 40, 20, YELLOW);
-    }
-
-    // --- Inventory overlay ---------------------------------------------------
-    if (game->state == STATE_INVENTORY) {
-        int sw = GetScreenWidth();
-        int sh = GetScreenHeight();
-        int iw = 640;
-        int ih = 360;
-        int ix = (sw - iw) / 2;
-        int iy = (sh - ih) / 2;
-
-        DrawRectangle(0, 0, sw, sh, (Color){ 0, 0, 0, 160 });
-        DrawRectangle(ix, iy, iw, ih, (Color){ 30, 30, 40, 255 });
-        DrawRectangleLines(ix, iy, iw, ih, LIGHTGRAY);
-
-        // --- Left column: item list ---
-        int lx = ix + 16;
-        int ly = iy + 12;
-        int lw = 280;
-        DrawText("INVENTORY", lx, ly, 20, YELLOW);
-        ly += 30;
-
-        if (game->inventorySlotCount == 0) {
-            DrawText("(empty)", lx, ly, 16, GRAY);
-        } else {
-            for (int i = 0; i < game->inventorySlotCount; i++) {
-                Color c = (i == game->inventorySelection) ? YELLOW : WHITE;
-                char line[128];
-                snprintf(line, sizeof(line), "%s x%d", GetItemName(game->inventory[i].type), game->inventory[i].quantity);
-                if (i == game->inventorySelection)
-                    DrawText(">", lx - 18, ly, 16, YELLOW);
-                DrawText(line, lx, ly, 16, c);
-                ly += 22;
-            }
-        }
-
-        // --- Right column: info panel (origin middle) ---
-        int rx = ix + lw + 24;
-        int rw = iw - lw - 40;
-        int rtop = iy + 40;
-        int rh = ih - 70;
-        int rcx = rx + rw / 2;   // horizontal centre
-
-        if (game->inventorySlotCount > 0) {
-            ItemType selType = game->inventory[game->inventorySelection].type;
-
-            // Draw a subtle border for the info box
-            DrawRectangleLines(rx, rtop, rw, rh, (Color){ 60, 60, 80, 255 });
-
-            int infoY = rtop + 14;
-
-            // Item name centred
-            const char* iname = GetItemName(selType);
-            int tw = MeasureText(iname, 16);
-            DrawText(iname, rcx - tw / 2, infoY, 16, YELLOW);
-            infoY += 24;
-
-            // Description (multi-line)
-            const char* desc = GetItemDescription(selType);
-            char descCopy[256];
-            strncpy(descCopy, desc, sizeof(descCopy) - 1);
-            descCopy[sizeof(descCopy) - 1] = '\0';
-            char* line = descCopy;
-            char* nl;
-            while ((nl = strchr(line, '\n')) != NULL) {
-                *nl = '\0';
-                DrawText(line, rx + 10, infoY, 14, LIGHTGRAY);
-                infoY += 18;
-                line = nl + 1;
-            }
-            if (*line) {
-                DrawText(line, rx + 10, infoY, 14, LIGHTGRAY);
-                infoY += 18;
-            }
-
-            // Quantity
-            char qty[64];
-            snprintf(qty, sizeof(qty), "Qty: %d", game->inventory[game->inventorySelection].quantity);
-            DrawText(qty, rx + 10, infoY, 14, WHITE);
-            infoY += 22;
-
-            // Heal amount
-            int heal = GetItemHealAmount(selType);
-            if (heal > 0) {
-                char healStr[64];
-                snprintf(healStr, sizeof(healStr), "Heals %d HP", heal);
-                DrawText(healStr, rx + 10, infoY, 14, (Color){ 100, 255, 100, 255 });
-            }
-        } else {
-            const char* msg = "(empty)";
-            int tw = MeasureText(msg, 16);
-            DrawText(msg, rcx - tw / 2, (iy + ih) / 2 - 8, 16, GRAY);
-        }
-
-        // --- Context-sensitive footer ---
-        char footer[128];
-        if (game->inventorySlotCount == 0) {
-            snprintf(footer, sizeof(footer), "I / ESC to close");
-        } else if (game->invSubState == INV_BROWSE) {
-            snprintf(footer, sizeof(footer), "ENTER to select action  |  I / ESC to close");
-        } else {
-            snprintf(footer, sizeof(footer), "UP/DOWN to choose  |  ENTER to confirm  |  ESC to go back");
-        }
-        DrawText(footer, ix + 16, iy + ih - 28, 14, GRAY);
-
-        // --- Action-menu popup ---
-        if (game->invSubState == INV_ACTION_MENU && game->inventorySlotCount > 0) {
-            static const char* actions[] = { "Use", "Drop", "Drop All", "Back" };
-            int mx = ix + 16 + lw + 2;
-            int my = iy + 40 + game->inventorySelection * 22 + 30 - 2;
-            if (my + 80 > iy + ih - 30) my = iy + ih - 30 - 80;
-            if (my < iy + 40) my = iy + 40;
-            int mw = 140;
-            int mh = 112;
-
-            DrawRectangle(mx, my, mw, mh, (Color){ 20, 20, 30, 240 });
-            DrawRectangleLines(mx, my, mw, mh, YELLOW);
-
-            for (int a = 0; a < 4; a++) {
-                Color ac = (a == game->invActionSelection) ? YELLOW : WHITE;
-                if (a == game->invActionSelection)
-                    DrawText(">", mx + 6, my + 6 + a * 26, 16, YELLOW);
-                DrawText(actions[a], mx + 22, my + 6 + a * 26, 16, ac);
-            }
-        }
-    }
-}
-
-// Build the blocking grid from the tile map.
-// Looks for a layer named "collision" (case-sensitive); if not found,
-// uses layer index 1 as the collision layer.  Any non-zero GID blocks movement.
-static void BuildBlockingMap(Game* game) {
-    if (!game || !game->map) return;
-
-    int w = game->map->width;
-    int h = game->map->height;
-
-    int collisionLayer = -1;
-    for (int i = 0; i < game->map->layerCount; i++) {
-        if (strcmp(game->map->layers[i].name, "collision") == 0 ||
-            strcmp(game->map->layers[i].name, "Collision") == 0) {
-            collisionLayer = i;
-            break;
-        }
-    }
-
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            if (collisionLayer >= 0) {
-                game->blocking[y][x] = (GetTileGID(game->map, collisionLayer, x, y) > 0) ? 1 : 0;
-            } else if (game->map->layerCount >= 2) {
-                game->blocking[y][x] = (GetTileGID(game->map, 1, x, y) > 0) ? 1 : 0;
-            } else {
-                game->blocking[y][x] = 0;
-            }
-        }
-    }
-}
-
-// Iterate map objects from the TMX file and spawn the player,
-// health potions, or monsters based on the object's type field.
-static void SpawnEntitiesFromObjects(Game* game) {
-    if (!game || !game->map) return;
-
-    for (int i = 0; i < game->map->objectCount; i++) {
-        MapObject* obj = &game->map->objects[i];
-        int tileX = (int)(obj->x / game->map->tileWidth);
-        int tileY = (int)(obj->y / game->map->tileHeight);
-
-        // --- Player spawn ----------------------------------------------------
-        if (strcmp(obj->type, "player") == 0 || strcmp(obj->name, "player") == 0 ||
-            strcmp(obj->type, "Player") == 0) {
-            game->player.ent.x = tileX;
-            game->player.ent.y = tileY;
-            game->player.ent.prevX = tileX;
-            game->player.ent.prevY = tileY;
-            TraceLog(LOG_INFO, "Player spawned at (%d, %d)", tileX, tileY);
-        }
-        // --- Health potion ---------------------------------------------------
-        else if (strcmp(obj->type, "healing") == 0 || strcmp(obj->type, "Healing") == 0 ||
-                 strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0 ||
-                 strcmp(obj->type, "health_potion") == 0 ||
-                 strcmp(obj->name, "health_potion") == 0 || strcmp(obj->name, "HealthPotion") == 0) {
-            if (game->potionCount >= MAX_POTIONS) continue;
-            game->potionTiles[game->potionCount][0] = tileX;
-            game->potionTiles[game->potionCount][1] = tileY;
-            game->potionCollected[game->potionCount] = false;
-            game->potionQuantities[game->potionCount] = 1;
-            if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
-            else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
-            else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
-            game->potionCount++;
-            TraceLog(LOG_INFO, "Health potion at (%d, %d)", tileX, tileY);
-        }
-        // --- Monsters --------------------------------------------------------
-        // TMX object type is matched against MonsterTemplate.tmxTypeName
-        else {
-            Monster* mon = Monster_SpawnByTypeName(obj->type, tileX, tileY, game->currentFloor);
-            if (mon) TraceLog(LOG_INFO, "%s spawned at (%d, %d)", mon->name, tileX, tileY);
-        }
-    }
-}
-
-static void LoadPotionTextures(Game* game);
-static void UnloadPotionTextures(Game* game);
-
-// Regenerate the map when the player descends to the next floor.
-// Player stats (HP, level, EXP) are preserved; the map and entities are rebuilt.
 void DescendFloor(Game* game) {
     Player savedPlayer = game->player;
     InventorySlot savedInventory[MAX_INVENTORY_SLOTS];
@@ -1037,120 +517,14 @@ void DescendFloor(Game* game) {
 
     char floorMsg[64];
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
-    CombatLog_Add(&game->combatLog, LIGHTGRAY, floorMsg);
+    CombatLog_Add(&game->combatLog, BLACK, floorMsg);
     TraceLog(LOG_INFO, "%s", floorMsg);
 }
 
-// ---------------------------------------------------------------------------
-// Item metadata
-// ---------------------------------------------------------------------------
-static const char* ITEM_NAMES[ITEM_COUNT] = {
-    "",
-    "Small HP Potion",
-    "Big HP Potion",
-    "Large HP Potion"
-};
-static const int ITEM_HEALS[ITEM_COUNT] = {
-    0,
-    8,  // floor 1-2
-    18, // floor 3-5
-    36  // floor 6+
-};
-static const char* ITEM_DESCS[ITEM_COUNT] = {
-    "",
-    "A small vial of red liquid.\nRestores 8 HP.",
-    "A hearty draught.\nRestores 18 HP.",
-    "A potent elixir.\nRestores 36 HP."
-};
-static const char* ITEM_SPRITES[ITEM_COUNT] = {
-    "",
-    "resources/sprites/items/health_potions/small_health_potion.png",
-    "resources/sprites/items/health_potions/big_health_potion.png",
-    "resources/sprites/items/health_potions/large_health_potion.png"
-};
-
-const char* GetItemName(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return "";
-    return ITEM_NAMES[type];
-}
-
-int GetItemHealAmount(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return 0;
-    return ITEM_HEALS[type];
-}
-const char* GetItemDescription(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return "";
-    return ITEM_DESCS[type];
-}
-
-// Add one instance of the given item to the inventory (stacking).
-// Returns true if added, false if inventory is full.
-bool InventoryAdd(Game* game, ItemType type) {
-    if (type == ITEM_NONE) return false;
-    // Try to stack on an existing slot of the same type
-    for (int i = 0; i < game->inventorySlotCount; i++) {
-        if (game->inventory[i].type == type) {
-            game->inventory[i].quantity++;
-            return true;
-        }
-    }
-    // Need a new slot
-    if (game->inventorySlotCount >= MAX_INVENTORY_SLOTS) return false;
-    game->inventory[game->inventorySlotCount].type = type;
-    game->inventory[game->inventorySlotCount].quantity = 1;
-    game->inventorySlotCount++;
-    return true;
-}
-
-// Use (consume) the item in the given inventory slot.
-// Returns true if used successfully.
-bool InventoryUse(Game* game, int slot) {
-    if (slot < 0 || slot >= game->inventorySlotCount) return false;
-    InventorySlot* s = &game->inventory[slot];
-    if (s->type == ITEM_NONE || s->quantity <= 0) return false;
-
-    int heal = GetItemHealAmount(s->type);
-    if (heal > 0) {
-        game->player.ent.hp += heal;
-        if (game->player.ent.hp > game->player.ent.maxHp)
-            game->player.ent.hp = game->player.ent.maxHp;
-        CombatLog_Add(&game->combatLog, LIGHTGRAY, "Used %s — restores %d HP!", GetItemName(s->type), heal);
-    }
-
-    s->quantity--;
-    if (s->quantity <= 0) {
-        // Remove slot by shifting later ones down
-        for (int i = slot; i < game->inventorySlotCount - 1; i++)
-            game->inventory[i] = game->inventory[i + 1];
-        game->inventorySlotCount--;
-        if (game->inventorySelection >= game->inventorySlotCount)
-            game->inventorySelection = game->inventorySlotCount - 1;
-    }
-    return true;
-}
-
-static void LoadPotionTextures(Game* game) {
-    for (int i = 1; i < ITEM_COUNT; i++) {
-        if (ITEM_SPRITES[i][0])
-            game->potionTextures[i - 1] = LoadTexture(ITEM_SPRITES[i]);
-    }
-}
-
-static void UnloadPotionTextures(Game* game) {
-    for (int i = 0; i < 3; i++) {
-        if (game->potionTextures[i].id > 0)
-            UnloadTexture(game->potionTextures[i]);
-    }
-}
-
-// Initialise (or re-initialise) the game: load map, build blocking,
-// load tileset, spawn entities, set default player stats,
-// and configure the camera.
 bool InitGame(Game* game, const char* tmxFile) {
     if (!game) return false;
     memset(game, 0, sizeof(Game));
 
-    // Load TMX map
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
         TraceLog(LOG_INFO, "TMX load failed, generating procedural map...");
@@ -1163,7 +537,6 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     BuildBlockingMap(game);
 
-    // Try to load all tileset textures
     for (int t = 0; t < game->map->tilesetCount; t++) {
         char imgPath[512] = {0};
         if (tmxFile) {
@@ -1183,7 +556,6 @@ bool InitGame(Game* game, const char* tmxFile) {
 
         TraceLog(LOG_INFO, "Loading tileset texture [%d]: %s", t, imgPath);
         game->tilesetTextures[t] = LoadTexture(imgPath);
-
         if (game->tilesetTextures[t].id == 0) {
             TraceLog(LOG_WARNING, "Could not load tileset texture: %s", imgPath);
             if (t == 0) {
@@ -1207,7 +579,6 @@ bool InitGame(Game* game, const char* tmxFile) {
         }
     }
 
-    // Player defaults (overridden by map objects below)
     game->player.ent.x = 1;
     game->player.ent.y = 1;
     game->player.ent.prevX = 1;
@@ -1246,7 +617,6 @@ bool InitGame(Game* game, const char* tmxFile) {
         Spawner_Populate(game, spawnRooms, spawnRoomCount);
     }
 
-    // Load monster sprite sheets
     Monster_LoadSprites();
 
     game->selectedMonsterIdx = -1;
@@ -1282,8 +652,6 @@ bool InitGame(Game* game, const char* tmxFile) {
     return true;
 }
 
-// Free all runtime assets (sprites, map, textures) and zero the Game struct.
-// Safe to call on an already-cleaned-up Game (idempotent if map is NULL).
 void CleanupGame(Game* game) {
     if (!game) return;
 
