@@ -108,7 +108,6 @@ static const char* TAB_LABELS[INV_TAB_COUNT] = {
 };
 
 // ---- Equipment slot labels (placeholder for now) --------------------------
-#define EQUIP_SLOT_COUNT 5
 static const char* EQUIP_SLOT_LABELS[EQUIP_SLOT_COUNT] = {
     "Head",
     "Chest",
@@ -321,9 +320,6 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
     snprintf(buf, sizeof(buf), "Floor:    %d / %d", game->currentFloor, game->maxFloors);
-    DrawText(buf, sx, sy, 16, BLACK); sy += gap;
-
-    snprintf(buf, sizeof(buf), "Turn:     %d", game->turnCount);
     DrawText(buf, sx, sy, 16, BLACK); sy += gap;
 
     DrawText("< Q / E to switch tabs >", ix + 16, iy + ih - 28, 14, DARKGRAY);

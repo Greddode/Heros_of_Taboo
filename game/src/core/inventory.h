@@ -8,6 +8,7 @@ typedef struct Game Game;
 
 #define MAX_POTIONS 32
 #define MAX_INVENTORY_SLOTS 16
+#define EQUIP_SLOT_COUNT 5
 
 typedef enum {
     ITEM_NONE = 0,

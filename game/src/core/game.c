@@ -25,23 +25,33 @@ void HandleInput(Game* game) {
             return;
         }
 
-        // Tab switching
+        // Tab switching (Q / E only)
         if (game->invSubState == INV_BROWSE) {
             int curTab = (int)game->inventoryTab;
-            if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_Q)) {
+            if (IsKeyPressed(KEY_Q)) {
                 curTab--;
                 if (curTab < 0) curTab = INV_TAB_COUNT - 1;
                 game->inventoryTab = (InventoryTab)curTab;
                 game->inventorySelection = 0;
                 return;
             }
-            if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_E)) {
+            if (IsKeyPressed(KEY_E)) {
                 curTab++;
                 if (curTab >= INV_TAB_COUNT) curTab = 0;
                 game->inventoryTab = (InventoryTab)curTab;
                 game->inventorySelection = 0;
                 return;
             }
+        }
+
+        // Equipment tab item selection (UP/DOWN to cycle through slots)
+        if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_EQUIPMENT) {
+            int maxSel = EQUIP_SLOT_COUNT - 1;
+            if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
+                game->inventorySelection--;
+            if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < maxSel)
+                game->inventorySelection++;
+            return;
         }
 
         // Inventory tab item selection
