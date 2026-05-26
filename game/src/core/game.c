@@ -25,9 +25,30 @@ void HandleInput(Game* game) {
             return;
         }
 
-        if (game->inventorySlotCount == 0) return;
-
+        // Tab switching
         if (game->invSubState == INV_BROWSE) {
+            int curTab = (int)game->inventoryTab;
+            if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_Q)) {
+                curTab--;
+                if (curTab < 0) curTab = INV_TAB_COUNT - 1;
+                game->inventoryTab = (InventoryTab)curTab;
+                game->inventorySelection = 0;
+                return;
+            }
+            if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_E)) {
+                curTab++;
+                if (curTab >= INV_TAB_COUNT) curTab = 0;
+                game->inventoryTab = (InventoryTab)curTab;
+                game->inventorySelection = 0;
+                return;
+            }
+        }
+
+        // Inventory tab item selection
+        if (game->inventoryTab == INV_TAB_INVENTORY &&
+            game->inventorySlotCount == 0) return;
+
+        if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_INVENTORY) {
             if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
                 game->inventorySelection--;
             if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < game->inventorySlotCount - 1)

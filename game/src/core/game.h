@@ -74,6 +74,7 @@ typedef struct Game {
     int inventorySelection;
     InventorySubState invSubState;
     int invActionSelection;
+    InventoryTab inventoryTab;
 
     int currentFloor;
     int maxFloors;

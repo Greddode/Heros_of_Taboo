@@ -27,6 +27,13 @@ typedef enum {
     INV_ACTION_MENU
 } InventorySubState;
 
+typedef enum {
+    INV_TAB_INVENTORY = 0,
+    INV_TAB_EQUIPMENT,
+    INV_TAB_STATS,
+    INV_TAB_COUNT
+} InventoryTab;
+
 const char* GetItemName(ItemType type);
 int GetItemHealAmount(ItemType type);
 const char* GetItemDescription(ItemType type);
