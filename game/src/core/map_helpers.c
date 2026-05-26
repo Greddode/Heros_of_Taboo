@@ -2,6 +2,7 @@
 #include "entity/spawner.h"
 #include "entity/monster.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 bool IsInRoom(int x, int y) {
@@ -26,6 +27,7 @@ void RevealFOW(Game* game) {
         }
     }
 
+    // Step 1: cast Bresenham rays — mark tiles with a clear line
     int r2 = FOG_RADIUS * FOG_RADIUS;
     for (int dy = -FOG_RADIUS; dy <= FOG_RADIUS; dy++) {
         int ny = py + dy;
@@ -33,8 +35,79 @@ void RevealFOW(Game* game) {
         for (int dx = -FOG_RADIUS; dx <= FOG_RADIUS; dx++) {
             int nx = px + dx;
             if (nx < 0 || nx >= game->map->width) continue;
-            if (dx * dx + dy * dy <= r2)
+            if (dx * dx + dy * dy > r2) continue;
+            if (nx == px && ny == py) { game->visibility[py][px] = 1; continue; }
+
+            int ldx = abs(nx - px);
+            int ldy = abs(ny - py);
+            int steps = ldx > ldy ? ldx : ldy;
+            int sx = (px < nx) ? 1 : -1;
+            int sy = (py < ny) ? 1 : -1;
+            int err = ldx - ldy;
+            int bx = px, by = py;
+
+            bool blocked = false;
+            for (int i = 0; i < steps; i++) {
+                int e2 = 2 * err;
+                if (e2 > -ldy) { err -= ldy; bx += sx; }
+                if (e2 < ldx)  { err += ldx; by += sy; }
+                if ((bx != nx || by != ny) && game->blocking[by][bx]) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (!blocked)
                 game->visibility[ny][nx] = 1;
+        }
+    }
+
+    // Step 2: wall adjacency — mark walls next to visible floor tiles only
+    for (int dy = -FOG_RADIUS; dy <= FOG_RADIUS; dy++) {
+        int ny = py + dy;
+        if (ny < 0 || ny >= game->map->height) continue;
+        for (int dx = -FOG_RADIUS; dx <= FOG_RADIUS; dx++) {
+            int nx = px + dx;
+            if (nx < 0 || nx >= game->map->width) continue;
+            if (dx * dx + dy * dy > r2) continue;
+            if (game->visibility[ny][nx] != 1) continue;
+            if (game->blocking[ny][nx]) continue;  // only extend from floor tiles
+
+            // Cardinal neighbors (4-dir) — always check
+            static const int card[4][2] = {{-1,0},{1,0},{0,-1},{0,1}};
+            bool isCorner = false;
+            for (int n = 0; n < 4; n++) {
+                int wx = nx + card[n][0];
+                int wy = ny + card[n][1];
+                if (wx < 0 || wx >= game->map->width || wy < 0 || wy >= game->map->height)
+                    continue;
+                if (game->visibility[wy][wx] == 1) continue;
+                if (game->blocking[wy][wx]) {
+                    game->visibility[wy][wx] = 1;
+                    isCorner = true;
+                }
+            }
+
+            // Diagonal neighbors — 8-dir check only on corner tiles
+            // (tiles that have at least one adjacent wall to peek around)
+            if (isCorner) {
+                static const int diag[4][2] = {{-1,-1},{1,-1},{-1,1},{1,1}};
+                for (int n = 0; n < 4; n++) {
+                    int wx = nx + diag[n][0];
+                    int wy = ny + diag[n][1];
+                    if (wx < 0 || wx >= game->map->width || wy < 0 || wy >= game->map->height)
+                        continue;
+                    if (game->visibility[wy][wx] == 1) continue;
+                    if (!game->blocking[wy][wx]) continue;
+                    int cx = nx + diag[n][0];
+                    int cy = ny;
+                    int c2x = nx;
+                    int c2y = ny + diag[n][1];
+                    if (cx >= 0 && cx < game->map->width &&
+                        c2y >= 0 && c2y < game->map->height &&
+                        game->blocking[cy][cx] && game->blocking[c2y][c2x])
+                        game->visibility[wy][wx] = 1;
+                }
+            }
         }
     }
 }

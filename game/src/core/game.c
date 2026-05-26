@@ -244,11 +244,16 @@ void HandleInput(Game* game) {
                     game->player.ent.y = ny;
                     game->turnCount++;
 
+                    int hpBefore = game->player.ent.hp;
                     bool alive = Monster_ProcessAllAI(game, game->timeWaited);
 
                     if (!alive) {
                         game->state = STATE_GAME_OVER;
                         return;
+                    }
+
+                    if (game->player.ent.hp < hpBefore) {
+                        break;
                     }
 
                     // Pick up any potion at the current tile
@@ -285,6 +290,13 @@ void HandleInput(Game* game) {
                 game->animDuration = 0.30f;
                 game->monsterAnimTimer = 0.30f;
                 game->monsterAnimDuration = 0.30f;
+                game->enemyTurnCooldown = 0.0f;
+                game->state = STATE_ENEMY_TURN;
+                game->animatingEnemyTurn = true;
+                if (!game->projectile.active) {
+                    game->animatingEnemyTurn = false;
+                    game->state = STATE_PLAYER_TURN;
+                }
                 RevealFOW(game);
 
                 if (game->player.ent.x == game->stairX && game->player.ent.y == game->stairY &&

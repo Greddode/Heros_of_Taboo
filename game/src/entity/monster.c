@@ -416,19 +416,19 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
                             int maxDist) {
     int dx = abs(x1 - x0);
     int dy = abs(y1 - y0);
-    int dist = dx > dy ? dx : dy;
-    if (dist > maxDist) return false;
+    int steps = dx > dy ? dx : dy;
+    if (steps > maxDist) return false;
 
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx - dy;
 
     int x = x0, y = y0;
-    while (x != x1 || y != y1) {
-        if ((x != x0 || y != y0) && blocking[y][x]) return false;
+    for (int i = 0; i < steps; i++) {
         int e2 = 2 * err;
         if (e2 > -dy) { err -= dy; x += sx; }
         if (e2 <  dx) { err += dx; y += sy; }
+        if ((x != x1 || y != y1) && blocking[y][x]) return false;
     }
     return true;
 }

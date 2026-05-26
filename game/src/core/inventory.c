@@ -68,7 +68,7 @@ bool InventoryUse(Game* game, int slot) {
         game->player.ent.hp += heal;
         if (game->player.ent.hp > game->player.ent.maxHp)
             game->player.ent.hp = game->player.ent.maxHp;
-        CombatLog_Add(&game->combatLog, BLACK, "Used %s — restores %d HP!", GetItemName(s->type), heal);
+        CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d HP!", GetItemName(s->type), heal);
     }
 
     s->quantity--;

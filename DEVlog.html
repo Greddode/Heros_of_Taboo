@@ -1,0 +1,104 @@
+<h1>Heroes of Taboo &mdash; ALPHA-0.0.7 Devlog</h1>
+<p><em>Ranged &amp; Magic Combat, Smarter AI, and Polish</em></p>
+<hr>
+
+<h2>What's New in 0.0.7</h2>
+<p>This update brings two big features: <strong>ranged and magic attack types</strong> (with projectiles!) and a <strong>major AI overhaul</strong> that makes monsters smarter and more dangerous. Plus a handful of quality-of-life fixes.</p>
+
+<hr>
+
+<h2>Ranged &amp; Magic Combat</h2>
+<p>Combat is no longer just bump-to-attack. Two monster types now attack from a distance:</p>
+
+<h3>Goblin Archer</h3>
+<ul>
+  <li>New monster type: <strong>Goblin Archer</strong> (HP 5, ATK 2, DEF 0, EXP 14)</li>
+  <li>Fires a <strong>pixel-line projectile</strong> in cardinal directions</li>
+  <li><strong>Range 5</strong> tiles &mdash; if you're in its sights, it will shoot before you can close the gap</li>
+  <li>Appears from <strong>floor 2</strong> onward</li>
+  <li>Sprite: <em>Goblin_Archer.png</em></li>
+</ul>
+
+<h3>Warp Skull (Magic)</h3>
+<ul>
+  <li>The Warp Skull now uses <strong>magic attacks</strong> instead of melee</li>
+  <li><strong>Range 3</strong> tiles, cardinal direction only</li>
+  <li>Fires an <strong>animated tileset projectile</strong> &mdash; wave-animated frames ripple from caster to target</li>
+  <li>Uses 9 animation frames from <em>magic_attacks.png</em> (GID 31&ndash;39, row 3)</li>
+  <li>Each tile along the Bresenham line shows a different frame based on wave propagation</li>
+</ul>
+
+<h3>Technical Details</h3>
+<ul>
+  <li>New <code>AttackType</code> enum: <code>ATTACK_MELEE</code>, <code>ATTACK_RANGED</code>, <code>ATTACK_MAGIC</code></li>
+  <li><code>attackType</code> and <code>attackRange</code> fields added to both <code>MonsterTemplate</code> and <code>Monster</code> structs</li>
+  <li><strong>Projectile system</strong> &mdash; <code>Projectile</code> struct tracks start/end tiles, attack type, animation frames, and color</li>
+  <li><strong>Projectile timers</strong> &mdash; <code>projectileTimer</code>/<code>projectileDuration</code> count down each frame, projectile auto-clears on expiry (0.25s)</li>
+  <li><strong>Enemy turn hold</strong> &mdash; the <code>animatingEnemyTurn</code> flag delays the player turn transition until all projectile and monster movement animations finish</li>
+  <li><strong>Ranged sound effects</strong> &mdash; loaded from <code>resources/audio/sounds/ranged_attack/</code></li>
+  <li><strong>Magic sound effects</strong> &mdash; loaded from <code>resources/audio/sounds/magic_attack/</code></li>
+  <li><strong>Magic texture</strong> &mdash; <code>magicAttacksTexture</code> loaded from <code>resources/tilesets/magic_attacks.png</code> (640&times;576, 10 cols, 64&times;64 tiles)</li>
+</ul>
+
+<hr>
+
+<h2>Monster AI Rebalance</h2>
+<p>Monsters are now smarter and more persistent. The old simple chase-or-wander behaviour has been replaced with a three-tier AI system:</p>
+
+<h3>Hunt Memory</h3>
+<ul>
+  <li>Monsters <strong>remember your last known position</strong> for <strong>4 turns</strong> after losing line of sight</li>
+  <li>They'll chase you around corners and through corridors</li>
+  <li>The <code>lastSeenX</code>/<code>lastSeenY</code> fields track the player's position; <code>huntTurns</code> counts down each turn without LOS, resetting to 4 when the player is re-spotted</li>
+</ul>
+
+<h3>Multi-Attempt Wander</h3>
+<ul>
+  <li>When wandering, monsters now try <strong>up to 4 random directions</strong> before giving up (previously just 1 attempt)</li>
+  <li>This means monsters navigate around obstacles instead of standing still when their first pick is blocked</li>
+  <li>Wander range expanded to <code>detectionRange + 8</code> (was <code>+4</code>)</li>
+</ul>
+
+<h3>Refactored Movement</h3>
+<ul>
+  <li>Movement logic extracted into two helper functions: <code>MoveToward()</code> and <code>ApplyMove()</code></li>
+  <li><code>MoveToward()</code> evaluates all 4 cardinal directions and picks the one closest to the target</li>
+  <li><code>ApplyMove()</code> handles the actual tile update and facing direction</li>
+  <li>This cleaned up the AI function significantly and reduced code duplication between chase and hunt phases</li>
+</ul>
+
+<hr>
+
+<h2>Bug Fixes &amp; Polish</h2>
+
+<ul>
+  <li><strong>Sprint potion pickup</strong> &mdash; sprinting over a potion tile now correctly picks it up (was only working with normal step-by-step movement)</li>
+  <li><strong>Monster_Spawn restoration</strong> &mdash; fixed a regression where <code>m-&gt;alive</code>, <code>m-&gt;active</code>, <code>m-&gt;facingRight</code>, <code>m-&gt;name</code>, and <code>m-&gt;expValue</code> were accidentally dropped when inserting new fields</li>
+  <li><strong>Missing Goblin template fields</strong> &mdash; added missing <code>.attackType</code>/<code>.attackRange</code> to the Goblin template (defaulting to melee)</li>
+</ul>
+
+<hr>
+
+<h2>File Changes</h2>
+
+<table>
+  <tbody><tr><th>File</th><th>Change</th></tr>
+  <tr><td><code>game/src/entity/entity.h</code></td><td>Added <code>AttackType</code> enum (MELEE, RANGED, MAGIC)</td></tr>
+  <tr><td><code>game/src/entity/monster.h</code></td><td>Added <code>MONSTER_RANGER_GOBLIN</code>, <code>attackType</code>/<code>attackRange</code> fields, <code>lastSeenX/Y</code>, <code>huntTurns</code></td></tr>
+  <tr><td><code>game/src/entity/monster.c</code></td><td>11 monster templates, AI rebalance with hunt memory + multi-attempt wander, <code>MoveToward</code>/<code>ApplyMove</code> refactor, Monster_Spawn fixes</td></tr>
+  <tr><td><code>game/src/core/game.h</code></td><td><code>Projectile</code> struct, <code>projectileTimer</code>/<code>projectileDuration</code>, <code>magicAttacksTexture</code>, <code>animatingEnemyTurn</code></td></tr>
+  <tr><td><code>game/src/core/game.c</code></td><td>Projectile timer countdown, enemy turn hold, sprint potion pickup</td></tr>
+  <tr><td><code>game/src/core/renderer.c</code></td><td>Ranged projectile line rendering, magic wave-animated tile rendering</td></tr>
+  <tr><td><code>game/src/core/audio.h</code>/<code>audio.c</code></td><td><code>PlayRangedAttackSound()</code>, <code>PlayMagicAttackSound()</code>, sound loading/unloading</td></tr>
+</tbody></table>
+
+<hr>
+
+<h2>Credits</h2>
+<p>
+  <strong>Development:</strong> Greddode<br>
+  <strong>Engine:</strong> raylib<br>
+</p>
+
+<hr>
+<p><em>Heroes of Taboo &mdash; ALPHA-0.0.7</em></p>

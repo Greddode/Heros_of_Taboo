@@ -1,0 +1,89 @@
+<h1>Heroes of Taboo &mdash; A Roguelike Adventure</h1>
+<p><em>Current Version: ALPHA-0.0.7 (Attacks & AI Update)</em></p>
+<p>You wake in cryo. Alarms are screaming. The station is failing &mdash; and the only way out is down.</p>
+<p>Heroes of Taboo is a turn-based roguelike dungeon crawler built in C with raylib. Descend 10 procedurally generated floors, fight monsters, loot items, level up, and claw your way to the escape teleporter &mdash; before the darkness finds you first.</p>
+<hr>
+<h2>Gameplay</h2>
+<p>Every turn counts. Move, attack, or rest &mdash; then every enemy on the floor acts. Clear all monsters to descend. Reach floor 10, wipe out the last enemy, and the escape teleport opens. Die once, and it's over. No second chances.</p>
+<h2>Features</h2>
+<h3>Shadow Stalker</h3>
+<p>Linger too long on a floor and a relentless shadow monster locks onto you from anywhere. Keep moving.</p>
+<h3>Smart Monster AI</h3>
+<p>Enemies remember your last known position for 4 turns after losing sight, patrol wider areas, and will multi-attempt wandering to track you down.</p>
+<h3>10 Procedural Floors</h3>
+<p>Branching corridors and rooms &mdash; every run is different. Monsters grow stronger the deeper you go.</p>
+<h3>Inventory & Potions</h3>
+<p>16-slot inventory with 3 potion tiers (Small 12 HP / Big 48 HP / Large 128 HP). Click a potion on the map to inspect it before picking up.</p>
+<h3>Leveling System</h3>
+<p>Earn EXP from kills. Level up for +5 HP, +1 ATK every 2 levels, and +1 DEF every 3 levels.</p>
+<h3>Fog of War</h3>
+<p>7-tile circular visibility radius with dimmed previously-seen areas. Know where you've been &mdash; not what's waiting.</p>
+<h3>Ranged & Magic Combat</h3>
+<p>Goblin Archers fire arrows in cardinal directions. Warp Skulls launch wave-animated magic projectiles. Don't let them get a line of sight.</p>
+<h3>Sprint</h3>
+<p>Hold SHIFT + direction to slide across the floor. Stops at room boundaries &mdash; press again to push through.</p>
+<h3>Other</h3>
+<ul>
+  <li><strong>Wait & Heal</strong> &mdash; Press Space or Period to rest and recover HP. Healing scales with your level.</li>
+  <li><strong>Combat Log</strong> &mdash; On-screen log of all combat events.</li>
+  <li><strong>Monster Info</strong> &mdash; Left-click any visible monster to inspect its stats.</li>
+</ul>
+<hr>
+<h2>Audio</h2>
+<ul>
+  <li><strong>5 In-Game Music Tracks</strong> &mdash; Randomly shuffled with seamless transitions</li>
+  <li><strong>Menu Music</strong> &mdash; Dedicated track on the main menu</li>
+  <li><strong>Sound Effects</strong> &mdash; Hit, pickup, ranged attack, and magic attack sounds</li>
+  <li><strong>Volume Controls</strong> &mdash; Independent music and SFX sliders</li>
+</ul>
+<hr>
+<h2>Bestiary</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Monster</th><th>HP</th><th>ATK</th><th>DEF</th><th>EXP</th><th>Type</th><th>Min Floor</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Bat</td><td>5</td><td>2</td><td>0</td><td>10</td><td>Melee</td><td>1+</td></tr>
+    <tr><td>Goblin</td><td>7</td><td>3</td><td>1</td><td>12</td><td>Melee</td><td>1+</td></tr>
+    <tr><td>Skeleton</td><td>8</td><td>3</td><td>1</td><td>14</td><td>Melee</td><td>1+</td></tr>
+    <tr><td>Goblin Archer</td><td>5</td><td>2</td><td>0</td><td>14</td><td>Ranged</td><td>2+</td></tr>
+    <tr><td>Floating Eye</td><td>10</td><td>4</td><td>1</td><td>22</td><td>Melee</td><td>3+</td></tr>
+    <tr><td>Fungal Myconid</td><td>12</td><td>5</td><td>2</td><td>26</td><td>Melee</td><td>3+</td></tr>
+    <tr><td>Warp Skull</td><td>11</td><td>5</td><td>1</td><td>30</td><td>Magic</td><td>3+</td></tr>
+    <tr><td>Demon Eye</td><td>18</td><td>6</td><td>2</td><td>45</td><td>Melee</td><td>6+</td></tr>
+    <tr><td>Ogre</td><td>22</td><td>6</td><td>3</td><td>55</td><td>Melee</td><td>6+</td></tr>
+    <tr><td>Dragon</td><td>28</td><td>7</td><td>3</td><td>70</td><td>Melee</td><td>6+</td></tr>
+    <tr><td>Shadow ⚠</td><td>10</td><td>4</td><td>1</td><td>10</td><td>Special</td><td>Any</td></tr>
+  </tbody>
+</table>
+<p><em>All monsters scale in stats as you descend. The Shadow is a special stalker that spawns if you idle too long.</em></p>
+<hr>
+<h2>Controls</h2>
+<table>
+  <thead>
+    <tr><th>Action</th><th>Key</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Move / Attack</td><td>Arrow Keys or W A S D<br></td></tr>
+    <tr><td>Sprint</td><td>SHIFT + Direction</td></tr>
+    <tr><td>Wait & Heal</td><td>Period (.) or Space</td></tr>
+    <tr><td>Inventory</td><td>I</td></tr>
+    <tr><td>Inventory Select</td><td>Enter</td></tr>
+    <tr><td>Pause / Menu</td><td>Escape</td></tr>
+    <tr><td>Restart</td><td>R</td></tr>
+    <tr><td>Inspect Monster / Item</td><td>Left Click</td></tr>
+  </tbody>
+</table>
+<hr>
+<h2>Credits</h2>
+<p>
+  <strong>Development:</strong> Greddode<br>
+  <strong>Tileset:</strong> Artisan of Artifacts &mdash; VelmoraRealms<br>
+  <strong>Player Sprite:</strong> Kenney<br>
+  <strong>Monster Sprites:</strong> DeepDiveGameStudio<br>
+  <strong>Music:</strong> Tallbeard Studios<br>
+  <strong>Sound Effects:</strong> Dabolka<br>
+  <strong>Engine:</strong> raylib
+</p>

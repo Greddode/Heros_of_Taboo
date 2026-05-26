@@ -1,5 +1,32 @@
 # Changelog
 
+## ALPHA-0.0.7 — Ranged Combat & AI Rebalance
+
+---
+
+### For Players
+
+- **Goblin Archer** — new ranged monster (floor 2+): fires pixel-line projectiles up to 5 tiles in cardinal directions.
+- **Warp Skull magic** — Warp Skull now attacks with wave-animated magic projectiles (range 3, cardinal only).
+- **Smarter monster AI** — monsters remember your last seen position for 4 turns after losing line of sight, chase you around corners.
+- **Better wandering** — monsters try up to 4 random directions before giving up, and patrol a wider area.
+- **Sprint picks up potions** — sprinting over a potion tile now correctly collects it.
+
+### For Developers
+
+- `AttackType` enum (`ATTACK_MELEE`, `ATTACK_RANGED`, `ATTACK_MAGIC`) in `entity.h`.
+- `MonsterTemplate`/`Monster` structs: new `attackType`, `attackRange` fields.
+- `Projectile` struct in `game.h`: active flag, start/end tile coords, attack type, animation frames, color.
+- Projectile timers (`projectileTimer`/`projectileDuration`) count down each frame; auto-clear on expiry (0.25s).
+- `animatingEnemyTurn` flag — delays player turn transition until projectiles and monster movement animations finish.
+- `magicAttacksTexture` — loaded from `resources/tilesets/magic_attacks.png`, unloaded in `CleanupGame`.
+- Ranged/magic sound effects — loaded from `resources/audio/sounds/ranged_attack/` and `magic_attack/`.
+- AI refactor: `MoveToward()` / `ApplyMove()` helper functions extracted, `Monster_ProcessAllAI` takes `Game*`.
+- Hunt memory: `lastSeenX/Y` + `huntTurns` fields, 4-turn chase after LOS lost.
+- Multi-attempt wander: up to 4 direction tries, wander range expanded to `detectionRange + 8`.
+- Bugfix: restored `alive = true`, `active = true`, `facingRight = true`, `strncpy(name, ...)`, `expValue` in `Monster_Spawn`.
+- Bugfix: added missing `attackType`/`attackRange` to Goblin template.
+
 ## ALPHA-0.0.6 — Rebalance & Inventory Update
 
 ---
