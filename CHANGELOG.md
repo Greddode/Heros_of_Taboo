@@ -1,5 +1,92 @@
 # Changelog
 
+## ALPHA-0.0.6 — Rebalance & Inventory Update
+
+---
+
+### For Players
+
+- **Sprint movement** — hold SHIFT + direction to slide to the nearest obstacle. Sprint stops at room/hallway boundaries; press sprint again to bypass. All monsters process AI between each step.
+- **Health potions** — pick up potions from the ground (press I to open inventory). Three tiers: Small (12 HP, floors 1–2), Big (48 HP, floors 3–5), Large (128 HP, floors 6+). Use, Drop, or Drop All from the action menu.
+- **Potion sprites** — each potion type has its own sprite on the map. Stacked potions show a quantity badge.
+- **Click to inspect** — left-click a potion tile to see its contents in the info panel.
+- **9-slice UI panels** — stats, combat log, monster info, and inventory now use framed texture backgrounds instead of solid rectangles.
+- **Wait healing scales** — resting (period/space) heals `1 + (level / 5) * 2` HP (1 at levels 1–4, 3 at 5–9, 5 at 10–14, etc.).
+- **6 new monster types** — Bat, Demon Eye, Dragon, Floating Eye, Fungal Myconid, Warp Skull added across 3 difficulty tiers (Early/Mid/Late).
+- **Monster rebalance** — floor stat scaling reduced from `GetRandomValue(3,6)` to `GetRandomValue(1,3)`; spawn weights are flat for consistent rarity.
+
+### For Developers
+
+#### Codebase Refactor (`game/src/core/`)
+
+- `game.c` (1352 → 594 lines) split into focused modules:
+  - **`renderer.c`** — `Draw9Slice()`, `RenderGame()` (map, entities, HUD)
+  - **`inventory.c`** — item metadata, `InventoryAdd/Use`, potion texture loading, `Inventory_Render()` overlay
+  - **`map_helpers.c`** — `IsInRoom()`, `RevealFOW()`, `BuildBlockingMap()`, `SpawnEntitiesFromObjects()`, `SpawnEscapeTile()`, `SpawnShadow()`
+- `game.h` now includes `inventory.h`, `renderer.h`, `map_helpers.h` and exports only core functions (`InitGame`, `CleanupGame`, `HandleInput`, `UpdateGame`, `DescendFloor`).
+- `premake5.lua` uses wildcard `files {"**.c", "**.h"}` — no manual Makefile updates needed.
+
+#### Sprint System (`game/src/core/game.c`)
+
+- SHIFT+direction: scans in a line to find the farthest unobstructed tile, then steps one-by-one.
+- `IsInRoom()` checks room boundaries using `GetGeneratedRooms()`. Room-to-hallway transition stops sprint; `sprintBypassRoom` flag allows re-triggering past the boundary.
+- Monster positions snapshotted before sprint and restored as `prevX/Y` for smooth interpolation.
+- Sprint animation: fixed 0.30s uniform duration via `animDuration`/`monsterAnimDuration`.
+- Input blocked while `animTimer > 0` (prevents mid-animation direction changes).
+- Sprint direction uses `IsKeyDown` (hold to continue); normal movement uses `IsKeyPressed`.
+
+#### Monster System (`game/src/entity/monster.c`, `monster.h`)
+
+- 10 monster types total (6 new): `MONSTER_BAT`, `MONSTER_DEMON_EYE`, `MONSTER_DRAGON`, `MONSTER_FLOATING_EYE`, `MONSTER_FUNGAL_MYCONID`, `MONSTER_WARP_SKULL`.
+- `MonsterTemplate` struct: `minFloor` (1/3/6), `spawnWeight` for weighted random selection.
+- `Monster_InitTemplates()` — 3-tier configuration: Early (floors 1+), Mid (floors 3+), Late (floors 6+). All base EXP doubled.
+- `Monster_Spawn()` — scales level by `GetRandomValue(1,3)` per floor.
+- Sprite paths moved from `resources/sprite_animations/idle/` to `resources/sprites/monsters/`.
+
+#### Inventory System (`game/src/core/inventory.c`, `inventory.h`)
+
+- `ItemType` enum: `ITEM_NONE`, `ITEM_SMALL_HP_POTION`, `ITEM_BIG_HP_POTION`, `ITEM_LARGE_HP_POTION`.
+- `InventorySlot` struct with `type` and `quantity`; max 16 slots, stacking by type.
+- `InventoryAdd()` / `InventoryUse()` — add stacks, consume items with HP restoration.
+- `Inventory_Render()` — full overlay: item list with selection, info panel with description/quantity/heal amount, action menu popup.
+- `LoadPotionTextures()` / `UnloadPotionTextures()` — load 3 potion sprites and 2 UI frame textures.
+
+#### 9-Slice UI (`game/src/core/renderer.c`)
+
+- `Draw9Slice(tex, dest, l, t, r, b)` — draws a 9-sliced texture without corner distortion.
+- `UI_Flat_Frame01a.png` (96×64, 16px corners) for stats panel, inventory, combat log.
+- `UI_Flat_FrameSlot01b.png` (32×32, 8px corners) for info popups, action menus.
+- All UI functions fall back to solid-colour rectangles when textures are missing.
+
+#### Combat Log (`game/src/ui/combat_log.c`, `combat_log.h`)
+
+- `CombatLog_Render()` now accepts optional `Texture2D bgTex` and `int sliceMargin` for 9-sliced background.
+
+#### New/Modified Files
+
+| File | Change |
+|------|--------|
+| `game/src/core/game.c` | Refactored — core loop only |
+| `game/src/core/game.h` | Removed item/inventory/render decls, added module includes |
+| `game/src/core/renderer.c` | **New** — `Draw9Slice`, `RenderGame` |
+| `game/src/core/renderer.h` | **New** — renderer API |
+| `game/src/core/inventory.c` | **New** — item metadata, inventory logic, overlay rendering |
+| `game/src/core/inventory.h` | **New** — `ItemType`, `InventorySlot`, inventory API |
+| `game/src/core/map_helpers.c` | **New** — `IsInRoom`, `RevealFOW`, `BuildBlockingMap`, spawn helpers |
+| `game/src/core/map_helpers.h` | **New** — map helper API |
+| `game/src/entity/monster.c` | 6 new monsters, `MonsterTemplate` with `minFloor`/`spawnWeight` |
+| `game/src/entity/monster.h` | 6 new `MonsterType` enums, template struct |
+| `game/src/entity/spawner.c` | Weighted random selection filtered by `minFloor` |
+| `game/src/entity/entity.c` | Potion pickup with inventory stacking |
+| `game/src/entity/player.c` | Black combat log text |
+| `game/src/ui/combat_log.c` | 9-slice background support |
+| `game/src/ui/combat_log.h` | Updated `CombatLog_Render` signature |
+| `game/src/ui/monster_info.c` | 9-sliced info panel |
+| `game/src/ui/monster_info.h` | Include game.h |
+| `resources/sprites/items/health_potions/` | **New** — 3 potion sprites |
+| `resources/sprites/monsters/` | **New** — monster sprites |
+| `resources/sprites/ui/` | **New** — `UI_Flat_Frame01a`, `UI_Flat_FrameSlot01b` |
+
 ## ALPHA-0.0.5 — Story Board & Floors Update
 
 ---
