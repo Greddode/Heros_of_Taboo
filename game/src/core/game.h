@@ -58,6 +58,9 @@ typedef struct Game {
     float enemyTurnCooldown;
     float animTimer;
     float monsterAnimTimer;
+    float animDuration;
+    float monsterAnimDuration;
+    bool sprintBypassRoom;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);

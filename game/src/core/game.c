@@ -10,6 +10,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Check if a tile lies within any generated room's bounds.
+static bool IsInRoom(int x, int y) {
+    ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+    int count = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
+    for (int i = 0; i < count; i++) {
+        if (x >= rooms[i].x && x < rooms[i].x + rooms[i].w &&
+            y >= rooms[i].y && y < rooms[i].y + rooms[i].h)
+            return true;
+    }
+    return false;
+}
+
 // Simple circular radius reveal: all tiles within FOG_RADIUS are lit.
 // Previously-seen tiles are dimmed.
 static void RevealFOW(Game* game) {
@@ -97,9 +109,11 @@ static void SpawnShadow(Game* game) {
 // After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
     if (game->state != STATE_PLAYER_TURN) return;
+    if (game->animTimer > 0.0f) return;
 
     // Mouse click: select monster at cursor position
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        game->sprintBypassRoom = false;
         Vector2 worldPos = GetScreenToWorld2D(GetMousePosition(), game->camera);
         int tileX = (int)(worldPos.x / game->map->tileWidth);
         int tileY = (int)(worldPos.y / game->map->tileHeight);
@@ -123,6 +137,126 @@ void HandleInput(Game* game) {
         }
     }
 
+    // Sprint: hold SHIFT + direction to slide to nearest obstacle
+    if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
+        Direction sprintDir = DIR_NONE;
+        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) sprintDir = DIR_UP;
+        else if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) sprintDir = DIR_DOWN;
+        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) sprintDir = DIR_LEFT;
+        else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) sprintDir = DIR_RIGHT;
+
+        if (sprintDir != DIR_NONE) {
+            bool stoppedAtRoom = false;
+            int dx = 0, dy = 0;
+            switch (sprintDir) {
+                case DIR_UP:    dy = -1; break;
+                case DIR_DOWN:  dy = 1;  break;
+                case DIR_LEFT:  dx = -1; break;
+                case DIR_RIGHT: dx = 1;  break;
+                default: break;
+            }
+
+            int startX = game->player.ent.x;
+            int startY = game->player.ent.y;
+            int endX = startX, endY = startY;
+
+            while (1) {
+                int nx = endX + dx;
+                int ny = endY + dy;
+                if (nx < 0 || nx >= game->map->width || ny < 0 || ny >= game->map->height) break;
+                if (game->blocking[ny][nx]) break;
+                if (Monster_GetAt(nx, ny, NULL)) break;
+                endX = nx;
+                endY = ny;
+            }
+
+            int steps = abs(endX - startX) + abs(endY - startY);
+            if (steps > 0) {
+                // Snapshot monster positions so sprite interpolation works smoothly
+                Monster* monArray = Monster_GetArray();
+                int monCount = Monster_GetCount();
+                typedef struct { int x, y; float hitFlash; } MonSnap;
+                MonSnap monSnap[64];
+                int snapCount = monCount < 64 ? monCount : 64;
+                for (int i = 0; i < snapCount; i++) {
+                    monSnap[i].x = monArray[i].x;
+                    monSnap[i].y = monArray[i].y;
+                    monSnap[i].hitFlash = monArray[i].hitFlashTimer;
+                }
+
+                game->player.ent.prevX = startX;
+                game->player.ent.prevY = startY;
+                game->player.ent.x = startX;
+                game->player.ent.y = startY;
+                if (sprintDir == DIR_RIGHT) game->player.ent.facingRight = true;
+                else if (sprintDir == DIR_LEFT) game->player.ent.facingRight = false;
+                game->selectedMonsterIdx = -1;
+
+                for (int s = 0; s < steps; s++) {
+                    int nx = game->player.ent.x + dx;
+                    int ny = game->player.ent.y + dy;
+
+                    // Re-check obstacles (a monster may have moved into the path)
+                    if (nx < 0 || nx >= game->map->width || ny < 0 || ny >= game->map->height) break;
+                    if (game->blocking[ny][nx]) break;
+                    if (Monster_GetAt(nx, ny, NULL)) break;
+
+                    // Stop when crossing between room and hallway; sprint again to bypass
+                    if (IsInRoom(game->player.ent.x, game->player.ent.y) != IsInRoom(nx, ny)) {
+                        if (game->sprintBypassRoom) {
+                            game->sprintBypassRoom = false;
+                        } else {
+                            game->sprintBypassRoom = true;
+                            stoppedAtRoom = true;
+                            break;
+                        }
+                    }
+
+                    game->player.ent.x = nx;
+                    game->player.ent.y = ny;
+                    game->turnCount++;
+
+                    bool alive = Monster_ProcessAllAI(
+                        game->player.ent.x, game->player.ent.y,
+                        &game->player.ent.hp, game->player.ent.defense,
+                        &game->player.ent.hitFlashTimer,
+                        game->blocking, game->map->width, game->map->height,
+                        &game->combatLog, game->timeWaited);
+
+                    if (!alive) {
+                        game->state = STATE_GAME_OVER;
+                        return;
+                    }
+                }
+
+                if (!stoppedAtRoom) game->sprintBypassRoom = false;
+
+                // Restore original positions as prev for smooth interpolation
+                for (int i = 0; i < snapCount; i++) {
+                    monArray[i].prevX = monSnap[i].x;
+                    monArray[i].prevY = monSnap[i].y;
+                    monArray[i].hitFlashTimer = monSnap[i].hitFlash;
+                }
+
+                game->animTimer = 0.30f;
+                game->animDuration = 0.30f;
+                game->monsterAnimTimer = 0.30f;
+                game->monsterAnimDuration = 0.30f;
+                RevealFOW(game);
+
+                if (game->player.ent.x == game->stairX && game->player.ent.y == game->stairY &&
+                    game->stairX >= 0 && game->stairY >= 0) {
+                    DescendFloor(game);
+                }
+                if (game->escapeSpawned &&
+                    game->player.ent.x == game->escapeX && game->player.ent.y == game->escapeY) {
+                    game->state = STATE_WIN;
+                }
+            }
+            return;
+        }
+    }
+
     Direction dir = DIR_NONE;
 
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) dir = DIR_UP;
@@ -130,6 +264,7 @@ void HandleInput(Game* game) {
     else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) dir = DIR_LEFT;
     else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) dir = DIR_RIGHT;
     else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
+        game->sprintBypassRoom = false;
         game->turnCount++;
         game->timeWaited++;
         if (game->timeWaited == 15 && game->currentFloor < game->maxFloors) {
@@ -146,6 +281,7 @@ void HandleInput(Game* game) {
     }
 
     if (dir != DIR_NONE) {
+        game->sprintBypassRoom = false;
         int oldX = game->player.ent.x;
         int oldY = game->player.ent.y;
         bool moved = MoveEntity(game, &game->player.ent, dir);
@@ -155,6 +291,7 @@ void HandleInput(Game* game) {
             game->enemyTurnCooldown = 0.15f;
             if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
                 game->animTimer = MOVE_ANIM_DURATION;
+                game->animDuration = MOVE_ANIM_DURATION;
                 RevealFOW(game);
             }
             game->state = STATE_ENEMY_TURN;
@@ -231,6 +368,7 @@ void UpdateGame(Game* game) {
         }
 
         game->monsterAnimTimer = MOVE_ANIM_DURATION;
+        game->monsterAnimDuration = MOVE_ANIM_DURATION;
         game->state = STATE_PLAYER_TURN;
     }
 }
@@ -276,8 +414,10 @@ void RenderGame(const Game* game) {
     }
 
     // --- Interpolation factors ------------------------------------------------
-    float playerT = (game->animTimer <= 0.0f) ? 1.0f : 1.0f - (game->animTimer / MOVE_ANIM_DURATION);
-    float monsterT = (game->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (game->monsterAnimTimer / MOVE_ANIM_DURATION);
+    float pd = (game->animDuration > 0.0f) ? game->animDuration : MOVE_ANIM_DURATION;
+    float md = (game->monsterAnimDuration > 0.0f) ? game->monsterAnimDuration : MOVE_ANIM_DURATION;
+    float playerT = (game->animTimer <= 0.0f) ? 1.0f : 1.0f - (game->animTimer / pd);
+    float monsterT = (game->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (game->monsterAnimTimer / md);
 
     // --- Monsters ------------------------------------------------------------
     Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, monsterT);
@@ -534,6 +674,9 @@ void DescendFloor(Game* game) {
     game->enemyTurnCooldown = 0.0f;
     game->animTimer = 0.0f;
     game->monsterAnimTimer = 0.0f;
+    game->animDuration = 0.0f;
+    game->monsterAnimDuration = 0.0f;
+    game->sprintBypassRoom = false;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
@@ -672,6 +815,8 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->enemyTurnCooldown = 0.0f;
     game->animTimer = 0.0f;
     game->monsterAnimTimer = 0.0f;
+    game->animDuration = 0.0f;
+    game->monsterAnimDuration = 0.0f;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {

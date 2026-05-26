@@ -169,7 +169,8 @@ int main(void)
                         HandleInput(&game);
                         UpdateGame(&game);
 
-                        float t = (game.animTimer <= 0.0f) ? 1.0f : 1.0f - (game.animTimer / MOVE_ANIM_DURATION);
+                        float d = (game.animDuration > 0.0f) ? game.animDuration : MOVE_ANIM_DURATION;
+                        float t = (game.animTimer <= 0.0f) ? 1.0f : 1.0f - (game.animTimer / d);
                         float prevCX = (float)(game.player.ent.prevX * game.map->tileWidth);
                         float curCX  = (float)(game.player.ent.x * game.map->tileWidth);
                         float prevCY = (float)(game.player.ent.prevY * game.map->tileHeight);
