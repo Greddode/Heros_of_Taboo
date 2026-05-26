@@ -207,11 +207,29 @@ void UnequipSlot(Game* game, EquipSlot slot) {
 
     game->equipped[slotIdx] = EQUIP_NONE;
 
+    // Move item to equipInventory instead of discarding it
+    AddEquipToInventory(game, oldType);
+
     CombatLog_Add(&game->combatLog, BLACK, "Unequipped %s", data->name);
 }
 
 bool IsEquipSlotOccupied(const Game* game, EquipSlot slot) {
     return game->equipped[(int)slot] != EQUIP_NONE;
+}
+
+bool AddEquipToInventory(Game* game, EquipType type) {
+    if (type == EQUIP_NONE) return false;
+    if (game->equipInventoryCount >= MAX_INVENTORY_SLOTS) return false;
+    game->equipInventory[game->equipInventoryCount++] = type;
+    return true;
+}
+
+bool RemoveEquipFromInventory(Game* game, int slot) {
+    if (slot < 0 || slot >= game->equipInventoryCount) return false;
+    for (int i = slot; i < game->equipInventoryCount - 1; i++)
+        game->equipInventory[i] = game->equipInventory[i + 1];
+    game->equipInventoryCount--;
+    return true;
 }
 
 // ---- Tab rendering ---------------------------------------------------------
@@ -274,18 +292,37 @@ static void DrawDescription(const char* desc, int x, int y, int maxWidth, int fo
 }
 
 // ---- Inventory tab content --------------------------------------------------
+// Total items shown = potion inventory + equip inventory
+static int InventoryTabTotalCount(const Game* game) {
+    return game->inventorySlotCount + game->equipInventoryCount;
+}
+
+// Returns true if the slot at index i is an equipment item
+static bool IsInventorySlotEquip(const Game* game, int i) {
+    return i >= game->inventorySlotCount;
+}
+
+// Get the equip type at the given combined inventory index (or EQUIP_NONE if it's a potion)
+static EquipType GetInventoryEquipType(const Game* game, int i) {
+    if (!IsInventorySlotEquip(game, i)) return EQUIP_NONE;
+    return game->equipInventory[i - game->inventorySlotCount];
+}
+
 static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
     int tabH = 24;
     int lx = ix + 16;
     int ly = iy + tabH + 12;
     int lw = 280;
+    int total = InventoryTabTotalCount(game);
 
     DrawText("INVENTORY", lx, ly, 20, YELLOW);
     ly += 30;
 
-    if (game->inventorySlotCount == 0) {
+    if (total == 0) {
         DrawText("(empty)", lx, ly, 16, GRAY);
     } else {
+        int lineCount = 0;
+        // First: potions
         for (int i = 0; i < game->inventorySlotCount; i++) {
             Color c = (i == game->inventorySelection) ? YELLOW : BLACK;
             char line[128];
@@ -294,6 +331,23 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
                 DrawText(">", lx - 18, ly, 16, YELLOW);
             DrawText(line, lx, ly, 16, c);
             ly += 22;
+            lineCount++;
+        }
+        // Then: equipment items
+        for (int i = 0; i < game->equipInventoryCount; i++) {
+            int idx = game->inventorySlotCount + i;
+            Color c = (idx == game->inventorySelection) ? YELLOW : BLACK;
+            const EquipData* d = GetEquipData(game->equipInventory[i]);
+            if (d) {
+                char line[128];
+                snprintf(line, sizeof(line), "[%s] %s",
+                         EQUIP_SLOT_LABELS[(int)d->slot], d->name);
+                if (idx == game->inventorySelection)
+                    DrawText(">", lx - 18, ly, 16, YELLOW);
+                DrawText(line, lx, ly, 16, c);
+                ly += 22;
+                lineCount++;
+            }
         }
     }
 
@@ -303,9 +357,7 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
     int rh = ih - tabH - 70;
     int rcx = rx + rw / 2;
 
-    if (game->inventorySlotCount > 0) {
-        ItemType selType = game->inventory[game->inventorySelection].type;
-
+    if (total > 0) {
         if (game->texUiSlot.id > 0)
             Draw9Slice(game->texUiSlot, (Rectangle){ (float)rx, (float)rtop, (float)rw, (float)rh }, 8, 8, 8, 8);
         else
@@ -313,40 +365,93 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
 
         int infoY = rtop + 14;
 
-        const char* iname = GetItemName(selType);
-        int tw = MeasureText(iname, 16);
-        DrawText(iname, rcx - tw / 2, infoY, 16, YELLOW);
-        infoY += 24;
+        // Determine what's selected
+        if (IsInventorySlotEquip(game, game->inventorySelection)) {
+            // Equipment item selected
+            EquipType eType = GetInventoryEquipType(game, game->inventorySelection);
+            const EquipData* d = GetEquipData(eType);
+            if (d) {
+                int tw = MeasureText(d->name, 16);
+                DrawText(d->name, rcx - tw / 2, infoY, 16, YELLOW);
+                infoY += 24;
 
-        const char* desc = GetItemDescription(selType);
-        DrawDescription(desc, rx + 10, infoY, rw - 20, 14, DARKGRAY);
-        // Count lines for infoY offset
-        int lines = 1;
-        for (const char* p = desc; *p; p++) if (*p == '\n') lines++;
-        infoY += lines * 18 + 4;
+                DrawDescription(d->description, rx + 10, infoY, rw - 20, 14, DARKGRAY);
 
-        char qty[64];
-        snprintf(qty, sizeof(qty), "Qty: %d", game->inventory[game->inventorySelection].quantity);
-        DrawText(qty, rx + 10, infoY, 14, BLACK);
-        infoY += 22;
+                infoY += 40; // spacing
 
-        int heal = GetItemHealAmount(selType);
-        if (heal > 0) {
-            char healStr[64];
-            snprintf(healStr, sizeof(healStr), "Heals %d HP", heal);
-            DrawText(healStr, rx + 10, infoY, 14, (Color){ 0, 90, 0, 255 });
+                if (d->bonusAttack > 0) {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "ATK+%d", d->bonusAttack);
+                    DrawText(buf, rx + 10, infoY, 14, GREEN);
+                    infoY += 18;
+                }
+                if (d->bonusDefense > 0) {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "DEF+%d", d->bonusDefense);
+                    DrawText(buf, rx + 10, infoY, 14, (Color){ 100, 150, 255, 255 });
+                    infoY += 18;
+                }
+                if (d->bonusMaxHp > 0) {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "HP+%d", d->bonusMaxHp);
+                    DrawText(buf, rx + 10, infoY, 14, RED);
+                    infoY += 18;
+                }
+            }
+        } else if (game->inventorySlotCount > 0) {
+            // Potion selected
+            ItemType selType = game->inventory[game->inventorySelection].type;
+
+            const char* iname = GetItemName(selType);
+            int tw = MeasureText(iname, 16);
+            DrawText(iname, rcx - tw / 2, infoY, 16, YELLOW);
+            infoY += 24;
+
+            const char* desc = GetItemDescription(selType);
+            DrawDescription(desc, rx + 10, infoY, rw - 20, 14, DARKGRAY);
+            int lines = 1;
+            for (const char* p = desc; *p; p++) if (*p == '\n') lines++;
+            infoY += lines * 18 + 4;
+
+            char qty[64];
+            snprintf(qty, sizeof(qty), "Qty: %d", game->inventory[game->inventorySelection].quantity);
+            DrawText(qty, rx + 10, infoY, 14, BLACK);
+            infoY += 22;
+
+            int heal = GetItemHealAmount(selType);
+            if (heal > 0) {
+                char healStr[64];
+                snprintf(healStr, sizeof(healStr), "Heals %d HP", heal);
+                DrawText(healStr, rx + 10, infoY, 14, (Color){ 0, 90, 0, 255 });
+            }
         }
     }
 
     // Action-menu popup
-    if (game->invSubState == INV_ACTION_MENU && game->inventorySlotCount > 0) {
-        static const char* actions[] = { "Use", "Drop", "Drop All", "Back" };
+    if (game->invSubState == INV_ACTION_MENU && total > 0) {
+        // Determine actions based on item type
+        bool isEquip = IsInventorySlotEquip(game, game->inventorySelection);
+        const char* actions[4];
+        int actionCount;
+        if (isEquip) {
+            actions[0] = "Equip";
+            actions[1] = "Drop";
+            actions[2] = "Back";
+            actionCount = 3;
+        } else {
+            actions[0] = "Use";
+            actions[1] = "Drop";
+            actions[2] = "Drop All";
+            actions[3] = "Back";
+            actionCount = 4;
+        }
+
         int mx = ix + 16 + lw + 2;
         int my = iy + tabH + 40 + game->inventorySelection * 22 + 30 - 2;
         if (my + 80 > iy + ih - 30) my = iy + ih - 30 - 80;
         if (my < iy + tabH + 40) my = iy + tabH + 40;
         int mw = 140;
-        int mh = 112;
+        int mh = actionCount * 26 + 8;
 
         if (game->texUiSlot.id > 0)
             Draw9Slice(game->texUiSlot, (Rectangle){ (float)mx, (float)my, (float)mw, (float)mh }, 8, 8, 8, 8);
@@ -355,7 +460,7 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
             DrawRectangleLines(mx, my, mw, mh, YELLOW);
         }
 
-        for (int a = 0; a < 4; a++) {
+        for (int a = 0; a < actionCount; a++) {
             Color ac = (a == game->invActionSelection) ? YELLOW : BLACK;
             if (a == game->invActionSelection)
                 DrawText(">", mx + 6, my + 6 + a * 26, 16, YELLOW);

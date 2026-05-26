@@ -77,6 +77,8 @@ typedef struct Game {
     InventoryTab inventoryTab;
 
     EquipType equipped[EQUIP_SLOT_COUNT];
+    EquipType equipInventory[MAX_INVENTORY_SLOTS];
+    int equipInventoryCount;
 
     int currentFloor;
     int maxFloors;

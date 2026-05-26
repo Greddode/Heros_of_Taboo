@@ -103,6 +103,8 @@ void EquipItem(Game* game, EquipType type);
 void EquipItemSilent(Game* game, EquipType type);
 void UnequipSlot(Game* game, EquipSlot slot);
 bool IsEquipSlotOccupied(const Game* game, EquipSlot slot);
+bool AddEquipToInventory(Game* game, EquipType type);
+bool RemoveEquipFromInventory(Game* game, int slot);
 
 // Inventory rendering
 void Inventory_Render(const Game* game);

@@ -98,102 +98,136 @@ void HandleInput(Game* game) {
             return;
         }
 
-        // Inventory tab item selection
-        if (game->inventoryTab == INV_TAB_INVENTORY &&
-            game->inventorySlotCount == 0) return;
+        // Inventory tab item selection (combined: potions + equipment)
+        {
+            int totalInv = game->inventorySlotCount + game->equipInventoryCount;
+            if (totalInv == 0 && game->inventoryTab == INV_TAB_INVENTORY) {
+                // No items at all, skip selection
+            } else if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_INVENTORY) {
+                if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
+                    game->inventorySelection--;
+                if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < totalInv - 1)
+                    game->inventorySelection++;
+                if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    game->invSubState = INV_ACTION_MENU;
+                    game->invActionSelection = 0;
+                }
+            } else if (game->invSubState == INV_ACTION_MENU && game->inventoryTab == INV_TAB_INVENTORY) {
+                bool isEquip = game->inventorySelection >= game->inventorySlotCount;
+                int maxAction = isEquip ? 2 : 3; // 0..2 for equip (Equip/Drop/Back), 0..3 for potions (Use/Drop/Drop All/Back)
 
-        if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_INVENTORY) {
-            if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
-                game->inventorySelection--;
-            if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < game->inventorySlotCount - 1)
-                game->inventorySelection++;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                game->invSubState = INV_ACTION_MENU;
-                game->invActionSelection = 0;
-            }
-        } else if (game->invSubState == INV_ACTION_MENU) {
-            if (IsKeyPressed(KEY_UP) && game->invActionSelection > 0)
-                game->invActionSelection--;
-            if (IsKeyPressed(KEY_DOWN) && game->invActionSelection < 3)
-                game->invActionSelection++;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                if (game->invActionSelection == 0) {
-                    if (InventoryUse(game, game->inventorySelection)) {
-                        game->turnCount++;
-                        game->enemyTurnCooldown = 0.15f;
-                        game->state = STATE_ENEMY_TURN;
+                if (IsKeyPressed(KEY_UP) && game->invActionSelection > 0)
+                    game->invActionSelection--;
+                if (IsKeyPressed(KEY_DOWN) && game->invActionSelection < maxAction)
+                    game->invActionSelection++;
+
+                if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    if (isEquip) {
+                        // Equipment item actions
+                        if (game->invActionSelection == 0) {
+                            // Equip
+                            int equipIdx = game->inventorySelection - game->inventorySlotCount;
+                            EquipType eType = game->equipInventory[equipIdx];
+                            EquipItem(game, eType);
+                            RemoveEquipFromInventory(game, equipIdx);
+                            game->invSubState = INV_BROWSE;
+                            if (game->inventorySelection >= game->inventorySlotCount + game->equipInventoryCount)
+                                game->inventorySelection = game->inventorySlotCount + game->equipInventoryCount - 1;
+                        } else if (game->invActionSelection == 1) {
+                            // Drop equipment from inventory
+                            int equipIdx = game->inventorySelection - game->inventorySlotCount;
+                            EquipType eType = game->equipInventory[equipIdx];
+                            const EquipData* d = GetEquipData(eType);
+                            RemoveEquipFromInventory(game, equipIdx);
+                            if (d) CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", d->name);
+                            game->invSubState = INV_BROWSE;
+                            if (game->inventorySelection >= game->inventorySlotCount + game->equipInventoryCount)
+                                game->inventorySelection = game->inventorySlotCount + game->equipInventoryCount - 1;
+                        } else {
+                            // Back
+                            game->invSubState = INV_BROWSE;
+                        }
                     } else {
-                        game->invSubState = INV_BROWSE;
-                    }
-                } else if (game->invActionSelection == 1) {
-                    InventorySlot* slot = &game->inventory[game->inventorySelection];
-                    ItemType type = slot->type;
-                    slot->quantity--;
-                    bool stacked = false;
-                    for (int p = 0; p < game->potionCount; p++) {
-                        if (game->potionCollected[p]) continue;
-                        if (game->potionTiles[p][0] == game->player.ent.x &&
-                            game->potionTiles[p][1] == game->player.ent.y &&
-                            game->potionTypes[p] == type) {
-                            game->potionQuantities[p]++;
-                            stacked = true;
-                            break;
+                        // Potion actions (original logic)
+                        if (game->invActionSelection == 0) {
+                            if (InventoryUse(game, game->inventorySelection)) {
+                                game->turnCount++;
+                                game->enemyTurnCooldown = 0.15f;
+                                game->state = STATE_ENEMY_TURN;
+                            } else {
+                                game->invSubState = INV_BROWSE;
+                            }
+                        } else if (game->invActionSelection == 1) {
+                            InventorySlot* slot = &game->inventory[game->inventorySelection];
+                            ItemType type = slot->type;
+                            slot->quantity--;
+                            bool stacked = false;
+                            for (int p = 0; p < game->potionCount; p++) {
+                                if (game->potionCollected[p]) continue;
+                                if (game->potionTiles[p][0] == game->player.ent.x &&
+                                    game->potionTiles[p][1] == game->player.ent.y &&
+                                    game->potionTypes[p] == type) {
+                                    game->potionQuantities[p]++;
+                                    stacked = true;
+                                    break;
+                                }
+                            }
+                            if (!stacked && game->potionCount < MAX_POTIONS) {
+                                game->potionTiles[game->potionCount][0] = game->player.ent.x;
+                                game->potionTiles[game->potionCount][1] = game->player.ent.y;
+                                game->potionCollected[game->potionCount] = false;
+                                game->potionTypes[game->potionCount] = type;
+                                game->potionQuantities[game->potionCount] = 1;
+                                game->potionCount++;
+                            }
+                            CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", GetItemName(type));
+                            if (slot->quantity <= 0) {
+                                for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
+                                    game->inventory[i] = game->inventory[i + 1];
+                                game->inventorySlotCount--;
+                                if (game->inventorySelection >= game->inventorySlotCount)
+                                    game->inventorySelection = game->inventorySlotCount - 1;
+                            }
+                            game->invSubState = INV_BROWSE;
+                        } else if (game->invActionSelection == 2) {
+                            InventorySlot* slot = &game->inventory[game->inventorySelection];
+                            ItemType type = slot->type;
+                            int total = slot->quantity;
+                            slot->quantity = 0;
+                            bool stacked = false;
+                            for (int p = 0; p < game->potionCount; p++) {
+                                if (game->potionCollected[p]) continue;
+                                if (game->potionTiles[p][0] == game->player.ent.x &&
+                                    game->potionTiles[p][1] == game->player.ent.y &&
+                                    game->potionTypes[p] == type) {
+                                    game->potionQuantities[p] += total;
+                                    stacked = true;
+                                    break;
+                                }
+                            }
+                            if (!stacked && game->potionCount < MAX_POTIONS) {
+                                game->potionTiles[game->potionCount][0] = game->player.ent.x;
+                                game->potionTiles[game->potionCount][1] = game->player.ent.y;
+                                game->potionCollected[game->potionCount] = false;
+                                game->potionTypes[game->potionCount] = type;
+                                game->potionQuantities[game->potionCount] = total;
+                                game->potionCount++;
+                            }
+                            CombatLog_Add(&game->combatLog, BLACK, "Dropped %d x %s", total, GetItemName(type));
+                            for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
+                                game->inventory[i] = game->inventory[i + 1];
+                            game->inventorySlotCount--;
+                            if (game->inventorySelection >= game->inventorySlotCount)
+                                game->inventorySelection = game->inventorySlotCount - 1;
+                            game->invSubState = INV_BROWSE;
+                        } else {
+                            game->invSubState = INV_BROWSE;
                         }
                     }
-                    if (!stacked && game->potionCount < MAX_POTIONS) {
-                        game->potionTiles[game->potionCount][0] = game->player.ent.x;
-                        game->potionTiles[game->potionCount][1] = game->player.ent.y;
-                        game->potionCollected[game->potionCount] = false;
-                        game->potionTypes[game->potionCount] = type;
-                        game->potionQuantities[game->potionCount] = 1;
-                        game->potionCount++;
-                    }
-                    CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", GetItemName(type));
-                    if (slot->quantity <= 0) {
-                        for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
-                            game->inventory[i] = game->inventory[i + 1];
-                        game->inventorySlotCount--;
-                        if (game->inventorySelection >= game->inventorySlotCount)
-                            game->inventorySelection = game->inventorySlotCount - 1;
-                    }
-                    game->invSubState = INV_BROWSE;
-                } else if (game->invActionSelection == 2) {
-                    InventorySlot* slot = &game->inventory[game->inventorySelection];
-                    ItemType type = slot->type;
-                    int total = slot->quantity;
-                    slot->quantity = 0;
-                    bool stacked = false;
-                    for (int p = 0; p < game->potionCount; p++) {
-                        if (game->potionCollected[p]) continue;
-                        if (game->potionTiles[p][0] == game->player.ent.x &&
-                            game->potionTiles[p][1] == game->player.ent.y &&
-                            game->potionTypes[p] == type) {
-                            game->potionQuantities[p] += total;
-                            stacked = true;
-                            break;
-                        }
-                    }
-                    if (!stacked && game->potionCount < MAX_POTIONS) {
-                        game->potionTiles[game->potionCount][0] = game->player.ent.x;
-                        game->potionTiles[game->potionCount][1] = game->player.ent.y;
-                        game->potionCollected[game->potionCount] = false;
-                        game->potionTypes[game->potionCount] = type;
-                        game->potionQuantities[game->potionCount] = total;
-                        game->potionCount++;
-                    }
-                    CombatLog_Add(&game->combatLog, BLACK, "Dropped %d x %s", total, GetItemName(type));
-                    for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
-                        game->inventory[i] = game->inventory[i + 1];
-                    game->inventorySlotCount--;
-                    if (game->inventorySelection >= game->inventorySlotCount)
-                        game->inventorySelection = game->inventorySlotCount - 1;
-                    game->invSubState = INV_BROWSE;
-                } else {
+                }
+                if (IsKeyPressed(KEY_ESCAPE)) {
                     game->invSubState = INV_BROWSE;
                 }
-            }
-            if (IsKeyPressed(KEY_ESCAPE)) {
-                game->invSubState = INV_BROWSE;
             }
         }
         return;
@@ -534,6 +568,9 @@ void DescendFloor(Game* game) {
     int savedInvCount = game->inventorySlotCount;
     EquipType savedEquipped[EQUIP_SLOT_COUNT];
     memcpy(savedEquipped, game->equipped, sizeof(savedEquipped));
+    EquipType savedEquipInventory[MAX_INVENTORY_SLOTS];
+    int savedEquipInvCount = game->equipInventoryCount;
+    memcpy(savedEquipInventory, game->equipInventory, sizeof(savedEquipInventory));
 
     Monster_UnloadSprites();
     Monster_ResetAll();
@@ -576,6 +613,9 @@ void DescendFloor(Game* game) {
             }
         }
     }
+    // Restore equipment inventory
+    memcpy(game->equipInventory, savedEquipInventory, sizeof(savedEquipInventory));
+    game->equipInventoryCount = savedEquipInvCount;
 
     game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
     if (game->magicAttacksTexture.id == 0) {
