@@ -38,6 +38,11 @@ typedef enum {
     STATE_INVENTORY
 } GameState;
 
+typedef enum {
+    INV_BROWSE,
+    INV_ACTION_MENU
+} InventorySubState;
+
 typedef struct Game {
     MapData* map;
     Texture2D tilesetTextures[MAX_TILESETS];
@@ -58,10 +63,18 @@ typedef struct Game {
     int potionTiles[MAX_POTIONS][2];
     bool potionCollected[MAX_POTIONS];
     ItemType potionTypes[MAX_POTIONS];
+    int potionQuantities[MAX_POTIONS];
+    int selectedPotionTileX;
+    int selectedPotionTileY;
+    bool selectedPotionTileActive;
+
+    Texture2D potionTextures[3]; // small, big, large
 
     InventorySlot inventory[MAX_INVENTORY_SLOTS];
     int inventorySlotCount;
     int inventorySelection;
+    InventorySubState invSubState;
+    int invActionSelection;
 
     int currentFloor;
     int maxFloors;
@@ -93,6 +106,7 @@ void DescendFloor(Game* game);
 
 const char* GetItemName(ItemType type);
 int GetItemHealAmount(ItemType type);
+const char* GetItemDescription(ItemType type);
 bool InventoryAdd(Game* game, ItemType type);
 bool InventoryUse(Game* game, int slot);
 

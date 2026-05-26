@@ -109,16 +109,119 @@ static void SpawnShadow(Game* game) {
 // After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
     if (game->state == STATE_INVENTORY) {
-        if (IsKeyPressed(KEY_I) || IsKeyPressed(KEY_ESCAPE)) {
+        // I always closes; ESC closes from BROWSE, goes back from action menu
+        if (IsKeyPressed(KEY_I)) {
             game->state = STATE_PLAYER_TURN;
+            return;
         }
-        if (game->inventorySlotCount > 0) {
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (game->invSubState == INV_ACTION_MENU)
+                game->invSubState = INV_BROWSE;
+            else
+                game->state = STATE_PLAYER_TURN;
+            return;
+        }
+
+        if (game->inventorySlotCount == 0) return;
+
+        if (game->invSubState == INV_BROWSE) {
             if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
                 game->inventorySelection--;
             if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < game->inventorySlotCount - 1)
                 game->inventorySelection++;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
-                InventoryUse(game, game->inventorySelection);
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                game->invSubState = INV_ACTION_MENU;
+                game->invActionSelection = 0;
+            }
+        } else if (game->invSubState == INV_ACTION_MENU) {
+            if (IsKeyPressed(KEY_UP) && game->invActionSelection > 0)
+                game->invActionSelection--;
+            if (IsKeyPressed(KEY_DOWN) && game->invActionSelection < 3)
+                game->invActionSelection++;
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                if (game->invActionSelection == 0) { // Use
+                    if (InventoryUse(game, game->inventorySelection)) {
+                        // Using an item costs a turn
+                        game->turnCount++;
+                        game->enemyTurnCooldown = 0.15f;
+                        game->state = STATE_ENEMY_TURN;
+                    } else {
+                        game->invSubState = INV_BROWSE;
+                    }
+                } else if (game->invActionSelection == 1) { // Drop (one at a time)
+                    InventorySlot* slot = &game->inventory[game->inventorySelection];
+                    ItemType type = slot->type;
+                    slot->quantity--;
+                    // Stack on an existing pile of the same type at this position
+                    bool stacked = false;
+                    for (int p = 0; p < game->potionCount; p++) {
+                        if (game->potionCollected[p]) continue;
+                        if (game->potionTiles[p][0] == game->player.ent.x &&
+                            game->potionTiles[p][1] == game->player.ent.y &&
+                            game->potionTypes[p] == type) {
+                            game->potionQuantities[p]++;
+                            stacked = true;
+                            break;
+                        }
+                    }
+                    if (!stacked && game->potionCount < MAX_POTIONS) {
+                        game->potionTiles[game->potionCount][0] = game->player.ent.x;
+                        game->potionTiles[game->potionCount][1] = game->player.ent.y;
+                        game->potionCollected[game->potionCount] = false;
+                        game->potionTypes[game->potionCount] = type;
+                        game->potionQuantities[game->potionCount] = 1;
+                        game->potionCount++;
+                    }
+                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Dropped %s", GetItemName(type));
+                    // Remove empty slot
+                    if (slot->quantity <= 0) {
+                        for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
+                            game->inventory[i] = game->inventory[i + 1];
+                        game->inventorySlotCount--;
+                        if (game->inventorySelection >= game->inventorySlotCount)
+                            game->inventorySelection = game->inventorySlotCount - 1;
+                    }
+                    game->invSubState = INV_BROWSE;
+                } else if (game->invActionSelection == 2) { // Drop All
+                    InventorySlot* slot = &game->inventory[game->inventorySelection];
+                    ItemType type = slot->type;
+                    int total = slot->quantity;
+                    slot->quantity = 0;
+                    // Stack on an existing pile of the same type at this position
+                    bool stacked = false;
+                    for (int p = 0; p < game->potionCount; p++) {
+                        if (game->potionCollected[p]) continue;
+                        if (game->potionTiles[p][0] == game->player.ent.x &&
+                            game->potionTiles[p][1] == game->player.ent.y &&
+                            game->potionTypes[p] == type) {
+                            game->potionQuantities[p] += total;
+                            stacked = true;
+                            break;
+                        }
+                    }
+                    if (!stacked && game->potionCount < MAX_POTIONS) {
+                        game->potionTiles[game->potionCount][0] = game->player.ent.x;
+                        game->potionTiles[game->potionCount][1] = game->player.ent.y;
+                        game->potionCollected[game->potionCount] = false;
+                        game->potionTypes[game->potionCount] = type;
+                        game->potionQuantities[game->potionCount] = total;
+                        game->potionCount++;
+                    }
+                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Dropped %d x %s", total, GetItemName(type));
+                    // Remove empty slot
+                    for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
+                        game->inventory[i] = game->inventory[i + 1];
+                    game->inventorySlotCount--;
+                    if (game->inventorySelection >= game->inventorySlotCount)
+                        game->inventorySelection = game->inventorySlotCount - 1;
+                    game->invSubState = INV_BROWSE;
+                } else { // Back
+                    game->invSubState = INV_BROWSE;
+                }
+            }
+            if (IsKeyPressed(KEY_ESCAPE)) {
+                game->invSubState = INV_BROWSE;
+            }
         }
         return;
     }
@@ -126,7 +229,7 @@ void HandleInput(Game* game) {
     if (game->state != STATE_PLAYER_TURN) return;
     if (game->animTimer > 0.0f) return;
 
-    // Mouse click: select monster at cursor position
+    // Mouse click: select monster or potion tile
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         game->sprintBypassRoom = false;
         Vector2 worldPos = GetScreenToWorld2D(GetMousePosition(), game->camera);
@@ -146,19 +249,35 @@ void HandleInput(Game* game) {
                         break;
                     }
                 }
-        }
+                game->selectedPotionTileActive = false;
+            } else {
+                // Check for potions at this tile
+                game->selectedMonsterIdx = -1;
+                game->selectedPotionTileActive = false;
+                for (int p = 0; p < game->potionCount; p++) {
+                    if (!game->potionCollected[p] &&
+                        game->potionTiles[p][0] == tileX &&
+                        game->potionTiles[p][1] == tileY) {
+                        game->selectedPotionTileX = tileX;
+                        game->selectedPotionTileY = tileY;
+                        game->selectedPotionTileActive = true;
+                        break;
+                    }
+                }
+            }
         } else {
             game->selectedMonsterIdx = -1;
+            game->selectedPotionTileActive = false;
         }
     }
 
     // Sprint: hold SHIFT + direction to slide to nearest obstacle
     if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
         Direction sprintDir = DIR_NONE;
-        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) sprintDir = DIR_UP;
-        else if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) sprintDir = DIR_DOWN;
-        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) sprintDir = DIR_LEFT;
-        else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) sprintDir = DIR_RIGHT;
+        if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) sprintDir = DIR_UP;
+        else if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) sprintDir = DIR_DOWN;
+        else if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) sprintDir = DIR_LEFT;
+        else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) sprintDir = DIR_RIGHT;
 
         if (sprintDir != DIR_NONE) {
             bool stoppedAtRoom = false;
@@ -316,6 +435,7 @@ void HandleInput(Game* game) {
     // Open inventory
     if (IsKeyPressed(KEY_I)) {
         game->state = STATE_INVENTORY;
+        game->invSubState = INV_BROWSE;
         if (game->inventorySelection < 0 || game->inventorySelection >= game->inventorySlotCount)
             game->inventorySelection = 0;
         return;
@@ -429,11 +549,20 @@ void RenderGame(const Game* game) {
         int hy = game->potionTiles[i][1];
         if (game->visibility[hy][hx] != 1) continue;
 
-        Vector2 hpos = TileToScreen(hx, hy, tw, th);
-        int pad = tw / 4;
-        Color healColor = { 0, 220, 80, 255 };
-        DrawRectangle(hpos.x + tw/2 - 2, hpos.y + pad, 4, th - 2*pad, healColor);
-        DrawRectangle(hpos.x + pad, hpos.y + th/2 - 2, tw - 2*pad, 4, healColor);
+        int texIdx = game->potionTypes[i] - 1; // ITEM_SMALL=1 → 0, etc.
+        if (texIdx >= 0 && texIdx < 3 && game->potionTextures[texIdx].id > 0) {
+            Vector2 hpos = TileToScreen(hx, hy, tw, th);
+            Rectangle dest = { hpos.x, hpos.y, (float)tw, (float)th };
+            DrawTexturePro(game->potionTextures[texIdx],
+                           (Rectangle){ 0, 0, (float)game->potionTextures[texIdx].width, (float)game->potionTextures[texIdx].height },
+                           dest, (Vector2){ 0, 0 }, 0, WHITE);
+            // Quantity badge
+            if (game->potionQuantities[i] > 1) {
+                char qty[8];
+                snprintf(qty, sizeof(qty), "x%d", game->potionQuantities[i]);
+                DrawText(qty, hpos.x + 2, hpos.y + 2, 10, YELLOW);
+            }
+        }
     }
 
     // --- Interpolation factors ------------------------------------------------
@@ -530,6 +659,54 @@ void RenderGame(const Game* game) {
 
     MonsterInfo_Render(game);
 
+    // --- Potion tile info (top-right, below monster info) ---
+    if (game->selectedPotionTileActive) {
+        // Collect items at this tile
+        int ptx = game->selectedPotionTileX;
+        int pty = game->selectedPotionTileY;
+        ItemType tileTypes[MAX_POTIONS];
+        int tileQtys[MAX_POTIONS];
+        int tileCount = 0;
+        for (int p = 0; p < game->potionCount; p++) {
+            if (game->potionCollected[p]) continue;
+            if (game->potionTiles[p][0] == ptx && game->potionTiles[p][1] == pty) {
+                tileTypes[tileCount] = game->potionTypes[p];
+                tileQtys[tileCount] = game->potionQuantities[p];
+                tileCount++;
+                if (tileCount >= MAX_POTIONS) break;
+            }
+        }
+
+        if (tileCount > 0) {
+            int pX = GetScreenWidth() - 200;
+            int pY = 180; // below monster info
+            int pW = 190;
+            int pH = 40 + tileCount * 50;
+            if (pH > GetScreenHeight() - pY - 10) pH = GetScreenHeight() - pY - 10;
+            int ly = pY + 6;
+            int fs = 14;
+            int lh = fs + 4;
+            char buf[128];
+
+            DrawRectangle(pX, pY, pW, pH, (Color){ 0, 0, 0, 200 });
+            DrawRectangleLines(pX, pY, pW, pH, (Color){ 80, 80, 80, 255 });
+
+            for (int i = 0; i < tileCount; i++) {
+                const char* name = GetItemName(tileTypes[i]);
+                int heal = GetItemHealAmount(tileTypes[i]);
+                int qty = tileQtys[i];
+
+                snprintf(buf, sizeof(buf), "%s x%d", name, qty);
+                DrawText(buf, pX + 6, ly, fs, YELLOW); ly += lh;
+
+                snprintf(buf, sizeof(buf), "Heals %d HP", heal);
+                DrawText(buf, pX + 6, ly, fs, (Color){ 100, 255, 100, 255 }); ly += lh;
+
+                ly += 4; // spacing between stacks
+            }
+        }
+    }
+
     // State text (bottom center)
     const char* stateText = "";
     if (game->state == STATE_GAME_OVER) stateText = "GAME OVER - Press R to restart";
@@ -546,8 +723,8 @@ void RenderGame(const Game* game) {
     if (game->state == STATE_INVENTORY) {
         int sw = GetScreenWidth();
         int sh = GetScreenHeight();
-        int iw = 400;
-        int ih = 300;
+        int iw = 640;
+        int ih = 360;
         int ix = (sw - iw) / 2;
         int iy = (sh - ih) / 2;
 
@@ -555,24 +732,115 @@ void RenderGame(const Game* game) {
         DrawRectangle(ix, iy, iw, ih, (Color){ 30, 30, 40, 255 });
         DrawRectangleLines(ix, iy, iw, ih, LIGHTGRAY);
 
-        int textX = ix + 16;
-        int textY = iy + 12;
-        DrawText("INVENTORY", textX, textY, 20, YELLOW);
-        textY += 30;
+        // --- Left column: item list ---
+        int lx = ix + 16;
+        int ly = iy + 12;
+        int lw = 280;
+        DrawText("INVENTORY", lx, ly, 20, YELLOW);
+        ly += 30;
 
         if (game->inventorySlotCount == 0) {
-            DrawText("(empty)", textX, textY, 16, GRAY);
+            DrawText("(empty)", lx, ly, 16, GRAY);
         } else {
             for (int i = 0; i < game->inventorySlotCount; i++) {
                 Color c = (i == game->inventorySelection) ? YELLOW : WHITE;
                 char line[128];
                 snprintf(line, sizeof(line), "%s x%d", GetItemName(game->inventory[i].type), game->inventory[i].quantity);
                 if (i == game->inventorySelection)
-                    DrawText(">", textX - 18, textY, 16, YELLOW);
-                DrawText(line, textX, textY, 16, c);
-                textY += 22;
+                    DrawText(">", lx - 18, ly, 16, YELLOW);
+                DrawText(line, lx, ly, 16, c);
+                ly += 22;
             }
-            DrawText("ENTER to use  |  I / ESC to close", ix + 16, iy + ih - 28, 14, GRAY);
+        }
+
+        // --- Right column: info panel (origin middle) ---
+        int rx = ix + lw + 24;
+        int rw = iw - lw - 40;
+        int rtop = iy + 40;
+        int rh = ih - 70;
+        int rcx = rx + rw / 2;   // horizontal centre
+
+        if (game->inventorySlotCount > 0) {
+            ItemType selType = game->inventory[game->inventorySelection].type;
+
+            // Draw a subtle border for the info box
+            DrawRectangleLines(rx, rtop, rw, rh, (Color){ 60, 60, 80, 255 });
+
+            int infoY = rtop + 14;
+
+            // Item name centred
+            const char* iname = GetItemName(selType);
+            int tw = MeasureText(iname, 16);
+            DrawText(iname, rcx - tw / 2, infoY, 16, YELLOW);
+            infoY += 24;
+
+            // Description (multi-line)
+            const char* desc = GetItemDescription(selType);
+            char descCopy[256];
+            strncpy(descCopy, desc, sizeof(descCopy) - 1);
+            descCopy[sizeof(descCopy) - 1] = '\0';
+            char* line = descCopy;
+            char* nl;
+            while ((nl = strchr(line, '\n')) != NULL) {
+                *nl = '\0';
+                DrawText(line, rx + 10, infoY, 14, LIGHTGRAY);
+                infoY += 18;
+                line = nl + 1;
+            }
+            if (*line) {
+                DrawText(line, rx + 10, infoY, 14, LIGHTGRAY);
+                infoY += 18;
+            }
+
+            // Quantity
+            char qty[64];
+            snprintf(qty, sizeof(qty), "Qty: %d", game->inventory[game->inventorySelection].quantity);
+            DrawText(qty, rx + 10, infoY, 14, WHITE);
+            infoY += 22;
+
+            // Heal amount
+            int heal = GetItemHealAmount(selType);
+            if (heal > 0) {
+                char healStr[64];
+                snprintf(healStr, sizeof(healStr), "Heals %d HP", heal);
+                DrawText(healStr, rx + 10, infoY, 14, (Color){ 100, 255, 100, 255 });
+            }
+        } else {
+            const char* msg = "(empty)";
+            int tw = MeasureText(msg, 16);
+            DrawText(msg, rcx - tw / 2, (iy + ih) / 2 - 8, 16, GRAY);
+        }
+
+        // --- Context-sensitive footer ---
+        char footer[128];
+        if (game->inventorySlotCount == 0) {
+            snprintf(footer, sizeof(footer), "I / ESC to close");
+        } else if (game->invSubState == INV_BROWSE) {
+            snprintf(footer, sizeof(footer), "ENTER to select action  |  I / ESC to close");
+        } else {
+            snprintf(footer, sizeof(footer), "UP/DOWN to choose  |  ENTER to confirm  |  ESC to go back");
+        }
+        DrawText(footer, ix + 16, iy + ih - 28, 14, GRAY);
+
+        // --- Action-menu popup ---
+        if (game->invSubState == INV_ACTION_MENU && game->inventorySlotCount > 0) {
+            static const char* actions[] = { "Use", "Drop", "Drop All", "Back" };
+            int mx = ix + 16 + lw + 2;
+            int my = iy + 40 + game->inventorySelection * 22 + 30 - 2;
+            if (my + 80 > iy + ih - 30) my = iy + ih - 30 - 80;
+            if (my < iy + 40) my = iy + 40;
+            int mw = 140;
+            int mh = 112;
+
+            DrawRectangle(mx, my, mw, mh, (Color){ 20, 20, 30, 240 });
+            DrawRectangleLines(mx, my, mw, mh, YELLOW);
+
+            for (int a = 0; a < 4; a++) {
+                Color ac = (a == game->invActionSelection) ? YELLOW : WHITE;
+                if (a == game->invActionSelection)
+                    DrawText(">", mx + 6, my + 6 + a * 26, 16, YELLOW);
+                DrawText(actions[a], mx + 22, my + 6 + a * 26, 16, ac);
+            }
         }
     }
 }
@@ -636,6 +904,7 @@ static void SpawnEntitiesFromObjects(Game* game) {
             game->potionTiles[game->potionCount][0] = tileX;
             game->potionTiles[game->potionCount][1] = tileY;
             game->potionCollected[game->potionCount] = false;
+            game->potionQuantities[game->potionCount] = 1;
             if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
             else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
             else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
@@ -651,6 +920,9 @@ static void SpawnEntitiesFromObjects(Game* game) {
     }
 }
 
+static void LoadPotionTextures(Game* game);
+static void UnloadPotionTextures(Game* game);
+
 // Regenerate the map when the player descends to the next floor.
 // Player stats (HP, level, EXP) are preserved; the map and entities are rebuilt.
 void DescendFloor(Game* game) {
@@ -661,6 +933,7 @@ void DescendFloor(Game* game) {
 
     Monster_UnloadSprites();
     Monster_ResetAll();
+    UnloadPotionTextures(game);
 
     if (game->map) {
         for (int t = 0; t < game->map->tilesetCount; t++) {
@@ -679,10 +952,12 @@ void DescendFloor(Game* game) {
     game->selectedMonsterIdx = -1;
     game->currentFloor = floor;
     game->maxFloors = 10;
-    game->player.ent.spriteSheet = LoadTexture("resources/roguelikeChar_transparent.png");
+    game->player.ent.spriteSheet = LoadTexture("resources/sprites/roguelikeChar_transparent.png");
     if (game->player.ent.spriteSheet.id == 0) {
         TraceLog(LOG_WARNING, "Could not load player spritesheet during descend");
     }
+
+    LoadPotionTextures(game);
 
     game->map = GenerateProceduralMap(80, 50, game->currentFloor < game->maxFloors);
     if (!game->map) {
@@ -781,6 +1056,18 @@ static const int ITEM_HEALS[ITEM_COUNT] = {
     18, // floor 3-5
     36  // floor 6+
 };
+static const char* ITEM_DESCS[ITEM_COUNT] = {
+    "",
+    "A small vial of red liquid.\nRestores 8 HP.",
+    "A hearty draught.\nRestores 18 HP.",
+    "A potent elixir.\nRestores 36 HP."
+};
+static const char* ITEM_SPRITES[ITEM_COUNT] = {
+    "",
+    "resources/sprites/items/health_potions/small_health_potion.png",
+    "resources/sprites/items/health_potions/big_health_potion.png",
+    "resources/sprites/items/health_potions/large_health_potion.png"
+};
 
 const char* GetItemName(ItemType type) {
     if (type < 0 || type >= ITEM_COUNT) return "";
@@ -790,6 +1077,10 @@ const char* GetItemName(ItemType type) {
 int GetItemHealAmount(ItemType type) {
     if (type < 0 || type >= ITEM_COUNT) return 0;
     return ITEM_HEALS[type];
+}
+const char* GetItemDescription(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return "";
+    return ITEM_DESCS[type];
 }
 
 // Add one instance of the given item to the inventory (stacking).
@@ -836,6 +1127,20 @@ bool InventoryUse(Game* game, int slot) {
             game->inventorySelection = game->inventorySlotCount - 1;
     }
     return true;
+}
+
+static void LoadPotionTextures(Game* game) {
+    for (int i = 1; i < ITEM_COUNT; i++) {
+        if (ITEM_SPRITES[i][0])
+            game->potionTextures[i - 1] = LoadTexture(ITEM_SPRITES[i]);
+    }
+}
+
+static void UnloadPotionTextures(Game* game) {
+    for (int i = 0; i < 3; i++) {
+        if (game->potionTextures[i].id > 0)
+            UnloadTexture(game->potionTextures[i]);
+    }
 }
 
 // Initialise (or re-initialise) the game: load map, build blocking,
@@ -919,10 +1224,12 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.ent.color = (Color){ 50, 200, 255, 255 };
     game->player.ent.spriteRow = 6;
 
-    game->player.ent.spriteSheet = LoadTexture("resources/roguelikeChar_transparent.png");
+    game->player.ent.spriteSheet = LoadTexture("resources/sprites/roguelikeChar_transparent.png");
     if (game->player.ent.spriteSheet.id == 0) {
         TraceLog(LOG_WARNING, "Could not load player spritesheet, using fallback rendering");
     }
+
+    LoadPotionTextures(game);
 
     game->player.exp = 0;
     game->player.expToNext = ExpForLevel(1);
@@ -990,6 +1297,7 @@ void CleanupGame(Game* game) {
         }
     }
     if (game->player.ent.spriteSheet.id > 0) UnloadTexture(game->player.ent.spriteSheet);
+    UnloadPotionTextures(game);
     if (game->map) {
         UnloadTMX(game->map);
         game->map = NULL;

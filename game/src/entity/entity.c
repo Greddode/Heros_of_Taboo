@@ -108,13 +108,17 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                 game->potionTiles[h][1] == newY) {
                 game->potionCollected[h] = true;
                 ItemType ptype = game->potionTypes[h];
-                if (InventoryAdd(game, ptype)) {
-                    TraceLog(LOG_INFO, "Picked up %s", GetItemName(ptype));
-                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Picked up %s", GetItemName(ptype));
-                } else {
-                    TraceLog(LOG_INFO, "Inventory full, dropping %s", GetItemName(ptype));
+                int qty = game->potionQuantities[h];
+                int picked = 0;
+                for (int i = 0; i < qty; i++) {
+                    if (InventoryAdd(game, ptype)) picked++;
+                    else break;
                 }
-                PlayPickupSound();
+                if (picked > 0) {
+                    TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(ptype));
+                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Picked up %d x %s", picked, GetItemName(ptype));
+                    PlayPickupSound();
+                }
             }
         }
     }

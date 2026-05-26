@@ -142,6 +142,8 @@ int main(void)
                         settingsMenuOpen = false;
                     } else if (gameMenuOpen) {
                         gameMenuOpen = false;
+                    } else if (game.state == STATE_INVENTORY) {
+                        // inventory handles ESC internally
                     } else if (game.state == STATE_GAME_OVER || game.state == STATE_WIN) {
                         nextScene = SCENE_MENU;
                     } else {

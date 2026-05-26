@@ -101,6 +101,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
                 game->potionTiles[game->potionCount][0] = hx;
                 game->potionTiles[game->potionCount][1] = hy;
                 game->potionCollected[game->potionCount] = false;
+                game->potionQuantities[game->potionCount] = 1;
                 if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
                 else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
                 else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
