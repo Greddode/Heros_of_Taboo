@@ -4,6 +4,13 @@
 #include "raylib.h"
 #include <stdbool.h>
 
+// -- Attack type identifiers -------------------------------------------------
+typedef enum {
+    ATTACK_MELEE = 0,
+    ATTACK_RANGED,
+    ATTACK_MAGIC
+} AttackType;
+
 // Direction an entity can move
 typedef enum {
     DIR_NONE = 0,

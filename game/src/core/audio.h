@@ -12,5 +12,7 @@ float GetSFXVolume(void);
 void SetSFXVolume(float vol);
 void PlayHitSound(void);
 void PlayPickupSound(void);
+void PlayRangedAttackSound(void);
+void PlayMagicAttackSound(void);
 
 #endif

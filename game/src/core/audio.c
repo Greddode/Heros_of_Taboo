@@ -7,6 +7,8 @@
 #define MAX_GAME_TRACKS   16
 #define MAX_HIT_SOUNDS     16
 #define MAX_PICKUP_SOUNDS  16
+#define MAX_RANGED_SOUNDS  16
+#define MAX_MAGIC_SOUNDS   16
 
 #define MENU_MUSIC_DIR  "resources/audio/music/main_menu"
 #define GAME_MUSIC_DIR  "resources/audio/music/game"
@@ -35,6 +37,12 @@ static int s_hitSoundCount = 0;
 
 static Sound s_pickupSounds[MAX_PICKUP_SOUNDS];
 static int s_pickupSoundCount = 0;
+
+static Sound s_rangedSounds[MAX_RANGED_SOUNDS];
+static int s_rangedSoundCount = 0;
+
+static Sound s_magicSounds[MAX_MAGIC_SOUNDS];
+static int s_magicSoundCount = 0;
 
 static void LoadSoundsFromDir(const char *dirPath, Sound *sounds, int *count, int maxCount) {
     FilePathList files = LoadDirectoryFiles(dirPath);
@@ -71,6 +79,14 @@ static void LoadPickupSounds(void) {
     LoadSoundsFromDir("resources/audio/sounds/pickup", s_pickupSounds, &s_pickupSoundCount, MAX_PICKUP_SOUNDS);
 }
 
+static void LoadRangedSounds(void) {
+    LoadSoundsFromDir("resources/audio/sounds/ranged_attack", s_rangedSounds, &s_rangedSoundCount, MAX_RANGED_SOUNDS);
+}
+
+static void LoadMagicSounds(void) {
+    LoadSoundsFromDir("resources/audio/sounds/magic_attack", s_magicSounds, &s_magicSoundCount, MAX_MAGIC_SOUNDS);
+}
+
 void InitAudioSystem(void) {
     InitAudioDevice();
     if (!IsAudioDeviceReady()) return;
@@ -80,6 +96,8 @@ void InitAudioSystem(void) {
 
     LoadHitSounds();
     LoadPickupSounds();
+    LoadRangedSounds();
+    LoadMagicSounds();
 
     s_audioReady = true;
 }
@@ -195,6 +213,20 @@ void PlayPickupSound(void) {
     PlaySound(s_pickupSounds[idx]);
 }
 
+void PlayRangedAttackSound(void) {
+    if (!s_audioReady || s_rangedSoundCount == 0) return;
+    int idx = GetRandomValue(0, s_rangedSoundCount - 1);
+    SetSoundVolume(s_rangedSounds[idx], s_sfxVolume);
+    PlaySound(s_rangedSounds[idx]);
+}
+
+void PlayMagicAttackSound(void) {
+    if (!s_audioReady || s_magicSoundCount == 0) return;
+    int idx = GetRandomValue(0, s_magicSoundCount - 1);
+    SetSoundVolume(s_magicSounds[idx], s_sfxVolume);
+    PlaySound(s_magicSounds[idx]);
+}
+
 void ShutdownAudioSystem(void) {
     if (!s_audioReady) return;
     for (int i = 0; i < s_menuTrackCount; i++)
@@ -205,6 +237,10 @@ void ShutdownAudioSystem(void) {
     s_hitSoundCount = 0;
     for (int i = 0; i < s_pickupSoundCount; i++) UnloadSound(s_pickupSounds[i]);
     s_pickupSoundCount = 0;
+    for (int i = 0; i < s_rangedSoundCount; i++) UnloadSound(s_rangedSounds[i]);
+    s_rangedSoundCount = 0;
+    for (int i = 0; i < s_magicSoundCount; i++) UnloadSound(s_magicSounds[i]);
+    s_magicSoundCount = 0;
     for (int i = 0; i < s_menuTrackCount; i++) UnloadMusicStream(s_menuTracks[i]);
     s_menuTrackCount = 0;
     for (int i = 0; i < s_gameTrackCount; i++) UnloadMusicStream(s_gameTracks[i]);

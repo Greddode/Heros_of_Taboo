@@ -42,6 +42,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 20,
         .minFloor        = 1,
         .spawnWeight     = 0,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     // --- Group 1: Early (floors 1+) -----------------------------------------
@@ -61,6 +63,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 1,
         .spawnWeight     = 14,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_GOBLIN] = (MonsterTemplate){
@@ -97,6 +101,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 1,
         .spawnWeight     = 14,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     // --- Group 2: Mid (floors 3+) -------------------------------------------
@@ -116,6 +122,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 3,
         .spawnWeight     = 10,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_FUNGAL_MYCONID] = (MonsterTemplate){
@@ -134,6 +142,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 3,
         .spawnWeight     = 10,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_WARP_SKULL] = (MonsterTemplate){
@@ -152,6 +162,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 10,
         .minFloor        = 3,
         .spawnWeight     = 10,
+        .attackType      = ATTACK_MAGIC,
+        .attackRange     = 3,
     };
 
     // --- Group 3: Late (floors 6+) ------------------------------------------
@@ -171,6 +183,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 10,
         .minFloor        = 6,
         .spawnWeight     = 7,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_OGRE] = (MonsterTemplate){
@@ -189,6 +203,8 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 8,
         .minFloor        = 6,
         .spawnWeight     = 7,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
     };
 
     s_templates[MONSTER_DRAGON] = (MonsterTemplate){
@@ -207,6 +223,29 @@ void Monster_InitTemplates(void) {
         .detectionRange  = 10,
         .minFloor        = 6,
         .spawnWeight     = 7,
+        .attackType      = ATTACK_MELEE,
+        .attackRange     = 1,
+    };
+
+    // --- Ranger: early floor 1+ (shorter hp, ranged attack) -------------------
+    s_templates[MONSTER_RANGER_GOBLIN] = (MonsterTemplate){
+        .type            = MONSTER_RANGER_GOBLIN,
+        .tmxTypeName     = "goblin_archer",
+        .name            = "Goblin Archer",
+        .hp              = 5,
+        .attack          = 2,
+        .defense         = 0,
+        .expValue        = 14,
+        .level           = 1,
+        .color           = { 100, 150, 60, 255 },
+        .spritePath      = "resources/sprites/monsters/Goblin_Archer.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 9,
+        .minFloor        = 2,
+        .spawnWeight     = 8,
+        .attackType      = ATTACK_RANGED,
+        .attackRange     = 5,
     };
 }
 
@@ -264,9 +303,11 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->prevY    = y;
     m->hp       = tpl->hp;
     m->maxHp    = tpl->hp;
-    m->attack   = tpl->attack;
-    m->defense  = tpl->defense;
-    m->level    = tpl->level;
+    m->attack      = tpl->attack;
+    m->defense     = tpl->defense;
+    m->level       = tpl->level;
+    m->attackType  = tpl->attackType;
+    m->attackRange = tpl->attackRange;
     m->expValue = tpl->expValue;
     m->alive    = true;
     m->active   = true;
@@ -393,22 +434,69 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
 
 // Process a single monster's AI (chase/attack/wander).
 // Does NOT snapshot prevX/prevY — that is done by the caller.
-static void ProcessMonsterAI(Monster* m,
-                              int playerX, int playerY, int* playerHp, int playerDefense,
-                              float* playerHitFlash,
-                              const unsigned char blocking[][MAP_WIDTH],
-                              int mapWidth, int mapHeight,
-                              CombatLog* combatLog) {
+static void ProcessMonsterAI(Monster* m, Game* game) {
     const MonsterTemplate* tpl = Monster_GetTemplate(m->type);
     if (!tpl) return;
 
+    int playerX = game->player.ent.x;
+    int playerY = game->player.ent.y;
     int dx = playerX - m->x;
     int dy = playerY - m->y;
     int dist = abs(dx) + abs(dy);
+    int mapWidth = game->map->width;
+    int mapHeight = game->map->height;
+    const unsigned char(*blocking)[MAP_WIDTH] = game->blocking;
 
     // --- chase / attack ----------------------------------------------------
     if (dist <= tpl->detectionRange &&
         MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, tpl->detectionRange)) {
+
+        // Check for ranged/magic attack: attack from distance if in range
+        if (m->attackType != ATTACK_MELEE && dist <= m->attackRange &&
+            (dx == 0 || dy == 0) &&
+            MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, m->attackRange)) {
+            int dmg = m->attack - game->player.ent.defense;
+            if (dmg < 1) dmg = 1;
+            game->player.ent.hp -= dmg;
+            if (game->player.ent.hp < 0) game->player.ent.hp = 0;
+            m->hitFlashTimer = 0.15f;
+            game->player.ent.hitFlashTimer = 0.15f;
+
+            int tw = game->map->tileWidth;
+            int th = game->map->tileHeight;
+            game->projectile.active = true;
+            game->projectile.sx = m->x * tw + tw / 2.0f;
+            game->projectile.sy = m->y * th + th / 2.0f;
+            game->projectile.ex = playerX * tw + tw / 2.0f;
+            game->projectile.ey = playerY * th + th / 2.0f;
+            game->projectile.tileSX = m->x;
+            game->projectile.tileSY = m->y;
+            game->projectile.tileEX = playerX;
+            game->projectile.tileEY = playerY;
+            game->projectile.attackType = m->attackType;
+            game->projectile.color = (m->attackType == ATTACK_MAGIC) ? (Color){ 80, 80, 255, 255 } : (Color){ 139, 69, 19, 255 };
+            if (m->attackType == ATTACK_MAGIC) {
+                game->projectile.startFrame = 30;
+                game->projectile.animFrameCount = 9;
+            } else {
+                game->projectile.startFrame = 0;
+                game->projectile.animFrameCount = 0;
+            }
+            game->projectileTimer = PROJECTILE_ANIM_DURATION;
+            game->projectileDuration = PROJECTILE_ANIM_DURATION;
+
+            PlayHitSound();
+            const char* verb = (m->attackType == ATTACK_MAGIC) ? "blasts" : "shoots";
+            if (m->attackType == ATTACK_MAGIC) {
+                PlayMagicAttackSound();
+            } else {
+                PlayRangedAttackSound();
+            }
+            TraceLog(LOG_INFO, "%s %s you for %d damage (HP: %d)!",
+                     m->name, verb, dmg, game->player.ent.hp);
+            CombatLog_Add(&game->combatLog, BLACK, "%s %s you for %d!", m->name, verb, dmg);
+            return;  // skip movement — we attacked from range
+        }
 
         Direction bestDir = DIR_NONE;
         int bestDist = dist;
@@ -426,16 +514,16 @@ static void ProcessMonsterAI(Monster* m,
 
             // can attack the player?
             if (tx == playerX && ty == playerY) {
-                int dmg = m->attack - playerDefense;
+                int dmg = m->attack - game->player.ent.defense;
                 if (dmg < 1) dmg = 1;
-                *playerHp -= dmg;
-                if (*playerHp < 0) *playerHp = 0;
+                game->player.ent.hp -= dmg;
+                if (game->player.ent.hp < 0) game->player.ent.hp = 0;
                 PlayHitSound();
                 m->hitFlashTimer = 0.15f;
-                if (playerHitFlash) *playerHitFlash = 0.15f;
+                game->player.ent.hitFlashTimer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
-                         m->name, dmg, *playerHp);
-                CombatLog_Add(combatLog, BLACK, "%s hits you for %d!", m->name, dmg);
+                         m->name, dmg, game->player.ent.hp);
+                CombatLog_Add(&game->combatLog, BLACK, "%s hits you for %d!", m->name, dmg);
                 return;  // skip movement — we attacked
             }
 
@@ -480,12 +568,7 @@ static void ProcessMonsterAI(Monster* m,
     }
 }
 
-bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
-                           float* playerHitFlash,
-                           const unsigned char blocking[][MAP_WIDTH],
-                           int mapWidth, int mapHeight,
-                           CombatLog* combatLog,
-                           int timeWaited) {
+bool Monster_ProcessAllAI(Game* game, int timeWaited) {
     for (int i = 0; i < s_monsterCount; i++) {
         Monster* m = &s_monsters[i];
         if (!m->alive || !m->active) continue;
@@ -501,18 +584,16 @@ bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDef
             m->shadowTurnCounter = 0;
         }
 
-        ProcessMonsterAI(m, playerX, playerY, playerHp, playerDefense,
-                         playerHitFlash, blocking, mapWidth, mapHeight, combatLog);
-        if (*playerHp <= 0) return false;
+        ProcessMonsterAI(m, game);
+        if (game->player.ent.hp <= 0) return false;
 
         // --- Frenzy: second action for shadow ----------------------------------
         if (m->type == MONSTER_SHADOW && timeWaited >= 35) {
-            ProcessMonsterAI(m, playerX, playerY, playerHp, playerDefense,
-                             playerHitFlash, blocking, mapWidth, mapHeight, combatLog);
-            if (*playerHp <= 0) return false;
+            ProcessMonsterAI(m, game);
+            if (game->player.ent.hp <= 0) return false;
         }
     }
-    return (*playerHp > 0);
+    return (game->player.ent.hp > 0);
 }
 
 // ============================================================================

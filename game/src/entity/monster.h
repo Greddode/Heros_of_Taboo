@@ -32,6 +32,7 @@ typedef enum {
     MONSTER_GOBLIN,
     MONSTER_SKELETON,
     MONSTER_WARP_SKULL,
+    MONSTER_RANGER_GOBLIN,
     MONSTER_TYPE_COUNT
 } MonsterType;
 
@@ -52,6 +53,8 @@ typedef struct {
     int detectionRange;        // tiles within which the monster notices the player
     int minFloor;              // lowest floor this monster can appear on
     int spawnWeight;           // relative spawn probability weight
+    AttackType attackType;
+    int attackRange;           // max tiles for ranged/magic attacks (1 = melee only)
 } MonsterTemplate;
 
 // -- Instance: runtime data for a single monster on the map ------------------
@@ -73,6 +76,8 @@ typedef struct {
     float animTimer;
     float hitFlashTimer;
     int shadowTurnCounter;
+    AttackType attackType;
+    int attackRange;
 } Monster;
 
 // ============================================================================
@@ -112,20 +117,13 @@ int Monster_GetCount(void);
 // Advance animation timers (call every frame).
 void Monster_UpdateAnimations(float dt);
 
+// Forward declaration so we can pass Game* without circular includes
+typedef struct Game Game;
+
 // Run AI for all living monsters.
-//  * playerX, playerY, playerDefense, playerHp — the player's current state
-//  * playerHitFlash — the player's hitFlashTimer (set on attack for white flash)
-//  * blocking — walkability grid (1 = blocked, 0 = open), indexed as [y][x]
-//  * mapWidth, mapHeight — logical map dimensions (≤ MAP_WIDTH / MAP_HEIGHT)
-//  * combatLog — log where monster attack messages are written
-// The function applies damage to *playerHp when monsters attack.
+// Applies damage to the player when monsters attack.
 // Returns false if the player was killed.
-bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
-                           float* playerHitFlash,
-                           const unsigned char blocking[][MAP_WIDTH],
-                           int mapWidth, int mapHeight,
-                           CombatLog* combatLog,
-                           int timeWaited);
+bool Monster_ProcessAllAI(Game* game, int timeWaited);
 
 // Load shared monster sprite sheets (call after InitGame map loading).
 void Monster_LoadSprites(void);

@@ -2,19 +2,22 @@
 #define GAME_H
 
 #include "raylib.h"
-#include "tmx/tmx.h"
-#include "entity/entity.h"
-#include "entity/player.h"
-#include "ui/combat_log.h"
-#include "inventory.h"
-#include "renderer.h"
-#include "map_helpers.h"
 #include <stdbool.h>
 
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
 #define MOVE_ANIM_DURATION 0.15f
 #define FOG_RADIUS 7
+#define PROJECTILE_ANIM_DURATION 0.25f
+
+#include "tmx/tmx.h"
+#include "entity/entity.h"
+#include "entity/player.h"
+#include "entity/monster.h"
+#include "ui/combat_log.h"
+#include "inventory.h"
+#include "renderer.h"
+#include "map_helpers.h"
 
 typedef enum {
     STATE_PLAYER_TURN,
@@ -23,6 +26,18 @@ typedef enum {
     STATE_WIN,
     STATE_INVENTORY
 } GameState;
+
+typedef struct {
+    bool active;
+    float sx, sy;    // start pixel coords (world space)
+    float ex, ey;    // end pixel coords (world space)
+    Color color;
+    int tileSX, tileSY;  // caster tile coords
+    int tileEX, tileEY;  // target tile coords
+    AttackType attackType;
+    int startFrame;       // first frame index (0-based) in magic texture
+    int animFrameCount;   // number of animation frames
+} Projectile;
 
 typedef struct Game {
     MapData* map;
@@ -52,6 +67,7 @@ typedef struct Game {
     Texture2D potionTextures[3];
     Texture2D texUiFrame;
     Texture2D texUiSlot;
+    Texture2D magicAttacksTexture;
 
     InventorySlot inventory[MAX_INVENTORY_SLOTS];
     int inventorySlotCount;
@@ -78,6 +94,11 @@ typedef struct Game {
     float animDuration;
     float monsterAnimDuration;
     bool sprintBypassRoom;
+    bool animatingEnemyTurn;
+
+    Projectile projectile;
+    float projectileTimer;
+    float projectileDuration;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);

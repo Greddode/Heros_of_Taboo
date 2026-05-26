@@ -3,6 +3,7 @@
 #include "ui/combat_log.h"
 #include "ui/monster_info.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void Draw9Slice(Texture2D tex, Rectangle dest, int l, int t, int r, int b) {
@@ -108,6 +109,58 @@ void RenderGame(const Game* game) {
             } else {
                 DrawCircle(cx - 5, cy + 4, 1, WHITE);
             }
+        }
+    }
+
+    // Projectile rendering (in world space)
+    if (game->projectile.active && game->projectileDuration > 0.0f) {
+        float pt = (game->projectileTimer <= 0.0f) ? 1.0f : 1.0f - (game->projectileTimer / game->projectileDuration);
+        float cx = game->projectile.sx + (game->projectile.ex - game->projectile.sx) * pt;
+        float cy = game->projectile.sy + (game->projectile.ey - game->projectile.sy) * pt;
+
+        if (game->projectile.attackType == ATTACK_MAGIC &&
+            game->magicAttacksTexture.id > 0 && game->projectile.animFrameCount > 0) {
+            int x0 = game->projectile.tileSX, y0 = game->projectile.tileSY;
+            int x1 = game->projectile.tileEX, y1 = game->projectile.tileEY;
+            int tw = game->map->tileWidth, th = game->map->tileHeight;
+            int totalDist = abs(x1 - x0) + abs(y1 - y0);
+            int cols = 10, tileSize = 64;
+            int animLen = game->projectile.animFrameCount;
+
+            // Bresenham: iterate all tiles on the line
+            int bdx = abs(x1 - x0), bdy = abs(y1 - y0);
+            int sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
+            int err = bdx - bdy;
+            int x = x0, y = y0;
+            while (1) {
+                int tx = x, ty = y;
+
+                // Wave effect: animation travels from caster toward target
+                int d = abs(tx - x0) + abs(ty - y0);
+                float wavePos = pt * (totalDist + animLen);
+                float waveOffset = wavePos - d;
+                if (waveOffset >= 0) {
+                    int frame = (int)waveOffset;
+                    if (frame >= animLen) frame = animLen - 1;
+                    int fIndex = game->projectile.startFrame + frame;
+                    Rectangle src = {
+                        (float)((fIndex % cols) * tileSize),
+                        (float)((fIndex / cols) * tileSize),
+                        (float)tileSize, (float)tileSize
+                    };
+                    if (tx >= 0 && tx < game->map->width && ty >= 0 && ty < game->map->height) {
+                        Rectangle dest = { (float)(tx * tw), (float)(ty * th), (float)tw, (float)th };
+                        DrawTexturePro(game->magicAttacksTexture, src, dest, (Vector2){ 0 }, 0, WHITE);
+                    }
+                }
+
+                if (tx == x1 && ty == y1) break;
+                int e2 = 2 * err;
+                if (e2 > -bdy) { err -= bdy; x += sx; }
+                if (e2 < bdx)  { err += bdx; y += sy; }
+            }
+        } else {
+            DrawLine((int)game->projectile.sx, (int)game->projectile.sy, (int)cx, (int)cy, game->projectile.color);
         }
     }
 

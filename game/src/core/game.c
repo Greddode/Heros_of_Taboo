@@ -243,12 +243,7 @@ void HandleInput(Game* game) {
                     game->player.ent.y = ny;
                     game->turnCount++;
 
-                    bool alive = Monster_ProcessAllAI(
-                        game->player.ent.x, game->player.ent.y,
-                        &game->player.ent.hp, game->player.ent.defense,
-                        &game->player.ent.hitFlashTimer,
-                        game->blocking, game->map->width, game->map->height,
-                        &game->combatLog, game->timeWaited);
+                    bool alive = Monster_ProcessAllAI(game, game->timeWaited);
 
                     if (!alive) {
                         game->state = STATE_GAME_OVER;
@@ -358,6 +353,14 @@ void UpdateGame(Game* game) {
         if (game->monsterAnimTimer < 0.0f) game->monsterAnimTimer = 0.0f;
     }
 
+    if (game->projectileTimer > 0.0f) {
+        game->projectileTimer -= GetFrameTime();
+        if (game->projectileTimer <= 0.0f) {
+            game->projectileTimer = 0.0f;
+            game->projectile.active = false;
+        }
+    }
+
     if (game->player.ent.hitFlashTimer > 0.0f) {
         game->player.ent.hitFlashTimer -= GetFrameTime();
         if (game->player.ent.hitFlashTimer < 0.0f) game->player.ent.hitFlashTimer = 0.0f;
@@ -373,11 +376,16 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        bool playerAlive = Monster_ProcessAllAI(
-            game->player.ent.x, game->player.ent.y, &game->player.ent.hp, game->player.ent.defense,
-            &game->player.ent.hitFlashTimer,
-            game->blocking, game->map->width, game->map->height,
-            &game->combatLog, game->timeWaited);
+        // Wait for all animations (projectile, monster movement) before giving player control
+        if (game->animatingEnemyTurn) {
+            if (game->projectile.active && game->projectileTimer > 0.0f) return;
+            if (game->monsterAnimTimer > 0.0f) return;
+            game->animatingEnemyTurn = false;
+            game->state = STATE_PLAYER_TURN;
+            return;
+        }
+
+        bool playerAlive = Monster_ProcessAllAI(game, game->timeWaited);
 
         if (!playerAlive) {
             game->player.ent.alive = false;
@@ -401,7 +409,12 @@ void UpdateGame(Game* game) {
 
         game->monsterAnimTimer = MOVE_ANIM_DURATION;
         game->monsterAnimDuration = MOVE_ANIM_DURATION;
-        game->state = STATE_PLAYER_TURN;
+        game->animatingEnemyTurn = true;
+        // If no projectile, we can go straight to player turn
+        if (!game->projectile.active) {
+            game->animatingEnemyTurn = false;
+            game->state = STATE_PLAYER_TURN;
+        }
     }
 }
 
@@ -438,6 +451,11 @@ void DescendFloor(Game* game) {
     }
 
     LoadPotionTextures(game);
+
+    game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
+    if (game->magicAttacksTexture.id == 0) {
+        TraceLog(LOG_WARNING, "Could not load magic attacks tileset");
+    }
 
     game->map = GenerateProceduralMap(80, 50, game->currentFloor < game->maxFloors);
     if (!game->map) {
@@ -499,6 +517,9 @@ void DescendFloor(Game* game) {
     game->animDuration = 0.0f;
     game->monsterAnimDuration = 0.0f;
     game->sprintBypassRoom = false;
+    game->projectile.active = false;
+    game->projectileTimer = 0.0f;
+    game->projectileDuration = 0.0f;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
@@ -602,6 +623,11 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     LoadPotionTextures(game);
 
+    game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
+    if (game->magicAttacksTexture.id == 0) {
+        TraceLog(LOG_WARNING, "Could not load magic attacks tileset");
+    }
+
     game->player.exp = 0;
     game->player.expToNext = ExpForLevel(1);
 
@@ -665,6 +691,7 @@ void CleanupGame(Game* game) {
         }
     }
     if (game->player.ent.spriteSheet.id > 0) UnloadTexture(game->player.ent.spriteSheet);
+    if (game->magicAttacksTexture.id > 0) UnloadTexture(game->magicAttacksTexture);
     UnloadPotionTextures(game);
     if (game->map) {
         UnloadTMX(game->map);
