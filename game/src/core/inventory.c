@@ -221,10 +221,6 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
             snprintf(healStr, sizeof(healStr), "Heals %d HP", heal);
             DrawText(healStr, rx + 10, infoY, 14, (Color){ 0, 90, 0, 255 });
         }
-    } else {
-        const char* msg = "(empty)";
-        int tw = MeasureText(msg, 16);
-        DrawText(msg, rcx - tw / 2, (iy + ih) / 2 - 8, 16, DARKGRAY);
     }
 
     // Action-menu popup
