@@ -11,7 +11,7 @@ static int DistSq(int ax, int ay, int bx, int by) {
     return dx * dx + dy * dy;
 }
 
-// Populate each room with monsters and occasional healing items.
+// Populate each room with monsters and health potions.
 // Uses shuffled floor tile indices so placement is randomised.
 void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
     if (!game || !game->map || roomCount == 0) return;
@@ -92,22 +92,25 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             Monster_Spawn(type, mx, my, floor);
         }
 
-        // --- Healing item: only in larger rooms, placed on the last shuffled tile ---
-        if (floorCount >= 40 && game->healingCount < MAX_HEALING) {
+        // --- Health potion: only in larger rooms, placed on the last shuffled tile ---
+        if (floorCount >= 40 && game->potionCount < MAX_POTIONS) {
             int fi = floorCount - 1;
             int hx = floorTiles[fi] % w;
             int hy = floorTiles[fi] / w;
             if (DistSq(hx, hy, px, py) >= minDist) {
-                game->healingTiles[game->healingCount][0] = hx;
-                game->healingTiles[game->healingCount][1] = hy;
-                game->healingCollected[game->healingCount] = false;
-                game->healingCount++;
+                game->potionTiles[game->potionCount][0] = hx;
+                game->potionTiles[game->potionCount][1] = hy;
+                game->potionCollected[game->potionCount] = false;
+                if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
+                else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
+                else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+                game->potionCount++;
             }
         }
     }
 
     #undef ROOM_MAX_FLOORS
 
-    TraceLog(LOG_INFO, "Spawner: %d monsters, %d healing items placed",
-             Monster_GetAliveCount(), game->healingCount);
+    TraceLog(LOG_INFO, "Spawner: %d monsters, %d health potions placed",
+             Monster_GetAliveCount(), game->potionCount);
 }

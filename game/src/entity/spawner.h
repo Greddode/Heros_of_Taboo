@@ -4,7 +4,7 @@
 #include "core/game.h"
 #include "core/procedural.h"
 
-// Populate dungeon rooms with monsters and healing items.
+// Populate dungeon rooms with monsters and health potions.
 // Uses room data from procedural generation to place enemies and pickups
 // at valid floor tiles, avoiding the player's starting area.
 void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount);

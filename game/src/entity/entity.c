@@ -102,18 +102,18 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     entity->y = newY;
 
     if (entity->isPlayer) {
-        for (int h = 0; h < game->healingCount; h++) {
-            if (!game->healingCollected[h] &&
-                game->healingTiles[h][0] == newX &&
-                game->healingTiles[h][1] == newY) {
-                game->healingCollected[h] = true;
-                int healAmt = 8;
-                game->player.ent.hp += healAmt;
-                if (game->player.ent.hp > game->player.ent.maxHp)
-                    game->player.ent.hp = game->player.ent.maxHp;
-                TraceLog(LOG_INFO, "Picked up healing! HP: %d/%d",
-                         game->player.ent.hp, game->player.ent.maxHp);
-                CombatLog_Add(&game->combatLog, LIGHTGRAY, "Healing restores %d HP!", healAmt);
+        for (int h = 0; h < game->potionCount; h++) {
+            if (!game->potionCollected[h] &&
+                game->potionTiles[h][0] == newX &&
+                game->potionTiles[h][1] == newY) {
+                game->potionCollected[h] = true;
+                ItemType ptype = game->potionTypes[h];
+                if (InventoryAdd(game, ptype)) {
+                    TraceLog(LOG_INFO, "Picked up %s", GetItemName(ptype));
+                    CombatLog_Add(&game->combatLog, LIGHTGRAY, "Picked up %s", GetItemName(ptype));
+                } else {
+                    TraceLog(LOG_INFO, "Inventory full, dropping %s", GetItemName(ptype));
+                }
                 PlayPickupSound();
             }
         }

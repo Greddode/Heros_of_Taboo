@@ -108,6 +108,21 @@ static void SpawnShadow(Game* game) {
 // Period/space waits a turn, restoring 1 HP.
 // After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
+    if (game->state == STATE_INVENTORY) {
+        if (IsKeyPressed(KEY_I) || IsKeyPressed(KEY_ESCAPE)) {
+            game->state = STATE_PLAYER_TURN;
+        }
+        if (game->inventorySlotCount > 0) {
+            if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
+                game->inventorySelection--;
+            if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < game->inventorySlotCount - 1)
+                game->inventorySelection++;
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
+                InventoryUse(game, game->inventorySelection);
+        }
+        return;
+    }
+
     if (game->state != STATE_PLAYER_TURN) return;
     if (game->animTimer > 0.0f) return;
 
@@ -298,6 +313,14 @@ void HandleInput(Game* game) {
         }
     }
 
+    // Open inventory
+    if (IsKeyPressed(KEY_I)) {
+        game->state = STATE_INVENTORY;
+        if (game->inventorySelection < 0 || game->inventorySelection >= game->inventorySlotCount)
+            game->inventorySelection = 0;
+        return;
+    }
+
     // Check if player is on the stair tile after movement
     if (game->player.ent.x == game->stairX && game->player.ent.y == game->stairY &&
         game->stairX >= 0 && game->stairY >= 0) {
@@ -400,10 +423,10 @@ void RenderGame(const Game* game) {
         }
     }
 
-    for (int i = 0; i < game->healingCount; i++) {
-        if (game->healingCollected[i]) continue;
-        int hx = game->healingTiles[i][0];
-        int hy = game->healingTiles[i][1];
+    for (int i = 0; i < game->potionCount; i++) {
+        if (game->potionCollected[i]) continue;
+        int hx = game->potionTiles[i][0];
+        int hy = game->potionTiles[i][1];
         if (game->visibility[hy][hx] != 1) continue;
 
         Vector2 hpos = TileToScreen(hx, hy, tw, th);
@@ -518,6 +541,40 @@ void RenderGame(const Game* game) {
         int textWidth = MeasureText(stateText, 20);
         DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - 40, 20, YELLOW);
     }
+
+    // --- Inventory overlay ---------------------------------------------------
+    if (game->state == STATE_INVENTORY) {
+        int sw = GetScreenWidth();
+        int sh = GetScreenHeight();
+        int iw = 400;
+        int ih = 300;
+        int ix = (sw - iw) / 2;
+        int iy = (sh - ih) / 2;
+
+        DrawRectangle(0, 0, sw, sh, (Color){ 0, 0, 0, 160 });
+        DrawRectangle(ix, iy, iw, ih, (Color){ 30, 30, 40, 255 });
+        DrawRectangleLines(ix, iy, iw, ih, LIGHTGRAY);
+
+        int textX = ix + 16;
+        int textY = iy + 12;
+        DrawText("INVENTORY", textX, textY, 20, YELLOW);
+        textY += 30;
+
+        if (game->inventorySlotCount == 0) {
+            DrawText("(empty)", textX, textY, 16, GRAY);
+        } else {
+            for (int i = 0; i < game->inventorySlotCount; i++) {
+                Color c = (i == game->inventorySelection) ? YELLOW : WHITE;
+                char line[128];
+                snprintf(line, sizeof(line), "%s x%d", GetItemName(game->inventory[i].type), game->inventory[i].quantity);
+                if (i == game->inventorySelection)
+                    DrawText(">", textX - 18, textY, 16, YELLOW);
+                DrawText(line, textX, textY, 16, c);
+                textY += 22;
+            }
+            DrawText("ENTER to use  |  I / ESC to close", ix + 16, iy + ih - 28, 14, GRAY);
+        }
+    }
 }
 
 // Build the blocking grid from the tile map.
@@ -552,7 +609,7 @@ static void BuildBlockingMap(Game* game) {
 }
 
 // Iterate map objects from the TMX file and spawn the player,
-// healing pickups, or monsters based on the object's type field.
+// health potions, or monsters based on the object's type field.
 static void SpawnEntitiesFromObjects(Game* game) {
     if (!game || !game->map) return;
 
@@ -570,15 +627,20 @@ static void SpawnEntitiesFromObjects(Game* game) {
             game->player.ent.prevY = tileY;
             TraceLog(LOG_INFO, "Player spawned at (%d, %d)", tileX, tileY);
         }
-        // --- Healing item ----------------------------------------------------
+        // --- Health potion ---------------------------------------------------
         else if (strcmp(obj->type, "healing") == 0 || strcmp(obj->type, "Healing") == 0 ||
-                 strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0) {
-            if (game->healingCount >= MAX_HEALING) continue;
-            game->healingTiles[game->healingCount][0] = tileX;
-            game->healingTiles[game->healingCount][1] = tileY;
-            game->healingCollected[game->healingCount] = false;
-            game->healingCount++;
-            TraceLog(LOG_INFO, "Healing item at (%d, %d)", tileX, tileY);
+                 strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0 ||
+                 strcmp(obj->type, "health_potion") == 0 ||
+                 strcmp(obj->name, "health_potion") == 0 || strcmp(obj->name, "HealthPotion") == 0) {
+            if (game->potionCount >= MAX_POTIONS) continue;
+            game->potionTiles[game->potionCount][0] = tileX;
+            game->potionTiles[game->potionCount][1] = tileY;
+            game->potionCollected[game->potionCount] = false;
+            if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
+            else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
+            else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+            game->potionCount++;
+            TraceLog(LOG_INFO, "Health potion at (%d, %d)", tileX, tileY);
         }
         // --- Monsters --------------------------------------------------------
         // TMX object type is matched against MonsterTemplate.tmxTypeName
@@ -593,6 +655,9 @@ static void SpawnEntitiesFromObjects(Game* game) {
 // Player stats (HP, level, EXP) are preserved; the map and entities are rebuilt.
 void DescendFloor(Game* game) {
     Player savedPlayer = game->player;
+    InventorySlot savedInventory[MAX_INVENTORY_SLOTS];
+    memcpy(savedInventory, game->inventory, sizeof(savedInventory));
+    int savedInvCount = game->inventorySlotCount;
 
     Monster_UnloadSprites();
     Monster_ResetAll();
@@ -609,6 +674,8 @@ void DescendFloor(Game* game) {
 
     memset(game, 0, sizeof(Game));
     game->player = savedPlayer;
+    memcpy(game->inventory, savedInventory, sizeof(savedInventory));
+    game->inventorySlotCount = savedInvCount;
     game->selectedMonsterIdx = -1;
     game->currentFloor = floor;
     game->maxFloors = 10;
@@ -697,6 +764,78 @@ void DescendFloor(Game* game) {
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
     CombatLog_Add(&game->combatLog, LIGHTGRAY, floorMsg);
     TraceLog(LOG_INFO, "%s", floorMsg);
+}
+
+// ---------------------------------------------------------------------------
+// Item metadata
+// ---------------------------------------------------------------------------
+static const char* ITEM_NAMES[ITEM_COUNT] = {
+    "",
+    "Small HP Potion",
+    "Big HP Potion",
+    "Large HP Potion"
+};
+static const int ITEM_HEALS[ITEM_COUNT] = {
+    0,
+    8,  // floor 1-2
+    18, // floor 3-5
+    36  // floor 6+
+};
+
+const char* GetItemName(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return "";
+    return ITEM_NAMES[type];
+}
+
+int GetItemHealAmount(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return 0;
+    return ITEM_HEALS[type];
+}
+
+// Add one instance of the given item to the inventory (stacking).
+// Returns true if added, false if inventory is full.
+bool InventoryAdd(Game* game, ItemType type) {
+    if (type == ITEM_NONE) return false;
+    // Try to stack on an existing slot of the same type
+    for (int i = 0; i < game->inventorySlotCount; i++) {
+        if (game->inventory[i].type == type) {
+            game->inventory[i].quantity++;
+            return true;
+        }
+    }
+    // Need a new slot
+    if (game->inventorySlotCount >= MAX_INVENTORY_SLOTS) return false;
+    game->inventory[game->inventorySlotCount].type = type;
+    game->inventory[game->inventorySlotCount].quantity = 1;
+    game->inventorySlotCount++;
+    return true;
+}
+
+// Use (consume) the item in the given inventory slot.
+// Returns true if used successfully.
+bool InventoryUse(Game* game, int slot) {
+    if (slot < 0 || slot >= game->inventorySlotCount) return false;
+    InventorySlot* s = &game->inventory[slot];
+    if (s->type == ITEM_NONE || s->quantity <= 0) return false;
+
+    int heal = GetItemHealAmount(s->type);
+    if (heal > 0) {
+        game->player.ent.hp += heal;
+        if (game->player.ent.hp > game->player.ent.maxHp)
+            game->player.ent.hp = game->player.ent.maxHp;
+        CombatLog_Add(&game->combatLog, LIGHTGRAY, "Used %s — restores %d HP!", GetItemName(s->type), heal);
+    }
+
+    s->quantity--;
+    if (s->quantity <= 0) {
+        // Remove slot by shifting later ones down
+        for (int i = slot; i < game->inventorySlotCount - 1; i++)
+            game->inventory[i] = game->inventory[i + 1];
+        game->inventorySlotCount--;
+        if (game->inventorySelection >= game->inventorySlotCount)
+            game->inventorySelection = game->inventorySlotCount - 1;
+    }
+    return true;
 }
 
 // Initialise (or re-initialise) the game: load map, build blocking,
