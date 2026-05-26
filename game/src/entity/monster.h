@@ -16,6 +16,7 @@
 //   2. Add a MonsterTemplate entry in Monster_InitTemplates() in monster.c.
 //   3. (Optional) Place a sprite sheet in resources/sprite_animations/idle/
 //      and set spritePath / frameCount in the new template.
+//   4. Set minFloor (first floor it can appear) and spawnWeight (relative rarity).
 // No changes to game.c needed — Monster_SpawnByTypeName() auto-maps TMX objects.
 // ============================================================================
 
@@ -25,6 +26,12 @@ typedef enum {
     MONSTER_FUNGAL_MYCONID,
     MONSTER_OGRE,
     MONSTER_SHADOW,
+    MONSTER_BAT,
+    MONSTER_DEMON_EYE,
+    MONSTER_DRAGON,
+    MONSTER_GOBLIN,
+    MONSTER_SKELETON,
+    MONSTER_WARP_SKULL,
     MONSTER_TYPE_COUNT
 } MonsterType;
 
@@ -43,6 +50,8 @@ typedef struct {
     int frameCount;            // horizontal frames in the sheet (0 = static)
     float animSpeed;           // seconds per animation frame
     int detectionRange;        // tiles within which the monster notices the player
+    int minFloor;              // lowest floor this monster can appear on
+    int spawnWeight;           // relative spawn probability weight
 } MonsterTemplate;
 
 // -- Instance: runtime data for a single monster on the map ------------------

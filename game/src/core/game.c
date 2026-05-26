@@ -645,6 +645,8 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.exp = 0;
     game->player.expToNext = ExpForLevel(1);
 
+    game->currentFloor = 1;
+
     Monster_InitTemplates();
 
     SpawnEntitiesFromObjects(game);
@@ -661,7 +663,6 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->selectedMonsterIdx = -1;
     game->timeWaited = 0;
     game->escapeSpawned = false;
-    game->currentFloor = 1;
     game->maxFloors = 10;
     game->stairX = GetStairX();
     game->stairY = GetStairY();

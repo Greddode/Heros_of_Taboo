@@ -60,14 +60,36 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             if (DistSq(mx, my, px, py) < minDist) continue;
             if (Monster_GetAt(mx, my, NULL)) continue;
 
-            // Weighted random monster selection (easier monsters are more common)
-            MonsterType type;
-            int roll = GetRandomValue(0, 100);
-            if (roll < 40)      type = MONSTER_FLOATING_EYE;
-            else if (roll < 75) type = MONSTER_FUNGAL_MYCONID;
-            else                type = MONSTER_OGRE;
+            // Weighted random monster selection, filtered by floor depth
+            MonsterType type = MONSTER_BAT; // fallback
+            float totalWeight = 0;
+            float monsterWeights[MONSTER_TYPE_COUNT];
+            int floor = game->currentFloor;
 
-            Monster_Spawn(type, mx, my, game->currentFloor);
+            for (int t = 0; t < MONSTER_TYPE_COUNT; t++) {
+                const MonsterTemplate* tpl = Monster_GetTemplate((MonsterType)t);
+                if (!tpl || tpl->spawnWeight <= 0 || floor < tpl->minFloor) {
+                    monsterWeights[t] = 0;
+                    continue;
+                }
+                monsterWeights[t] = (float)tpl->spawnWeight;
+                totalWeight += monsterWeights[t];
+            }
+
+            if (totalWeight > 0) {
+                float roll = (float)GetRandomValue(0, (int)(totalWeight * 100)) / 100.0f;
+                float acc = 0;
+                for (int t = 0; t < MONSTER_TYPE_COUNT; t++) {
+                    if (monsterWeights[t] <= 0) continue;
+                    acc += monsterWeights[t];
+                    if (roll <= acc) {
+                        type = (MonsterType)t;
+                        break;
+                    }
+                }
+            }
+
+            Monster_Spawn(type, mx, my, floor);
         }
 
         // --- Healing item: only in larger rooms, placed on the last shuffled tile ---

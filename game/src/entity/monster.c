@@ -26,54 +26,6 @@ void Monster_InitTemplates(void) {
     if (s_templatesReady) return;
     s_templatesReady = true;
 
-    s_templates[MONSTER_FLOATING_EYE] = (MonsterTemplate){
-        .type            = MONSTER_FLOATING_EYE,
-        .tmxTypeName     = "floating_eye",
-        .name            = "Floating Eye",
-        .hp              = 6,
-        .attack          = 3,
-        .defense         = 0,
-        .expValue        = 5,
-        .level           = 1,
-        .color           = { 50, 220, 80, 255 },
-        .spritePath      = "resources/sprite_animations/idle/Floating_Eye.png",
-        .frameCount      = 4,
-        .animSpeed       = 0.5f,
-        .detectionRange  = 8,
-    };
-
-    s_templates[MONSTER_FUNGAL_MYCONID] = (MonsterTemplate){
-        .type            = MONSTER_FUNGAL_MYCONID,
-        .tmxTypeName     = "fungal_myconid",
-        .name            = "Fungal Myconid",
-        .hp              = 10,
-        .attack          = 4,
-        .defense         = 1,
-        .expValue        = 10,
-        .level           = 1,
-        .color           = { 220, 220, 200, 255 },
-        .spritePath      = "resources/sprite_animations/idle/Fungal_Myconid.png",
-        .frameCount      = 4,
-        .animSpeed       = 0.5f,
-        .detectionRange  = 8,
-    };
-
-    s_templates[MONSTER_OGRE] = (MonsterTemplate){
-        .type            = MONSTER_OGRE,
-        .tmxTypeName     = "ogre",
-        .name            = "Ogre",
-        .hp              = 20,
-        .attack          = 4,
-        .defense         = 1,
-        .expValue        = 25,
-        .level           = 1,
-        .color           = { 120, 60, 180, 255 },
-        .spritePath      = "resources/sprite_animations/idle/Ogre.png",
-        .frameCount      = 4,
-        .animSpeed       = 0.5f,
-        .detectionRange  = 8,
-    };
-
     s_templates[MONSTER_SHADOW] = (MonsterTemplate){
         .type            = MONSTER_SHADOW,
         .tmxTypeName     = "shadow",
@@ -88,6 +40,173 @@ void Monster_InitTemplates(void) {
         .frameCount      = 4,
         .animSpeed       = 0.5f,
         .detectionRange  = 20,
+        .minFloor        = 1,
+        .spawnWeight     = 0,
+    };
+
+    // --- Group 1: Early (floors 1+) -----------------------------------------
+    s_templates[MONSTER_BAT] = (MonsterTemplate){
+        .type            = MONSTER_BAT,
+        .tmxTypeName     = "bat",
+        .name            = "Bat",
+        .hp              = 5,
+        .attack          = 2,
+        .defense         = 0,
+        .expValue        = 10,
+        .level           = 1,
+        .color           = { 100, 60, 140, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Bat.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 1,
+        .spawnWeight     = 14,
+    };
+
+    s_templates[MONSTER_GOBLIN] = (MonsterTemplate){
+        .type            = MONSTER_GOBLIN,
+        .tmxTypeName     = "goblin",
+        .name            = "Goblin",
+        .hp              = 7,
+        .attack          = 3,
+        .defense         = 1,
+        .expValue        = 12,
+        .level           = 1,
+        .color           = { 80, 160, 80, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Goblin.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 1,
+        .spawnWeight     = 14,
+    };
+
+    s_templates[MONSTER_SKELETON] = (MonsterTemplate){
+        .type            = MONSTER_SKELETON,
+        .tmxTypeName     = "skeleton",
+        .name            = "Skeleton",
+        .hp              = 8,
+        .attack          = 3,
+        .defense         = 1,
+        .expValue        = 14,
+        .level           = 1,
+        .color           = { 200, 200, 180, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Skeleton.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 1,
+        .spawnWeight     = 14,
+    };
+
+    // --- Group 2: Mid (floors 3+) -------------------------------------------
+    s_templates[MONSTER_FLOATING_EYE] = (MonsterTemplate){
+        .type            = MONSTER_FLOATING_EYE,
+        .tmxTypeName     = "floating_eye",
+        .name            = "Floating Eye",
+        .hp              = 10,
+        .attack          = 4,
+        .defense         = 1,
+        .expValue        = 22,
+        .level           = 1,
+        .color           = { 50, 220, 80, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Floating_Eye.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 3,
+        .spawnWeight     = 10,
+    };
+
+    s_templates[MONSTER_FUNGAL_MYCONID] = (MonsterTemplate){
+        .type            = MONSTER_FUNGAL_MYCONID,
+        .tmxTypeName     = "fungal_myconid",
+        .name            = "Fungal Myconid",
+        .hp              = 12,
+        .attack          = 5,
+        .defense         = 2,
+        .expValue        = 26,
+        .level           = 1,
+        .color           = { 220, 220, 200, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Fungal_Myconid.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 3,
+        .spawnWeight     = 10,
+    };
+
+    s_templates[MONSTER_WARP_SKULL] = (MonsterTemplate){
+        .type            = MONSTER_WARP_SKULL,
+        .tmxTypeName     = "warp_skull",
+        .name            = "Warp Skull",
+        .hp              = 11,
+        .attack          = 5,
+        .defense         = 1,
+        .expValue        = 30,
+        .level           = 1,
+        .color           = { 160, 40, 200, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Warp_Skull.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 10,
+        .minFloor        = 3,
+        .spawnWeight     = 10,
+    };
+
+    // --- Group 3: Late (floors 6+) ------------------------------------------
+    s_templates[MONSTER_DEMON_EYE] = (MonsterTemplate){
+        .type            = MONSTER_DEMON_EYE,
+        .tmxTypeName     = "demon_eye",
+        .name            = "Demon Eye",
+        .hp              = 18,
+        .attack          = 6,
+        .defense         = 2,
+        .expValue        = 45,
+        .level           = 1,
+        .color           = { 200, 50, 50, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Demon_Eye.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 10,
+        .minFloor        = 6,
+        .spawnWeight     = 7,
+    };
+
+    s_templates[MONSTER_OGRE] = (MonsterTemplate){
+        .type            = MONSTER_OGRE,
+        .tmxTypeName     = "ogre",
+        .name            = "Ogre",
+        .hp              = 22,
+        .attack          = 6,
+        .defense         = 3,
+        .expValue        = 55,
+        .level           = 1,
+        .color           = { 120, 60, 180, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Ogre.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 8,
+        .minFloor        = 6,
+        .spawnWeight     = 7,
+    };
+
+    s_templates[MONSTER_DRAGON] = (MonsterTemplate){
+        .type            = MONSTER_DRAGON,
+        .tmxTypeName     = "dragon",
+        .name            = "Dragon",
+        .hp              = 28,
+        .attack          = 7,
+        .defense         = 3,
+        .expValue        = 70,
+        .level           = 1,
+        .color           = { 180, 80, 20, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Dragon.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 10,
+        .minFloor        = 6,
+        .spawnWeight     = 7,
     };
 }
 
@@ -156,7 +275,7 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->name[MONSTER_NAME_LEN - 1] = '\0';
 
     if (floor > 1) {
-        int extra = (floor - 1) * GetRandomValue(3, 6);
+        int extra = (floor - 1) * GetRandomValue(1, 3);
         m->level    = tpl->level + extra;
         m->maxHp    = tpl->hp + extra * 2;
         m->hp       = m->maxHp;
