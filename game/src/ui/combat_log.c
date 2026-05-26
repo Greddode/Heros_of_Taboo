@@ -3,8 +3,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-// Append a formatted message to the ring buffer
-void CombatLog_Add(CombatLog* log, const char* fmt, ...) {
+// Append a formatted message to the ring buffer with a color
+void CombatLog_Add(CombatLog* log, Color color, const char* fmt, ...) {
     if (!log) return;
     int idx = log->count % COMBAT_LOG_MAX;
     va_list args;
@@ -12,6 +12,7 @@ void CombatLog_Add(CombatLog* log, const char* fmt, ...) {
     vsnprintf(log->entries[idx], COMBAT_LOG_LEN, fmt, args);
     va_end(args);
     log->entries[idx][COMBAT_LOG_LEN - 1] = '\0';
+    log->colors[idx] = color;
     log->count++;
 }
 
@@ -33,6 +34,7 @@ void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int font
     int firstVirtual = total - visible;
     for (int i = 0; i < visible; i++) {
         int idx = (firstVirtual + i) % COMBAT_LOG_MAX;
-        DrawText(log->entries[idx], x, bgY + 2 + i * lineH, fontSize, LIGHTGRAY);
+        Color c = log->colors[idx].a > 0 ? log->colors[idx] : LIGHTGRAY;
+        DrawText(log->entries[idx], x, bgY + 2 + i * lineH, fontSize, c);
     }
 }

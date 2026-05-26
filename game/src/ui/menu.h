@@ -6,6 +6,7 @@ typedef enum {
     MENU_PLAY,
     MENU_SETTINGS,
     MENU_CONTROLS,
+    MENU_STORY,
     MENU_CREDITS,
     MENU_EXIT
 } MenuAction;
@@ -34,6 +35,12 @@ void Menu_SettingsUpdateGame(void);
 // Draw the settings overlay panel (semi-transparent, like the pause menu)
 void Menu_SettingsRenderGame(void);
 
+// Update the story screen, returns MENU_PLAY to go back
+MenuAction Menu_StoryUpdate(void);
+
+// Draw the story screen
+void Menu_StoryRender(void);
+
 // Update the controls screen, returns MENU_PLAY to go back
 MenuAction Menu_ControlsUpdate(void);
 
@@ -48,6 +55,9 @@ void GameMenu_Render(void);
 
 // Reset menu state (call when entering main menu)
 void Menu_Reset(void);
+
+// Reset story screen (free loaded text)
+void Menu_ResetStory(void);
 
 // Reset settings selection to "Music Volume"
 void Menu_ResetSettings(void);

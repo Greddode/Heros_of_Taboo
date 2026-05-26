@@ -24,6 +24,7 @@ typedef enum {
     MONSTER_FLOATING_EYE,
     MONSTER_FUNGAL_MYCONID,
     MONSTER_OGRE,
+    MONSTER_SHADOW,
     MONSTER_TYPE_COUNT
 } MonsterType;
 
@@ -62,6 +63,7 @@ typedef struct {
     int animFrame;
     float animTimer;
     float hitFlashTimer;
+    int shadowTurnCounter;
 } Monster;
 
 // ============================================================================
@@ -74,12 +76,13 @@ void Monster_InitTemplates(void);
 // Retrieve the template for a given type.
 const MonsterTemplate* Monster_GetTemplate(MonsterType type);
 
-// Spawn a monster at (x, y). Returns a pointer or NULL if the pool is full.
-Monster* Monster_Spawn(MonsterType type, int x, int y);
+// Spawn a monster at (x, y), scaling stats for the given floor.
+// Returns a pointer or NULL if the pool is full.
+Monster* Monster_Spawn(MonsterType type, int x, int y, int floor);
 
 // Spawn a monster by its TMX object type name (matches tmxTypeName exactly).
 // Returns NULL if no template matches or the pool is full.
-Monster* Monster_SpawnByTypeName(const char* tmxTypeName, int x, int y);
+Monster* Monster_SpawnByTypeName(const char* tmxTypeName, int x, int y, int floor);
 
 // Destroy all monsters (for restarting the game).
 void Monster_ResetAll(void);
@@ -112,7 +115,8 @@ bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDef
                            float* playerHitFlash,
                            const unsigned char blocking[][MAP_WIDTH],
                            int mapWidth, int mapHeight,
-                           CombatLog* combatLog);
+                           CombatLog* combatLog,
+                           int timeWaited);
 
 // Load shared monster sprite sheets (call after InitGame map loading).
 void Monster_LoadSprites(void);

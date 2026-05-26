@@ -42,6 +42,19 @@ typedef struct Game {
     int healingTiles[MAX_HEALING][2];
     bool healingCollected[MAX_HEALING];
 
+    int currentFloor;
+    int maxFloors;
+    int stairX;
+    int stairY;
+    bool floorClearedNotified;
+    bool escapeSpawned;
+
+    int timeWaited;
+    int selectedMonsterIdx;
+
+    int escapeX;
+    int escapeY;
+
     float enemyTurnCooldown;
     float animTimer;
     float monsterAnimTimer;
@@ -52,5 +65,6 @@ void CleanupGame(Game* game);
 void HandleInput(Game* game);
 void UpdateGame(Game* game);
 void RenderGame(const Game* game);
+void DescendFloor(Game* game);
 
 #endif

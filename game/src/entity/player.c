@@ -33,7 +33,7 @@ void GainExperience(Game* game, int amount) {
     while (p->exp >= p->expToNext) {
         p->exp -= p->expToNext;
         ApplyLevelUp(game);
-        CombatLog_Add(&game->combatLog, "Level %d! HP+5 ATK+%d DEF+%d",
+        CombatLog_Add(&game->combatLog, LIGHTGRAY, "Level %d! HP+5 ATK+%d DEF+%d",
                       p->ent.level,
                       (p->ent.level % 2 == 0) ? 1 : 0,
                       (p->ent.level % 3 == 0) ? 1 : 0);

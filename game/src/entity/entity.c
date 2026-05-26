@@ -61,12 +61,12 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
         PlayHitSound();
         TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
                  entity->name, target->name, damage, target->hp, target->maxHp);
-        CombatLog_Add(&game->combatLog, "%s hits %s for %d!", entity->name, target->name, damage);
+        CombatLog_Add(&game->combatLog, LIGHTGRAY, "%s hits %s for %d!", entity->name, target->name, damage);
         if (target->hp <= 0) {
             target->alive = false;
             target->hp = 0;
             TraceLog(LOG_INFO, "%s has been slain!", target->name);
-            CombatLog_Add(&game->combatLog, "%s is defeated!", target->name);
+            CombatLog_Add(&game->combatLog, LIGHTGRAY, "%s is defeated!", target->name);
         }
         return true;
     }
@@ -83,12 +83,12 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
             mon->hitFlashTimer = 0.15f;
             TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
                      entity->name, mon->name, damage, mon->hp, mon->maxHp);
-            CombatLog_Add(&game->combatLog, "%s hits %s for %d!", entity->name, mon->name, damage);
+            CombatLog_Add(&game->combatLog, LIGHTGRAY, "%s hits %s for %d!", entity->name, mon->name, damage);
             if (mon->hp <= 0) {
                 mon->alive = false;
                 GainExperience(game, mon->expValue);
                 TraceLog(LOG_INFO, "%s has been slain!", mon->name);
-                CombatLog_Add(&game->combatLog, "%s defeated! (+%d exp)", mon->name, mon->expValue);
+                CombatLog_Add(&game->combatLog, LIGHTGRAY, "%s defeated! (+%d exp)", mon->name, mon->expValue);
             }
             return true;
         }
@@ -113,7 +113,7 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                     game->player.ent.hp = game->player.ent.maxHp;
                 TraceLog(LOG_INFO, "Picked up healing! HP: %d/%d",
                          game->player.ent.hp, game->player.ent.maxHp);
-                CombatLog_Add(&game->combatLog, "Healing restores %d HP!", healAmt);
+                CombatLog_Add(&game->combatLog, LIGHTGRAY, "Healing restores %d HP!", healAmt);
                 PlayPickupSound();
             }
         }

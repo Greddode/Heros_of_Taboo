@@ -9,11 +9,12 @@
 // Ring buffer for combat events displayed on-screen
 typedef struct {
     char entries[COMBAT_LOG_MAX][COMBAT_LOG_LEN];
+    Color colors[COMBAT_LOG_MAX];
     int count;    // Total messages added (for indexing into the ring)
 } CombatLog;
 
-// Append a formatted message to the combat log
-void CombatLog_Add(CombatLog* log, const char* fmt, ...);
+// Append a formatted message to the combat log with a color
+void CombatLog_Add(CombatLog* log, Color color, const char* fmt, ...);
 
 // Draw the last maxLines entries from the log, oldest at top, newest at bottom
 void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize);

@@ -2,6 +2,7 @@
 #include "entity/entity.h"
 #include "entity/player.h"
 #include "ui/combat_log.h"
+#include "ui/monster_info.h"
 #include "entity/monster.h"
 #include "procedural.h"
 #include "entity/spawner.h"
@@ -35,11 +36,92 @@ static void RevealFOW(Game* game) {
     }
 }
 
+// Place the escape teleport tile on a random floor tile when all monsters on floor 10 are dead.
+static void SpawnEscapeTile(Game* game) {
+    int w = game->map->width;
+    int h = game->map->height;
+    int* data = game->map->layers[0].data;
+
+    for (int attempt = 0; attempt < 200; attempt++) {
+        int tx = GetRandomValue(3, w - 4);
+        int ty = GetRandomValue(3, h - 4);
+        if (IsFloorGID(data[ty * w + tx])) {
+            data[ty * w + tx] = TILE_ESCAPE;
+            game->escapeX = tx;
+            game->escapeY = ty;
+            TraceLog(LOG_INFO, "Escape tile placed at (%d,%d)", tx, ty);
+            return;
+        }
+    }
+    TraceLog(LOG_WARNING, "Escape tile: could not find valid position");
+}
+
+// Locate a walkable tile away from the player and spawn the shadow monster,
+// scaled to twice the player's level.
+static void SpawnShadow(Game* game) {
+    int px = game->player.ent.x;
+    int py = game->player.ent.y;
+    int w = game->map->width;
+    int h = game->map->height;
+
+    for (int attempt = 0; attempt < 100; attempt++) {
+        int tx = GetRandomValue(3, w - 4);
+        int ty = GetRandomValue(3, h - 4);
+        int dx = tx - px;
+        int dy = ty - py;
+        if (dx * dx + dy * dy >= 25 && !game->blocking[ty][tx] && IsFloorGID(GetTileGID(game->map, 0, tx, ty))) {
+            Monster* shadow = Monster_Spawn(MONSTER_SHADOW, tx, ty, 1);
+            if (shadow) {
+                int targetLevel = game->player.ent.level * 2;
+                if (targetLevel < 10) targetLevel = 10;
+                int extra = targetLevel - 1;
+                if (extra > 0) {
+                    shadow->level    = targetLevel;
+                    shadow->maxHp   += extra * 2;
+                    shadow->hp       = shadow->maxHp;
+                    shadow->attack  += extra;
+                    shadow->defense += extra / 2;
+                    shadow->expValue += extra * 5;
+                }
+                shadow->shadowTurnCounter = 0;
+                TraceLog(LOG_INFO, "Shadow spawned at (%d,%d) level %d", tx, ty, targetLevel);
+            }
+            return;
+        }
+    }
+    TraceLog(LOG_WARNING, "Shadow: could not find valid spawn position");
+}
+
 // Read directional keys (arrow/WASD) and pass them to MoveEntity.
 // Period/space waits a turn, restoring 1 HP.
 // After any action, control passes to the enemy turn.
 void HandleInput(Game* game) {
     if (game->state != STATE_PLAYER_TURN) return;
+
+    // Mouse click: select monster at cursor position
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        Vector2 worldPos = GetScreenToWorld2D(GetMousePosition(), game->camera);
+        int tileX = (int)(worldPos.x / game->map->tileWidth);
+        int tileY = (int)(worldPos.y / game->map->tileHeight);
+        if (tileX >= 0 && tileX < game->map->width &&
+            tileY >= 0 && tileY < game->map->height &&
+            game->visibility[tileY][tileX] == 1) {
+            Monster* mon = Monster_GetAt(tileX, tileY, NULL);
+            if (mon) {
+                Monster* arr = Monster_GetArray();
+                int count = Monster_GetCount();
+                game->selectedMonsterIdx = -1;
+                for (int i = 0; i < count; i++) {
+                    if (&arr[i] == mon) {
+                        game->selectedMonsterIdx = i;
+                        break;
+                    }
+                }
+        }
+        } else {
+            game->selectedMonsterIdx = -1;
+        }
+    }
 
     Direction dir = DIR_NONE;
 
@@ -49,9 +131,14 @@ void HandleInput(Game* game) {
     else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) dir = DIR_RIGHT;
     else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
         game->turnCount++;
+        game->timeWaited++;
+        if (game->timeWaited == 15 && game->currentFloor < game->maxFloors) {
+            SpawnShadow(game);
+            CombatLog_Add(&game->combatLog, RED, "You feel a presence come to this floor");
+        }
         if (game->player.ent.hp < game->player.ent.maxHp) {
             game->player.ent.hp++;
-            CombatLog_Add(&game->combatLog, "Wait heals 1 HP");
+            CombatLog_Add(&game->combatLog, LIGHTGRAY, "Wait heals 1 HP");
         }
         game->enemyTurnCooldown = 0.08f;
         game->state = STATE_ENEMY_TURN;
@@ -63,6 +150,7 @@ void HandleInput(Game* game) {
         int oldY = game->player.ent.y;
         bool moved = MoveEntity(game, &game->player.ent, dir);
         if (moved) {
+            game->selectedMonsterIdx = -1;
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
             if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
@@ -71,6 +159,18 @@ void HandleInput(Game* game) {
             }
             game->state = STATE_ENEMY_TURN;
         }
+    }
+
+    // Check if player is on the stair tile after movement
+    if (game->player.ent.x == game->stairX && game->player.ent.y == game->stairY &&
+        game->stairX >= 0 && game->stairY >= 0) {
+        DescendFloor(game);
+    }
+
+    // Check if player is on the escape tile
+    if (game->escapeSpawned &&
+        game->player.ent.x == game->escapeX && game->player.ent.y == game->escapeY) {
+        game->state = STATE_WIN;
     }
 }
 
@@ -108,7 +208,7 @@ void UpdateGame(Game* game) {
             game->player.ent.x, game->player.ent.y, &game->player.ent.hp, game->player.ent.defense,
             &game->player.ent.hitFlashTimer,
             game->blocking, game->map->width, game->map->height,
-            &game->combatLog);
+            &game->combatLog, game->timeWaited);
 
         if (!playerAlive) {
             game->player.ent.alive = false;
@@ -118,8 +218,16 @@ void UpdateGame(Game* game) {
         }
 
         if (Monster_GetCount() > 0 && Monster_AreAllDead()) {
-            game->state = STATE_WIN;
-            return;
+            if (game->currentFloor >= game->maxFloors) {
+                if (!game->escapeSpawned) {
+                    SpawnEscapeTile(game);
+                    game->escapeSpawned = true;
+                    CombatLog_Add(&game->combatLog, GREEN, "A teleport circle has appeared somewhere for you to escape!");
+                }
+            } else if (!game->floorClearedNotified) {
+                game->floorClearedNotified = true;
+                CombatLog_Add(&game->combatLog, YELLOW, "This floor sounds earily Quite now");
+            }
         }
 
         game->monsterAnimTimer = MOVE_ANIM_DURATION;
@@ -248,14 +356,16 @@ void RenderGame(const Game* game) {
     snprintf(expText, sizeof(expText), "EXP: %d/%d", game->player.exp, game->player.expToNext);
     DrawText(expText, panelX + 4, textY + 1, 14, WHITE);
 
-    // Turn + enemies
+    // Floor + enemies
     textY += barH + 6;
     char infoText[64];
-    snprintf(infoText, sizeof(infoText), "Turn: %d   Enemies: %d", game->turnCount, Monster_GetAliveCount());
+    snprintf(infoText, sizeof(infoText), "Floor: %d/%d", game->currentFloor, game->maxFloors);
     DrawText(infoText, panelX, textY, 14, LIGHTGRAY);
 
     // Combat log (bottom-right)
     CombatLog_Render(&game->combatLog, GetScreenWidth() - 370, GetScreenHeight() - 10, 14, 18);
+
+    MonsterInfo_Render(game);
 
     // State text (bottom center)
     const char* stateText = "";
@@ -333,10 +443,117 @@ static void SpawnEntitiesFromObjects(Game* game) {
         // --- Monsters --------------------------------------------------------
         // TMX object type is matched against MonsterTemplate.tmxTypeName
         else {
-            Monster* mon = Monster_SpawnByTypeName(obj->type, tileX, tileY);
+            Monster* mon = Monster_SpawnByTypeName(obj->type, tileX, tileY, game->currentFloor);
             if (mon) TraceLog(LOG_INFO, "%s spawned at (%d, %d)", mon->name, tileX, tileY);
         }
     }
+}
+
+// Regenerate the map when the player descends to the next floor.
+// Player stats (HP, level, EXP) are preserved; the map and entities are rebuilt.
+void DescendFloor(Game* game) {
+    Player savedPlayer = game->player;
+
+    Monster_UnloadSprites();
+    Monster_ResetAll();
+
+    if (game->map) {
+        for (int t = 0; t < game->map->tilesetCount; t++) {
+            if (game->tilesetTextures[t].id > 0)
+                UnloadTexture(game->tilesetTextures[t]);
+        }
+        UnloadTMX(game->map);
+    }
+
+    int floor = game->currentFloor + 1;
+
+    memset(game, 0, sizeof(Game));
+    game->player = savedPlayer;
+    game->selectedMonsterIdx = -1;
+    game->currentFloor = floor;
+    game->maxFloors = 10;
+    game->player.ent.spriteSheet = LoadTexture("resources/roguelikeChar_transparent.png");
+    if (game->player.ent.spriteSheet.id == 0) {
+        TraceLog(LOG_WARNING, "Could not load player spritesheet during descend");
+    }
+
+    game->map = GenerateProceduralMap(80, 50, game->currentFloor < game->maxFloors);
+    if (!game->map) {
+        TraceLog(LOG_ERROR, "Failed to generate map for floor %d", game->currentFloor);
+        return;
+    }
+
+    BuildBlockingMap(game);
+
+    for (int t = 0; t < game->map->tilesetCount; t++) {
+        char imgPath[512] = {0};
+        if (imgPath[0] == '\0' || !FileExists(imgPath)) {
+            snprintf(imgPath, sizeof(imgPath), "resources/%s", game->map->tilesets[t].imageSource);
+        }
+        game->tilesetTextures[t] = LoadTexture(imgPath);
+        if (game->tilesetTextures[t].id == 0) {
+            TraceLog(LOG_WARNING, "Could not load tileset texture: %s", imgPath);
+            if (t == 0) {
+                Image img = GenImageColor(game->map->tileWidth * 8, game->map->tileHeight * 8,
+                                          (Color){ 100, 100, 100, 255 });
+                for (int x = 0; x < 8; x++) {
+                    for (int y = 0; y < 8; y++) {
+                        Color c = ((x + y) % 2 == 0)
+                            ? (Color){ 120, 120, 120, 255 }
+                            : (Color){ 80, 80, 80, 255 };
+                        ImageDrawRectangle(&img, x * game->map->tileWidth, y * game->map->tileHeight,
+                                           game->map->tileWidth - 1, game->map->tileHeight - 1, c);
+                    }
+                }
+                game->tilesetTextures[t] = LoadTextureFromImage(img);
+                UnloadImage(img);
+                game->map->tilesets[0].columns = 8;
+                game->map->tilesets[0].imageWidth = game->map->tileWidth * 8;
+                game->map->tilesets[0].imageHeight = game->map->tileHeight * 8;
+            }
+        }
+    }
+
+    Monster_InitTemplates();
+
+    SpawnEntitiesFromObjects(game);
+
+    ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
+    int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
+    if (spawnRoomCount > 0) {
+        Spawner_Populate(game, spawnRooms, spawnRoomCount);
+    }
+
+    Monster_LoadSprites();
+
+    game->stairX = GetStairX();
+    game->stairY = GetStairY();
+
+    game->state = STATE_PLAYER_TURN;
+    game->turnCount = 0;
+    game->enemyTurnCooldown = 0.0f;
+    game->animTimer = 0.0f;
+    game->monsterAnimTimer = 0.0f;
+
+    for (int y = 0; y < game->map->height; y++) {
+        for (int x = 0; x < game->map->width; x++) {
+            game->visibility[y][x] = 0;
+        }
+    }
+    RevealFOW(game);
+
+    game->camera.target = (Vector2){
+        game->player.ent.x * game->map->tileWidth  + game->map->tileWidth  / 2,
+        game->player.ent.y * game->map->tileHeight + game->map->tileHeight / 2
+    };
+    game->camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
+    game->camera.rotation = 0;
+    game->camera.zoom = 4.0f;
+
+    char floorMsg[64];
+    snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
+    CombatLog_Add(&game->combatLog, LIGHTGRAY, floorMsg);
+    TraceLog(LOG_INFO, "%s", floorMsg);
 }
 
 // Initialise (or re-initialise) the game: load map, build blocking,
@@ -350,7 +567,7 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
         TraceLog(LOG_INFO, "TMX load failed, generating procedural map...");
-        game->map = GenerateProceduralMap(80, 50);
+        game->map = GenerateProceduralMap(80, 50, 1);
     }
     if (!game->map) {
         TraceLog(LOG_ERROR, "Failed to create any map");
@@ -440,6 +657,14 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     // Load monster sprite sheets
     Monster_LoadSprites();
+
+    game->selectedMonsterIdx = -1;
+    game->timeWaited = 0;
+    game->escapeSpawned = false;
+    game->currentFloor = 1;
+    game->maxFloors = 10;
+    game->stairX = GetStairX();
+    game->stairY = GetStairY();
 
     game->state = STATE_PLAYER_TURN;
     game->turnCount = 0;

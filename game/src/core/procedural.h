@@ -17,8 +17,13 @@
 #define TILE_WALL_SOUTH      99
 #define TILE_WALL_WEST       42
 #define TILE_FLOOR           27 
+#define TILE_STAIRS          137
+#define TILE_ESCAPE          47
 #define FLOOR_VARIANT_COUNT 8
 static const int FLOOR_VARIANTS[FLOOR_VARIANT_COUNT] = { 23, 24, 48, 49, 50, 51, 52, 53 };
+
+int GetStairX(void);
+int GetStairY(void);
 
 // Returns 1 if the given GID is any floor variant (used for collision, wall placement, and spawning).
 int IsFloorGID(int gid);
@@ -33,7 +38,8 @@ typedef struct {
 } ProceduralRoom;
 
 // Generate a complete dungeon map. Returns a MapData that must be freed with UnloadTMX().
-MapData* GenerateProceduralMap(int width, int height);
+// If generateStairs is non-zero, a stair tile (TILE_STAIRS) is placed in a random room.
+MapData* GenerateProceduralMap(int width, int height, int generateStairs);
 
 // Fill an array with the room metadata from the last generation.
 // Returns the number of rooms written.

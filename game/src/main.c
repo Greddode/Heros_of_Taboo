@@ -9,6 +9,7 @@ typedef enum {
     SCENE_MENU,
     SCENE_SETTINGS,
     SCENE_CONTROLS,
+    SCENE_STORY,
     SCENE_CREDITS,
     SCENE_GAME,
     SCENE_EXIT
@@ -71,6 +72,9 @@ int main(void)
                     scene = SCENE_SETTINGS;
                 } else if (action == MENU_CONTROLS) {
                     scene = SCENE_CONTROLS;
+                } else if (action == MENU_STORY) {
+                    Menu_ResetStory();
+                    scene = SCENE_STORY;
                 } else if (action == MENU_CREDITS) {
                     scene = SCENE_CREDITS;
                 } else if (action == MENU_EXIT) {
@@ -100,6 +104,16 @@ int main(void)
                 Menu_ControlsRender();
                 EndDrawing();
                 if (Menu_ControlsUpdate() == MENU_PLAY) scene = SCENE_MENU;
+                break;
+            }
+
+            // =================================================================
+            case SCENE_STORY:
+            {
+                BeginDrawing();
+                Menu_StoryRender();
+                EndDrawing();
+                if (Menu_StoryUpdate() == MENU_PLAY) { Menu_ResetStory(); scene = SCENE_MENU; }
                 break;
             }
 

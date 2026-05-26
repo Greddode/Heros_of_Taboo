@@ -50,7 +50,7 @@ void Monster_InitTemplates(void) {
         .attack          = 4,
         .defense         = 1,
         .expValue        = 10,
-        .level           = 2,
+        .level           = 1,
         .color           = { 220, 220, 200, 255 },
         .spritePath      = "resources/sprite_animations/idle/Fungal_Myconid.png",
         .frameCount      = 4,
@@ -66,12 +66,28 @@ void Monster_InitTemplates(void) {
         .attack          = 4,
         .defense         = 1,
         .expValue        = 25,
-        .level           = 3,
+        .level           = 1,
         .color           = { 120, 60, 180, 255 },
         .spritePath      = "resources/sprite_animations/idle/Ogre.png",
         .frameCount      = 4,
         .animSpeed       = 0.5f,
         .detectionRange  = 8,
+    };
+
+    s_templates[MONSTER_SHADOW] = (MonsterTemplate){
+        .type            = MONSTER_SHADOW,
+        .tmxTypeName     = "shadow",
+        .name            = "Shadow",
+        .hp              = 10,
+        .attack          = 4,
+        .defense         = 1,
+        .expValue        = 10,
+        .level           = 1,
+        .color           = { 40, 0, 80, 255 },
+        .spritePath      = "resources/sprite_animations/idle/Shadow.png",
+        .frameCount      = 4,
+        .animSpeed       = 0.5f,
+        .detectionRange  = 20,
     };
 }
 
@@ -114,7 +130,7 @@ void Monster_UnloadSprites(void) {
 //  SPAWN / RESET
 // ============================================================================
 
-Monster* Monster_Spawn(MonsterType type, int x, int y) {
+Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     const MonsterTemplate* tpl = Monster_GetTemplate(type);
     if (!tpl) return NULL;
     if (s_monsterCount >= MAX_MONSTERS) return NULL;
@@ -139,15 +155,25 @@ Monster* Monster_Spawn(MonsterType type, int x, int y) {
     strncpy(m->name, tpl->name, MONSTER_NAME_LEN - 1);
     m->name[MONSTER_NAME_LEN - 1] = '\0';
 
+    if (floor > 1) {
+        int extra = (floor - 1) * GetRandomValue(3, 6);
+        m->level    = tpl->level + extra;
+        m->maxHp    = tpl->hp + extra * 2;
+        m->hp       = m->maxHp;
+        m->attack   = tpl->attack + extra;
+        m->defense  = tpl->defense + extra / 2;
+        m->expValue = tpl->expValue + extra * 5;
+    }
+
     return m;
 }
 
-Monster* Monster_SpawnByTypeName(const char* tmxTypeName, int x, int y) {
+Monster* Monster_SpawnByTypeName(const char* tmxTypeName, int x, int y, int floor) {
     if (!tmxTypeName) return NULL;
     for (int i = 0; i < MONSTER_TYPE_COUNT; i++) {
         const MonsterTemplate* tpl = &s_templates[i];
         if (tpl->tmxTypeName && strcmp(tmxTypeName, tpl->tmxTypeName) == 0)
-            return Monster_Spawn((MonsterType)i, x, y);
+            return Monster_Spawn((MonsterType)i, x, y, floor);
     }
     return NULL;
 }
@@ -246,100 +272,126 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
 //  AI  –  processes all living monsters in one batch
 // ============================================================================
 
-bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
-                           float* playerHitFlash,
-                           const unsigned char blocking[][MAP_WIDTH],
-                           int mapWidth, int mapHeight,
-                           CombatLog* combatLog) {
-    for (int i = 0; i < s_monsterCount; i++) {
-        Monster* m = &s_monsters[i];
-        if (!m->alive || !m->active) continue;
+// Process a single monster's AI (chase/attack/wander).
+// Does NOT snapshot prevX/prevY — that is done by the caller.
+static void ProcessMonsterAI(Monster* m,
+                              int playerX, int playerY, int* playerHp, int playerDefense,
+                              float* playerHitFlash,
+                              const unsigned char blocking[][MAP_WIDTH],
+                              int mapWidth, int mapHeight,
+                              CombatLog* combatLog) {
+    const MonsterTemplate* tpl = Monster_GetTemplate(m->type);
+    if (!tpl) return;
 
-        const MonsterTemplate* tpl = Monster_GetTemplate(m->type);
-        if (!tpl) continue;
+    int dx = playerX - m->x;
+    int dy = playerY - m->y;
+    int dist = abs(dx) + abs(dy);
 
-        // --- snapshot old position for interpolation ---------------------------
-        m->prevX = m->x;
-        m->prevY = m->y;
+    // --- chase / attack ----------------------------------------------------
+    if (dist <= tpl->detectionRange &&
+        MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, tpl->detectionRange)) {
 
-        int dx = playerX - m->x;
-        int dy = playerY - m->y;
-        int dist = abs(dx) + abs(dy);
+        Direction bestDir = DIR_NONE;
+        int bestDist = dist;
+        Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
 
-        // --- chase / attack ----------------------------------------------------
-        if (dist <= tpl->detectionRange &&
-            MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, tpl->detectionRange)) {
-
-            Direction bestDir = DIR_NONE;
-            int bestDist = dist;
-            Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
-
-            for (int d = 0; d < 4; d++) {
-                int tx = m->x, ty = m->y;
-                switch (dirs[d]) {
-                    case DIR_UP:    ty--; break;
-                    case DIR_DOWN:  ty++; break;
-                    case DIR_LEFT:  tx--; break;
-                    case DIR_RIGHT: tx++; break;
-                    default: break;
-                }
-
-                // can attack the player?
-                if (tx == playerX && ty == playerY) {
-                    int dmg = m->attack - playerDefense;
-                    if (dmg < 1) dmg = 1;
-                    *playerHp -= dmg;
-                    if (*playerHp < 0) *playerHp = 0;
-                    PlayHitSound();
-                    m->hitFlashTimer = 0.15f;
-                    if (playerHitFlash) *playerHitFlash = 0.15f;
-                    TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
-                             m->name, dmg, *playerHp);
-                    CombatLog_Add(combatLog, "%s hits you for %d!", m->name, dmg);
-                    goto next_monster;  // skip movement — we attacked
-                }
-
-                if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
-                    !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
-                    int newDist = abs(playerX - tx) + abs(playerY - ty);
-                    if (newDist < bestDist) {
-                        bestDist = newDist;
-                        bestDir = dirs[d];
-                    }
-                }
-            }
-
-            if (bestDir != DIR_NONE) {
-                switch (bestDir) {
-                    case DIR_UP:    m->y--; break;
-                    case DIR_DOWN:  m->y++; break;
-                    case DIR_LEFT:  m->x--; m->facingRight = false; break;
-                    case DIR_RIGHT: m->x++; m->facingRight = true;  break;
-                    default: break;
-                }
-            }
-        }
-        // --- wander ------------------------------------------------------------
-        else if (dist <= tpl->detectionRange + 4) {
-            Direction dir = (Direction)(GetRandomValue(DIR_UP, DIR_RIGHT));
+        for (int d = 0; d < 4; d++) {
             int tx = m->x, ty = m->y;
-            switch (dir) {
+            switch (dirs[d]) {
                 case DIR_UP:    ty--; break;
                 case DIR_DOWN:  ty++; break;
                 case DIR_LEFT:  tx--; break;
                 case DIR_RIGHT: tx++; break;
                 default: break;
             }
+
+            // can attack the player?
+            if (tx == playerX && ty == playerY) {
+                int dmg = m->attack - playerDefense;
+                if (dmg < 1) dmg = 1;
+                *playerHp -= dmg;
+                if (*playerHp < 0) *playerHp = 0;
+                PlayHitSound();
+                m->hitFlashTimer = 0.15f;
+                if (playerHitFlash) *playerHitFlash = 0.15f;
+                TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
+                         m->name, dmg, *playerHp);
+                CombatLog_Add(combatLog, LIGHTGRAY, "%s hits you for %d!", m->name, dmg);
+                return;  // skip movement — we attacked
+            }
+
             if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
                 !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
-                m->x = tx;
-                m->y = ty;
-                if (dir == DIR_LEFT)  m->facingRight = false;
-                if (dir == DIR_RIGHT) m->facingRight = true;
+                int newDist = abs(playerX - tx) + abs(playerY - ty);
+                if (newDist < bestDist) {
+                    bestDist = newDist;
+                    bestDir = dirs[d];
+                }
             }
         }
 
-    next_monster:;
+        if (bestDir != DIR_NONE) {
+            switch (bestDir) {
+                case DIR_UP:    m->y--; break;
+                case DIR_DOWN:  m->y++; break;
+                case DIR_LEFT:  m->x--; m->facingRight = false; break;
+                case DIR_RIGHT: m->x++; m->facingRight = true;  break;
+                default: break;
+            }
+        }
+    }
+    // --- wander ------------------------------------------------------------
+    else if (dist <= tpl->detectionRange + 4) {
+        Direction dir = (Direction)(GetRandomValue(DIR_UP, DIR_RIGHT));
+        int tx = m->x, ty = m->y;
+        switch (dir) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
+            !blocking[ty][tx] && !Monster_GetAt(tx, ty, m)) {
+            m->x = tx;
+            m->y = ty;
+            if (dir == DIR_LEFT)  m->facingRight = false;
+            if (dir == DIR_RIGHT) m->facingRight = true;
+        }
+    }
+}
+
+bool Monster_ProcessAllAI(int playerX, int playerY, int* playerHp, int playerDefense,
+                           float* playerHitFlash,
+                           const unsigned char blocking[][MAP_WIDTH],
+                           int mapWidth, int mapHeight,
+                           CombatLog* combatLog,
+                           int timeWaited) {
+    for (int i = 0; i < s_monsterCount; i++) {
+        Monster* m = &s_monsters[i];
+        if (!m->alive || !m->active) continue;
+
+        // --- snapshot old position for interpolation ---------------------------
+        m->prevX = m->x;
+        m->prevY = m->y;
+
+        // --- Shadow state handling ---------------------------------------------
+        if (m->type == MONSTER_SHADOW && timeWaited < 25) {
+            m->shadowTurnCounter++;
+            if (m->shadowTurnCounter < 2) continue;
+            m->shadowTurnCounter = 0;
+        }
+
+        ProcessMonsterAI(m, playerX, playerY, playerHp, playerDefense,
+                         playerHitFlash, blocking, mapWidth, mapHeight, combatLog);
+        if (*playerHp <= 0) return false;
+
+        // --- Frenzy: second action for shadow ----------------------------------
+        if (m->type == MONSTER_SHADOW && timeWaited >= 35) {
+            ProcessMonsterAI(m, playerX, playerY, playerHp, playerDefense,
+                             playerHitFlash, blocking, mapWidth, mapHeight, combatLog);
+            if (*playerHp <= 0) return false;
+        }
     }
     return (*playerHp > 0);
 }

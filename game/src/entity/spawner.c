@@ -34,7 +34,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
 
         for (int y = rooms[r].y; y < rooms[r].y + rooms[r].h; y++)
             for (int x = rooms[r].x; x < rooms[r].x + rooms[r].w; x++)
-                if (IsFloorGID(tiles[y * w + x]) && floorCount < ROOM_MAX_FLOORS)
+                if (IsFloorGID(tiles[y * w + x]) && tiles[y * w + x] != TILE_STAIRS && floorCount < ROOM_MAX_FLOORS)
                     floorTiles[floorCount++] = y * w + x;
 
         if (floorCount < 4) continue;
@@ -67,7 +67,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             else if (roll < 75) type = MONSTER_FUNGAL_MYCONID;
             else                type = MONSTER_OGRE;
 
-            Monster_Spawn(type, mx, my);
+            Monster_Spawn(type, mx, my, game->currentFloor);
         }
 
         // --- Healing item: only in larger rooms, placed on the last shuffled tile ---

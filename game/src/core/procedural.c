@@ -28,6 +28,13 @@ typedef struct {
 static ProceduralRoom s_generatedRooms[MAX_GENERATED_ROOMS];
 static int s_generatedRoomCount = 0;
 
+// Stair tile position on the current generated map
+static int s_stairX = -1;
+static int s_stairY = -1;
+
+int GetStairX(void) { return s_stairX; }
+int GetStairY(void) { return s_stairY; }
+
 // Returns 1 if tile (x, y) is still void (un-carved)
 static int TileFree(int* data, int mapW, int mapH, int x, int y) {
     if (x < 0 || x >= mapW || y < 0 || y >= mapH) return 0;
@@ -46,6 +53,8 @@ static int RectFree(int* data, int mapW, int mapH, int rx, int ry, int rw, int r
 
 int IsFloorGID(int gid) {
     if (gid == TILE_FLOOR) return 1;
+    if (gid == TILE_STAIRS) return 1;
+    if (gid == TILE_ESCAPE) return 1;
     for (int i = 0; i < FLOOR_VARIANT_COUNT; i++)
         if (FLOOR_VARIANTS[i] == gid) return 1;
     return 0;
@@ -346,7 +355,7 @@ static void PlaceICornersSW(int* data, int mapW, int mapH) {
 
 // ---- Main entry point: generates a dungeon with branching corridors ----
 
-MapData* GenerateProceduralMap(int width, int height) {
+MapData* GenerateProceduralMap(int width, int height, int generateStairs) {
     MapData* map = (MapData*)calloc(1, sizeof(MapData));
     if (!map) return NULL;
 
@@ -459,6 +468,48 @@ MapData* GenerateProceduralMap(int width, int height) {
         s_generatedRooms[i].h  = rooms[i].h;
         s_generatedRooms[i].cx = rooms[i].cx;
         s_generatedRooms[i].cy = rooms[i].cy;
+    }
+
+    // Place stairs in a random room (preferring non-spawn rooms)
+    s_stairX = -1;
+    s_stairY = -1;
+    if (generateStairs && roomCount > 0) {
+        int stairRoomIdx = 0;
+        if (roomCount >= 2) {
+            do {
+                stairRoomIdx = GetRandomValue(0, roomCount - 1);
+            } while (stairRoomIdx == 0);
+        }
+        Room* sr = &rooms[stairRoomIdx];
+        int floorTilesInRoom[100];
+        int floorTileCount = 0;
+        for (int y = sr->y; y < sr->y + sr->h; y++) {
+            for (int x = sr->x; x < sr->x + sr->w; x++) {
+                if (IsFloorGID(layer->data[y * width + x])) {
+                    floorTilesInRoom[floorTileCount++] = y * width + x;
+                }
+            }
+        }
+        if (floorTileCount > 0) {
+            int picked = floorTilesInRoom[GetRandomValue(0, floorTileCount - 1)];
+            // Avoid placing stairs directly on the player spawn (room-0 centre)
+            if (stairRoomIdx == 0 && floorTileCount > 1) {
+                int centreIdx = rooms[0].cy * width + rooms[0].cx;
+                if (picked == centreIdx) {
+                    for (int f = 0; f < floorTileCount; f++) {
+                        if (floorTilesInRoom[f] != centreIdx) {
+                            picked = floorTilesInRoom[f];
+                            break;
+                        }
+                    }
+                }
+            }
+            layer->data[picked] = TILE_STAIRS;
+            s_stairX = picked % width;
+            s_stairY = picked / width;
+            TraceLog(LOG_INFO, "Procedural: Stairs placed at (%d,%d) in room %d",
+                     s_stairX, s_stairY, stairRoomIdx);
+        }
     }
 
     // Place a MapObject for the player at the centre of the first (spawn) room
