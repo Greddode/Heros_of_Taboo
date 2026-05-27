@@ -26,20 +26,39 @@ static const char* s_gameMenuOptions[GAME_MENU_OPTION_COUNT] = {
 };
 
 static int s_selection = 0;
+static int s_menuScroll = 0;
 static int s_gameMenuSel = 0;
 static int s_settingsSel = 0;
+static int s_settingsScroll = 0;
 static float s_guiScale = 1.0f; // GUI scale multiplier (1.0 = default)
+static int s_controlsScroll = 0;
+static int s_creditsScroll = 0;
 
 
 
 MenuAction Menu_Update(void) {
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
-        s_selection--;
-        if (s_selection < 0) s_selection = MENU_OPTION_COUNT - 1;
+        if (s_selection > 0) {
+            s_selection--;
+            if (s_selection < s_menuScroll) {
+                s_menuScroll = s_selection;
+            }
+        }
     }
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
-        s_selection++;
-        if (s_selection >= MENU_OPTION_COUNT) s_selection = 0;
+        if (s_selection < MENU_OPTION_COUNT - 1) {
+            s_selection++;
+            float scale = GetUIScale();
+            int sh = GetScreenHeight();
+            int optionSpacing = (int)(45 * scale);
+            int optionY = sh / 2;
+            int viewH = sh - optionY - (int)(40 * scale);
+            int maxVisible = viewH / optionSpacing;
+            if (maxVisible < 1) maxVisible = 1;
+            if (s_selection >= s_menuScroll + maxVisible) {
+                s_menuScroll = s_selection - maxVisible + 1;
+            }
+        }
     }
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
         switch (s_selection) {
@@ -74,14 +93,22 @@ void Menu_Render(void) {
     int optionSize = (int)(30 * scale);
     int optionSpacing = (int)(45 * scale);
     int optionY = sh / 2;
-    for (int i = 0; i < MENU_OPTION_COUNT; i++) {
+    int viewH = sh - optionY - (int)(40 * scale);
+    int maxVisible = viewH / optionSpacing;
+    if (maxVisible < 1) maxVisible = 1;
+
+    BeginScissorMode(0, optionY, sw, viewH);
+    for (int i = s_menuScroll; i < MENU_OPTION_COUNT; i++) {
+        int y = optionY + (i - s_menuScroll) * optionSpacing;
+        if (y > optionY + viewH) break;
         Color c = (i == s_selection) ? (Color){ 255, 255, 100, 255 } : LIGHTGRAY;
         int textW = MeasureText(s_options[i], optionSize);
-        DrawText(s_options[i], (sw - textW) / 2, optionY + i * optionSpacing, optionSize, c);
+        DrawText(s_options[i], (sw - textW) / 2, y, optionSize, c);
         if (i == s_selection) {
-            DrawText("> ", (sw - textW) / 2 - (int)(30 * scale), optionY + i * optionSpacing, optionSize, (Color){ 255, 255, 100, 255 });
+            DrawText("> ", (sw - textW) / 2 - (int)(30 * scale), y, optionSize, (Color){ 255, 255, 100, 255 });
         }
     }
+    EndScissorMode();
 
     int hintSize = (int)(14 * scale);
     const char* hint = "Use Arrow Keys / WASD to navigate, Enter to select";
@@ -93,13 +120,24 @@ MenuAction Menu_CreditsUpdate(void) {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
         return MENU_PLAY;
     }
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+        s_creditsScroll -= (int)(22 * s_guiScale);
+        if (s_creditsScroll < 0) s_creditsScroll = 0;
+    }
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+        s_creditsScroll += (int)(22 * s_guiScale);
+    }
     return MENU_NONE;
 }
 
 void Menu_Reset(void) {
     s_selection = 0;
+    s_menuScroll = 0;
     s_gameMenuSel = 0;
     s_settingsSel = 0;
+    s_settingsScroll = 0;
+    s_controlsScroll = 0;
+    s_creditsScroll = 0;
 }
 
 void Menu_ResetSettings(void) {
@@ -109,11 +147,11 @@ void Menu_ResetSettings(void) {
 MenuAction GameMenu_Update(void) {
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
         s_gameMenuSel--;
-        if (s_gameMenuSel < 0) s_gameMenuSel = GAME_MENU_OPTION_COUNT - 1;
+        if (s_gameMenuSel < 0) s_gameMenuSel = 0;
     }
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
         s_gameMenuSel++;
-        if (s_gameMenuSel >= GAME_MENU_OPTION_COUNT) s_gameMenuSel = 0;
+        if (s_gameMenuSel >= GAME_MENU_OPTION_COUNT) s_gameMenuSel = GAME_MENU_OPTION_COUNT - 1;
     }
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
         switch (s_gameMenuSel) {
@@ -157,6 +195,7 @@ void GameMenu_Render(void) {
 }
 
 static int s_storyScroll = 0;
+static int s_storySel = 0;
 static int s_storyLineCount = 0;
 static char** s_storyLines = NULL;
 static char* s_storyBuf = NULL;
@@ -182,6 +221,21 @@ static void Story_LoadFile(void) {
         }
     }
     s_storyBuf[writeIdx] = '\0';
+    int finalLen = writeIdx;
+
+    // Replace UTF-8 em dash (U+2014 = 0xE2 0x80 0x94) with "--" (the default font doesn't have it)
+    int di = 0;
+    for (int si = 0; si < finalLen; si++) {
+        unsigned char c = (unsigned char)s_storyBuf[si];
+        if (c == 0xE2 && si + 2 < finalLen && (unsigned char)s_storyBuf[si+1] == 0x80 && (unsigned char)s_storyBuf[si+2] == 0x94) {
+            s_storyBuf[di++] = '-';
+            s_storyBuf[di++] = '-';
+            si += 2;
+        } else {
+            s_storyBuf[di++] = c;
+        }
+    }
+    s_storyBuf[di] = '\0';
 
     s_storyLineCount = 1;
     for (char* p = s_storyBuf; *p; p++) {
@@ -294,12 +348,31 @@ MenuAction Menu_StoryUpdate(void) {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
         return MENU_PLAY;
     }
-    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
-        s_storyScroll--;
-        if (s_storyScroll < 0) s_storyScroll = 0;
-    }
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
-        s_storyScroll++;
+
+    int scrollDelta = 0;
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) scrollDelta = -1;
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) scrollDelta = 1;
+
+    if (scrollDelta != 0) {
+        s_storySel += scrollDelta;
+        if (s_storySel < 0) s_storySel = 0;
+        if (s_visualLineCount > 0 && s_storySel >= s_visualLineCount) s_storySel = s_visualLineCount - 1;
+
+        // Ensure selected line is visible
+        float scale = GetUIScale();
+        int sh = GetScreenHeight();
+        int titleSize = (int)(50 * scale);
+        int lineH = (int)(22 * scale);
+        int y = sh / 12 + titleSize + (int)(20 * scale);
+        int viewH = sh - y - (int)(60 * scale);
+        int maxVisible = viewH / lineH;
+        if (maxVisible < 1) maxVisible = 1;
+
+        if (s_storySel < s_storyScroll) {
+            s_storyScroll = s_storySel;
+        } else if (s_storySel >= s_storyScroll + maxVisible) {
+            s_storyScroll = s_storySel - maxVisible + 1;
+        }
     }
     return MENU_NONE;
 }
@@ -322,19 +395,31 @@ void Menu_StoryRender(void) {
 
     if (s_visualLineCount > 0) {
         if (s_storyScroll >= s_visualLineCount) s_storyScroll = s_visualLineCount - 1;
+        if (s_storySel >= s_visualLineCount) s_storySel = s_visualLineCount - 1;
 
         int lineH = (int)(22 * scale);
-        int y = sh / 6;
-        int maxLines = (sh - y - (int)(60 * scale)) / lineH;
+        int y = sh / 12 + titleSize + (int)(20 * scale);
+        int viewH = sh - y - (int)(60 * scale);
+        int maxLines = viewH / lineH;
+        if (maxLines < 1) maxLines = 1;
 
         int end = s_storyScroll + maxLines;
         if (end > s_visualLineCount) end = s_visualLineCount;
 
+        BeginScissorMode(0, y, sw, viewH);
         for (int i = s_storyScroll; i < end; i++) {
+            bool isSel = (i == s_storySel);
+            Color c = isSel ? (Color){ 255, 255, 100, 255 } : LIGHTGRAY;
             int textW = MeasureText(s_visualLines[i], (int)(18 * scale));
-            DrawText(s_visualLines[i], (sw - textW) / 2, y, (int)(18 * scale), LIGHTGRAY);
+            int lx = (sw - textW) / 2;
+            if (isSel) {
+                DrawText("> ", lx - (int)(22 * scale), y, (int)(18 * scale), (Color){ 255, 255, 100, 255 });
+                DrawRectangle(lx - (int)(4 * scale), y - (int)(2 * scale), textW + (int)(8 * scale), lineH, (Color){ 40, 40, 60, 200 });
+            }
+            DrawText(s_visualLines[i], lx, y, (int)(18 * scale), c);
             y += lineH;
         }
+        EndScissorMode();
 
         if (s_visualLineCount > maxLines) {
             int totalScroll = s_visualLineCount - maxLines;
@@ -370,6 +455,7 @@ void Menu_ResetStory(void) {
         s_storyLines = NULL;
     }
     s_storyScroll = 0;
+    s_storySel = 0;
     s_storyLineCount = 0;
 }
 
@@ -377,17 +463,24 @@ MenuAction Menu_ControlsUpdate(void) {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
         return MENU_PLAY;
     }
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+        s_controlsScroll -= (int)(22 * s_guiScale);
+        if (s_controlsScroll < 0) s_controlsScroll = 0;
+    }
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+        s_controlsScroll += (int)(22 * s_guiScale);
+    }
     return MENU_NONE;
 }
 
 void Menu_ControlsRender(void) {
     RenderTextScreen(s_controls_data, sizeof(s_controls_data),
-                     "ESC / BACKSPACE - Back to Menu");
+                     "ESC / BACKSPACE - Back to Menu", s_controlsScroll);
 }
 
 void Menu_CreditsRender(void) {
     RenderTextScreen(s_credits_data, sizeof(s_credits_data),
-                     "ESC / BACKSPACE - Back to Menu");
+                     "ESC / BACKSPACE - Back to Menu", s_creditsScroll);
 }
 
 static void DrawVolumeBarItem(int cx, int cy, const char* label, float vol, bool selected, int fontSize, int barW, bool isGuiScale) {
@@ -444,9 +537,23 @@ static void Settings_UpdateSel(bool inc) {
     if (inc) {
         s_settingsSel++;
         if (s_settingsSel > 2) s_settingsSel = 2;
+        // Scroll down if selection past visible area
+        float scale = GetUIScale();
+        int sh = GetScreenHeight();
+        int cy = sh / 2 - (int)(30 * scale);
+        int itemSpacing = (int)(70 * scale);
+        int viewH = sh - cy - (int)(40 * scale);
+        int maxVisible = viewH / itemSpacing;
+        if (maxVisible < 1) maxVisible = 1;
+        if (s_settingsSel >= s_settingsScroll + maxVisible) {
+            s_settingsScroll = s_settingsSel - maxVisible + 1;
+        }
     } else {
         s_settingsSel--;
         if (s_settingsSel < 0) s_settingsSel = 0;
+        if (s_settingsSel < s_settingsScroll) {
+            s_settingsScroll = s_settingsSel;
+        }
     }
 }
 
@@ -498,19 +605,26 @@ void Menu_SettingsRender(void) {
     int itemSize = (int)(22 * scale);
     int barW = (int)(260 * scale);
 
-    if (s_settingsSel == 0) {
-        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), true, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
-    } else if (s_settingsSel == 1) {
-        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), true, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
-    } else if (s_settingsSel == 2) {
-        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), true, itemSize, barW, true);
+    int viewY = cy;
+    int viewH = sh - cy - (int)(40 * scale);
+    int maxVisible = viewH / itemSpacing;
+    if (maxVisible < 1) maxVisible = 1;
+
+    BeginScissorMode(0, viewY, sw, viewH);
+    for (int i = 0; i < 3; i++) {
+        int idx = i + s_settingsScroll;
+        if (idx >= 3) break;
+        int itemY = cy + i * itemSpacing;
+        bool isSelected = (idx == s_settingsSel);
+        if (idx == 0) {
+            DrawVolumeBarItem(cx, itemY, "Music Volume", GetMusicVolume(), isSelected, itemSize, barW, false);
+        } else if (idx == 1) {
+            DrawVolumeBarItem(cx, itemY, "SFX Volume", GetSFXVolume(), isSelected, itemSize, barW, false);
+        } else if (idx == 2) {
+            DrawVolumeBarItem(cx, itemY, "GUI Scale", GetGuiScale(), isSelected, itemSize, barW, true);
+        }
     }
+    EndScissorMode();
 
     int hintSize = (int)(14 * scale);
     const char* hint = "UP / DOWN - select     LEFT / RIGHT or A / D - adjust     ESC - Back";

@@ -30,14 +30,18 @@ Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude) {
     return NULL;
 }
 
+// Return the direction this entity is facing
+Direction GetFacingDirection(const Entity* entity) {
+    return entity->facingDir;
+}
+
 // Attempt to move an entity one step in the given direction.
 // If the target tile contains an enemy, the entity attacks instead.
 // Returns true if the entity did something (moved or attacked).
 bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     if (!entity->alive) return false;
 
-    if (dir == DIR_LEFT)  entity->facingRight = false;
-    if (dir == DIR_RIGHT) entity->facingRight = true;
+    if (dir != DIR_NONE) entity->facingDir = dir;
 
     int newX = entity->x;
     int newY = entity->y;
@@ -75,8 +79,27 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     if (entity->isPlayer) {
         Monster* mon = Monster_GetAt(newX, newY, NULL);
         if (mon && mon->alive) {
-            int damage = entity->attack - mon->defense;
+            // Monster dodge check
+            int dodgePct = mon->dex * 2;
+            if (dodgePct > 60) dodgePct = 60;
+            if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
+                entity->hitFlashTimer = 0.15f;
+                CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", mon->name);
+                TraceLog(LOG_INFO, "%s dodges your attack!", mon->name);
+                return true;
+            }
+
+            // Base damage: entity->attack (weapon) + STR * 2
+            int damage = entity->attack + entity->str * 2 - mon->defense;
             if (damage < 1) damage = 1;
+
+            // Player crit check
+            if (GetRandomValue(1, 100) <= entity->lck) {
+                damage = damage * 2;
+                if (damage < 1) damage = 1;
+                CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+            }
+
             mon->hp -= damage;
             PlayHitSound();
             entity->hitFlashTimer = 0.15f;
@@ -89,6 +112,40 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                 GainExperience(game, mon->expValue);
                 TraceLog(LOG_INFO, "%s has been slain!", mon->name);
                 CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", mon->name, mon->expValue);
+
+                // Equipment drop chance (20% base, increased by LCK)
+                int dropChance = 20 + entity->lck * 2;
+                if (dropChance > 50) dropChance = 50;
+                if (GetRandomValue(1, 100) <= dropChance) {
+                    // Pick a random accessory available on this floor
+                    EquipType pool[] = {
+                        EQUIP_RING_OF_STRENGTH,
+                        EQUIP_AMULET_OF_WARDING,
+                        EQUIP_BOOTS_OF_SWIFTNESS,
+                        EQUIP_RING_OF_THE_HAWK,
+                        EQUIP_SAGES_PENDANT,
+                        EQUIP_LUCKY_CHARM,
+                        EQUIP_BERSERKER_BAND,
+                    };
+                    int poolSize = 7;
+                    int floor = game->currentFloor;
+                    // Filter by floor availability
+                    EquipType valid[7];
+                    int validCount = 0;
+                    for (int p = 0; p < poolSize; p++) {
+                        int minF = 1;
+                        if (pool[p] >= EQUIP_RING_OF_THE_HAWK) minF = 3;
+                        if (pool[p] >= EQUIP_BERSERKER_BAND) minF = 5;
+                        if (floor >= minF) valid[validCount++] = pool[p];
+                    }
+                    if (validCount > 0) {
+                        EquipType drop = valid[GetRandomValue(0, validCount - 1)];
+                        if (AddEquipToInventory(game, drop)) {
+                            const EquipData* ed = GetEquipData(drop);
+                            CombatLog_Add(&game->combatLog, BLACK, "%s dropped %s!", mon->name, ed ? ed->name : "item");
+                        }
+                    }
+                }
             }
             return true;
         }
@@ -117,6 +174,31 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                 if (picked > 0) {
                     TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(ptype));
                     CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(ptype));
+                    PlayPickupSound();
+                }
+            }
+        }
+        // Pick up on-map equipment
+        for (int e = 0; e < game->equipMapCount; e++) {
+            if (!game->equipMapCollected[e] &&
+                game->equipMapTiles[e][0] == newX &&
+                game->equipMapTiles[e][1] == newY) {
+                EquipType eType = game->equipMapTypes[e];
+                int qty = game->equipMapQuantities[e];
+                int picked = 0;
+                for (int i = 0; i < qty; i++) {
+                    if (AddEquipToInventory(game, eType)) picked++;
+                    else break;
+                }
+                if (picked >= qty) {
+                    game->equipMapCollected[e] = true;
+                } else {
+                    game->equipMapQuantities[e] -= picked;
+                }
+                if (picked > 0) {
+                    const EquipData* d = GetEquipData(eType);
+                    TraceLog(LOG_INFO, "Picked up %s", d ? d->name : "equipment");
+                    CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
                     PlayPickupSound();
                 }
             }

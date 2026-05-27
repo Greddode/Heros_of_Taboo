@@ -143,22 +143,25 @@ void SpawnShadow(Game* game) {
         int dx = tx - px;
         int dy = ty - py;
         if (dx * dx + dy * dy >= 25 && !game->blocking[ty][tx] && IsFloorGID(GetTileGID(game->map, 0, tx, ty))) {
-            Monster* shadow = Monster_Spawn(MONSTER_SHADOW, tx, ty, 1);
-            if (shadow) {
-                int targetLevel = game->player.ent.level * 2;
-                if (targetLevel < 10) targetLevel = 10;
-                int extra = targetLevel - 1;
-                if (extra > 0) {
-                    shadow->level    = targetLevel;
-                    shadow->maxHp   += extra * 2;
-                    shadow->hp       = shadow->maxHp;
-                    shadow->attack  += extra;
-                    shadow->defense += extra / 2;
-                    shadow->expValue += extra * 5;
-                }
-                shadow->shadowTurnCounter = 0;
-                TraceLog(LOG_INFO, "Shadow spawned at (%d,%d) level %d", tx, ty, targetLevel);
-            }
+    Monster* shadow = Monster_Spawn(MONSTER_SHADOW, tx, ty, 1);
+    if (shadow) {
+        int targetLevel = game->player.ent.level * 2;
+        if (targetLevel < 10) targetLevel = 10;
+        float scale = powf(1.12f, (float)(targetLevel - 1));
+        shadow->str      = (int)(4 * scale);
+        shadow->dex      = (int)(6 * scale);
+        shadow->intel    = (int)(2 * scale);
+        shadow->con      = (int)(3 * scale);
+        shadow->lck      = (int)(5 * scale);
+        shadow->level    = targetLevel;
+        shadow->maxHp    = 10 + shadow->con * 5;
+        shadow->hp       = shadow->maxHp;
+        shadow->attack   = 4 + shadow->str * 2;
+        shadow->defense  = 1 + shadow->con / 2;
+        shadow->expValue = 10 + shadow->lck * 3;
+        shadow->shadowTurnCounter = 0;
+        TraceLog(LOG_INFO, "Shadow spawned at (%d,%d) level %d", tx, ty, targetLevel);
+    }
             return;
         }
     }

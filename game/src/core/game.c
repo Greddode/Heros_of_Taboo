@@ -4,7 +4,6 @@
 #include "entity/monster.h"
 #include "entity/spawner.h"
 #include "ui/combat_log.h"
-#include "ui/monster_info.h"
 #include "core/audio.h"
 #include "procedural.h"
 #include <stdio.h>
@@ -58,6 +57,7 @@ void HandleInput(Game* game) {
                 if (curTab < 0) curTab = INV_TAB_COUNT - 1;
                 game->inventoryTab = (InventoryTab)curTab;
                 game->inventorySelection = 0;
+                game->invScrollOffset = 0;
                 return;
             }
             if (IsKeyPressed(KEY_E)) {
@@ -65,17 +65,127 @@ void HandleInput(Game* game) {
                 if (curTab >= INV_TAB_COUNT) curTab = 0;
                 game->inventoryTab = (InventoryTab)curTab;
                 game->inventorySelection = 0;
+                game->invScrollOffset = 0;
                 return;
+            }
+
+            // Mouse wheel scroll
+            int wheel = (int)GetMouseWheelMove();
+            if (wheel != 0) {
+                game->invScrollOffset -= wheel * (int)(20 * GetUIScale());
+                if (game->invScrollOffset < 0) game->invScrollOffset = 0;
+            }
+        }
+
+        // Stats tab: selection-based navigation with column switching
+        if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_STATS) {
+            float iscale = GetUIScale();
+            int gap = (int)(22 * iscale);
+            int textSize = (int)(16 * iscale);
+            int derivedSize = (int)(14 * iscale);
+            int viewH = (int)((400 - 24 - 40 - 60) * iscale); // ih - tabH - header_gap - footer
+
+            int col1SelMax = 13; // max selection index in col1 (0-13 lines)
+            int col2SelMax = (game->player.ent.statPoints > 0) ? 5 : 0;
+
+            if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+                game->statsActiveCol = 0;
+                game->statsSelection = 0;
+            }
+            if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+                game->statsActiveCol = 1;
+                game->statsSelection = 1;
+                if (game->statsSelection > col2SelMax) game->statsSelection = col2SelMax;
+            }
+
+            if (game->statsActiveCol == 0) {
+                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                    game->statsSelection--;
+                    if (game->statsSelection < 0) game->statsSelection = 0;
+                }
+                if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                    game->statsSelection++;
+                    if (game->statsSelection > col1SelMax) game->statsSelection = col1SelMax;
+                }
+                // Scroll col1 to keep selection visible
+                int selY = game->statsSelection * gap;
+                int scrollGap = gap * 3;
+                if (selY - game->statsScrollCol1 < 0) {
+                    game->statsScrollCol1 = selY - scrollGap;
+                    if (game->statsScrollCol1 < 0) game->statsScrollCol1 = 0;
+                }
+                if (selY - game->statsScrollCol1 + gap > viewH) {
+                    game->statsScrollCol1 = selY + gap - viewH + scrollGap;
+                }
+            } else {
+                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                    game->statsSelection--;
+                    if (game->statsSelection < 0) game->statsSelection = 0;
+                }
+                if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                    game->statsSelection++;
+                    if (game->statsSelection > col2SelMax) game->statsSelection = col2SelMax;
+                }
+                // Scroll col2 to keep selection visible
+                int selY = game->statsSelection * gap;
+                int scrollGap = gap * 3;
+                if (selY - game->statsScrollCol2 < 0) {
+                    game->statsScrollCol2 = selY - scrollGap;
+                    if (game->statsScrollCol2 < 0) game->statsScrollCol2 = 0;
+                }
+                if (selY - game->statsScrollCol2 + gap > viewH) {
+                    game->statsScrollCol2 = selY + gap - viewH + scrollGap;
+                }
+            }
+
+            if (game->player.ent.statPoints > 0) {
+                // Enter allocates based on current selection
+                if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    int statIdx = -1;
+                    if (game->statsActiveCol == 0) {
+                        // Col1: selection indices 3-7 map to stats 0-4
+                        if (game->statsSelection >= 3 && game->statsSelection <= 7) {
+                            statIdx = game->statsSelection - 3;
+                        }
+                    } else {
+                        // Col2: selection 1-5 maps to stats 0-4 (line 0 is "Unspent" header)
+                        if (game->statsSelection >= 1 && game->statsSelection <= 5) {
+                            statIdx = game->statsSelection - 1;
+                        }
+                    }
+                    if (statIdx >= 0) {
+                        AllocateStatPoint(&game->player.ent, statIdx);
+                        return;
+                    }
+                }
             }
         }
 
         // Equipment tab item selection and action menu
         if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_EQUIPMENT) {
-            int maxSel = EQUIP_SLOT_COUNT - 1;
-            if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
-                game->inventorySelection--;
-            if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < maxSel)
-                game->inventorySelection++;
+            float iscale = GetUIScale();
+            int slotH = (int)(44 * iscale); // slotH(36) + gap(8)
+            int contentH = (int)((400 - 24 - 40 - 60) * iscale); // ih - tabH - header_gap - footer
+            int topPad = (int)(40 * iscale);
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                if (game->inventorySelection > 0) {
+                    game->inventorySelection--;
+                    int t = topPad - game->invScrollOffset + game->inventorySelection * slotH;
+                    if (t < 0) game->invScrollOffset += t;
+                } else if (game->invScrollOffset > 0) {
+                    game->invScrollOffset -= slotH;
+                    if (game->invScrollOffset < 0) game->invScrollOffset = 0;
+                }
+            }
+            if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                int maxSel = EQUIP_SLOT_COUNT - 1;
+                if (game->inventorySelection < maxSel) {
+                    int prevSel = game->inventorySelection;
+                    game->inventorySelection++;
+                    int b = topPad - game->invScrollOffset + (game->inventorySelection + 1) * slotH;
+                    if (b > contentH) game->invScrollOffset += (b - contentH);
+                }
+            }
             if ((IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) &&
                 game->equipped[game->inventorySelection] != EQUIP_NONE) {
                 game->invSubState = INV_ACTION_MENU;
@@ -97,18 +207,45 @@ void HandleInput(Game* game) {
                     UnequipSlot(game, slot);
                     game->invSubState = INV_BROWSE;
                 } else if (game->invActionSelection == 1) {
-                    // Drop (unequip without log — dropping means it's gone)
+                    // Drop (unequip and place on map)
                     EquipType oldType = game->equipped[(int)slot];
                     if (oldType != EQUIP_NONE) {
                         const EquipData* data = GetEquipData(oldType);
                         if (data) {
                             game->player.ent.attack   -= data->bonusAttack;
                             game->player.ent.defense  -= data->bonusDefense;
-                            game->player.ent.maxHp    -= data->bonusMaxHp;
+                            game->player.ent.str      -= data->bonusStr;
+                            game->player.ent.dex      -= data->bonusDex;
+                            game->player.ent.intel    -= data->bonusInt;
+                            game->player.ent.con      -= data->bonusCon;
+                            game->player.ent.lck      -= data->bonusLck;
+                            game->player.ent.maxHp    = 30 + game->player.ent.con * 5;
                             if (game->player.ent.hp > game->player.ent.maxHp)
                                 game->player.ent.hp = game->player.ent.maxHp;
                         }
                         game->equipped[(int)slot] = EQUIP_NONE;
+                        // Place on map at player position
+                        {
+                            bool stacked = false;
+                            for (int e = 0; e < game->equipMapCount; e++) {
+                                if (game->equipMapCollected[e]) continue;
+                                if (game->equipMapTiles[e][0] == game->player.ent.x &&
+                                    game->equipMapTiles[e][1] == game->player.ent.y &&
+                                    game->equipMapTypes[e] == oldType) {
+                                    game->equipMapQuantities[e]++;
+                                    stacked = true;
+                                    break;
+                                }
+                            }
+                            if (!stacked && game->equipMapCount < MAX_EQUIP_ON_MAP) {
+                                game->equipMapTiles[game->equipMapCount][0] = game->player.ent.x;
+                                game->equipMapTiles[game->equipMapCount][1] = game->player.ent.y;
+                                game->equipMapCollected[game->equipMapCount] = false;
+                                game->equipMapTypes[game->equipMapCount] = oldType;
+                                game->equipMapQuantities[game->equipMapCount] = 1;
+                                game->equipMapCount++;
+                            }
+                        }
                         CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", data ? data->name : "item");
                     }
                     game->invSubState = INV_BROWSE;
@@ -129,10 +266,30 @@ void HandleInput(Game* game) {
             if (totalInv == 0 && game->inventoryTab == INV_TAB_INVENTORY) {
                 // No items at all, skip selection
             } else if (game->invSubState == INV_BROWSE && game->inventoryTab == INV_TAB_INVENTORY) {
-                if (IsKeyPressed(KEY_UP) && game->inventorySelection > 0)
-                    game->inventorySelection--;
-                if (IsKeyPressed(KEY_DOWN) && game->inventorySelection < totalInv - 1)
-                    game->inventorySelection++;
+                float iscale = GetUIScale();
+                int itemH = (int)(22 * iscale);
+            int contentH = (int)((400 - 24 - 40 - 60) * iscale); // ih - tabH - header_gap - footer
+                int topPad = (int)(42 * iscale); // title + gap
+                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                    if (game->inventorySelection > 0) {
+                        game->inventorySelection--;
+                        int t = topPad - game->invScrollOffset + game->inventorySelection * itemH;
+                        if (t < 0) game->invScrollOffset += t;
+                    } else if (game->invScrollOffset > 0) {
+                        game->invScrollOffset -= itemH;
+                        if (game->invScrollOffset < 0) game->invScrollOffset = 0;
+                    }
+                }
+                if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                    if (game->inventorySelection < totalInv - 1) {
+                        game->inventorySelection++;
+                        int b = topPad - game->invScrollOffset + (game->inventorySelection + 1) * itemH;
+                        if (b > contentH) game->invScrollOffset += (b - contentH);
+                    } else if (game->inventorySelection >= totalInv - 1) {
+                        // Already at last item; try to scroll if more content exists below
+                        // (handled by the else clause — no-op when at absolute end)
+                    }
+                }
                 if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
                     game->invSubState = INV_ACTION_MENU;
                     game->invActionSelection = 0;
@@ -153,18 +310,41 @@ void HandleInput(Game* game) {
                             // Equip
                             int equipIdx = game->inventorySelection - game->inventorySlotCount;
                             EquipType eType = game->equipInventory[equipIdx];
-                            EquipItem(game, eType);
-                            RemoveEquipFromInventory(game, equipIdx);
+                            if (EquipItem(game, eType)) {
+                                RemoveEquipFromInventory(game, equipIdx);
+                            }
                             game->invSubState = INV_BROWSE;
                             if (game->inventorySelection >= game->inventorySlotCount + game->equipInventoryCount)
                                 game->inventorySelection = game->inventorySlotCount + game->equipInventoryCount - 1;
                         } else if (game->invActionSelection == 1) {
-                            // Drop equipment from inventory
+                            // Drop equipment from inventory to map
                             int equipIdx = game->inventorySelection - game->inventorySlotCount;
                             EquipType eType = game->equipInventory[equipIdx];
                             const EquipData* d = GetEquipData(eType);
                             RemoveEquipFromInventory(game, equipIdx);
-                            if (d) CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", d->name);
+                            if (d) {
+                                // Place on map at player position (stack same type)
+                                bool stacked = false;
+                                for (int e = 0; e < game->equipMapCount; e++) {
+                                    if (game->equipMapCollected[e]) continue;
+                                    if (game->equipMapTiles[e][0] == game->player.ent.x &&
+                                        game->equipMapTiles[e][1] == game->player.ent.y &&
+                                        game->equipMapTypes[e] == eType) {
+                                        game->equipMapQuantities[e]++;
+                                        stacked = true;
+                                        break;
+                                    }
+                                }
+                                if (!stacked && game->equipMapCount < MAX_EQUIP_ON_MAP) {
+                                    game->equipMapTiles[game->equipMapCount][0] = game->player.ent.x;
+                                    game->equipMapTiles[game->equipMapCount][1] = game->player.ent.y;
+                                    game->equipMapCollected[game->equipMapCount] = false;
+                                    game->equipMapTypes[game->equipMapCount] = eType;
+                                    game->equipMapQuantities[game->equipMapCount] = 1;
+                                    game->equipMapCount++;
+                                }
+                                CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", d->name);
+                            }
                             game->invSubState = INV_BROWSE;
                             if (game->inventorySelection >= game->inventorySlotCount + game->equipInventoryCount)
                                 game->inventorySelection = game->inventorySlotCount + game->equipInventoryCount - 1;
@@ -261,47 +441,6 @@ void HandleInput(Game* game) {
     if (game->state != STATE_PLAYER_TURN) return;
     if (game->animTimer > 0.0f) return;
 
-    // Mouse click: select monster or potion tile
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        game->sprintBypassRoom = false;
-        Vector2 worldPos = GetScreenToWorld2D(GetMousePosition(), game->camera);
-        int tileX = (int)(worldPos.x / game->map->tileWidth);
-        int tileY = (int)(worldPos.y / game->map->tileHeight);
-        if (tileX >= 0 && tileX < game->map->width &&
-            tileY >= 0 && tileY < game->map->height &&
-            game->visibility[tileY][tileX] == 1) {
-            Monster* mon = Monster_GetAt(tileX, tileY, NULL);
-            if (mon) {
-                Monster* arr = Monster_GetArray();
-                int count = Monster_GetCount();
-                game->selectedMonsterIdx = -1;
-                for (int i = 0; i < count; i++) {
-                    if (&arr[i] == mon) {
-                        game->selectedMonsterIdx = i;
-                        break;
-                    }
-                }
-                game->selectedPotionTileActive = false;
-            } else {
-                game->selectedMonsterIdx = -1;
-                game->selectedPotionTileActive = false;
-                for (int p = 0; p < game->potionCount; p++) {
-                    if (!game->potionCollected[p] &&
-                        game->potionTiles[p][0] == tileX &&
-                        game->potionTiles[p][1] == tileY) {
-                        game->selectedPotionTileX = tileX;
-                        game->selectedPotionTileY = tileY;
-                        game->selectedPotionTileActive = true;
-                        break;
-                    }
-                }
-            }
-        } else {
-            game->selectedMonsterIdx = -1;
-            game->selectedPotionTileActive = false;
-        }
-    }
-
     // Sprint: hold SHIFT + direction
     if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
         Direction sprintDir = DIR_NONE;
@@ -352,8 +491,7 @@ void HandleInput(Game* game) {
                 game->player.ent.prevY = startY;
                 game->player.ent.x = startX;
                 game->player.ent.y = startY;
-                if (sprintDir == DIR_RIGHT) game->player.ent.facingRight = true;
-                else if (sprintDir == DIR_LEFT) game->player.ent.facingRight = false;
+                if (sprintDir != DIR_NONE) game->player.ent.facingDir = sprintDir;
                 game->selectedMonsterIdx = -1;
 
                 for (int s = 0; s < steps; s++) {
@@ -410,6 +548,32 @@ void HandleInput(Game* game) {
                             }
                         }
                     }
+
+                    // Pick up any equipment at the current tile
+                    for (int e = 0; e < game->equipMapCount; e++) {
+                        if (!game->equipMapCollected[e] &&
+                            game->equipMapTiles[e][0] == game->player.ent.x &&
+                            game->equipMapTiles[e][1] == game->player.ent.y) {
+                            EquipType eType = game->equipMapTypes[e];
+                            int qty = game->equipMapQuantities[e];
+                            int picked = 0;
+                            for (int i = 0; i < qty; i++) {
+                                if (AddEquipToInventory(game, eType)) picked++;
+                                else break;
+                            }
+                            if (picked >= qty) {
+                                game->equipMapCollected[e] = true;
+                            } else {
+                                game->equipMapQuantities[e] -= picked;
+                            }
+                            if (picked > 0) {
+                                const EquipData* d = GetEquipData(eType);
+                                TraceLog(LOG_INFO, "Picked up %s", d ? d->name : "equipment");
+                                CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
+                                PlayPickupSound();
+                            }
+                        }
+                    }
                 }
 
                 if (!stoppedAtRoom) game->sprintBypassRoom = false;
@@ -452,7 +616,31 @@ void HandleInput(Game* game) {
     else if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) dir = DIR_DOWN;
     else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) dir = DIR_LEFT;
     else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) dir = DIR_RIGHT;
-    else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
+
+    if (dir != DIR_NONE) {
+        bool ctrlHeld = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        game->player.ent.facingDir = dir;
+        if (ctrlHeld) {
+            // Ctrl + direction: just face that way, no turn cost
+            game->selectedMonsterIdx = -1;
+        } else {
+            game->sprintBypassRoom = false;
+            int oldX = game->player.ent.x;
+            int oldY = game->player.ent.y;
+            bool moved = MoveEntity(game, &game->player.ent, dir);
+            if (moved) {
+                game->selectedMonsterIdx = -1;
+                game->turnCount++;
+                game->enemyTurnCooldown = 0.15f;
+                if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
+                    game->animTimer = MOVE_ANIM_DURATION;
+                    game->animDuration = MOVE_ANIM_DURATION;
+                    RevealFOW(game);
+                }
+                game->state = STATE_ENEMY_TURN;
+            }
+        }
+    } else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
         game->sprintBypassRoom = false;
         game->turnCount++;
         game->timeWaited++;
@@ -472,21 +660,86 @@ void HandleInput(Game* game) {
         return;
     }
 
-    if (dir != DIR_NONE) {
-        game->sprintBypassRoom = false;
-        int oldX = game->player.ent.x;
-        int oldY = game->player.ent.y;
-        bool moved = MoveEntity(game, &game->player.ent, dir);
-        if (moved) {
-            game->selectedMonsterIdx = -1;
+    // Dedicated attack: F or Enter — attack in faced direction without moving
+    if ((IsKeyPressed(KEY_F) || IsKeyPressed(KEY_ENTER)) && game->state == STATE_PLAYER_TURN) {
+        Direction fdir = GetFacingDirection(&game->player.ent);
+        int tx = game->player.ent.x;
+        int ty = game->player.ent.y;
+        switch (fdir) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        Monster* mon = Monster_GetAt(tx, ty, NULL);
+        if (mon && mon->alive) {
+            // Monster dodge
+            int dodgePct = mon->dex * 2;
+            if (dodgePct > 60) dodgePct = 60;
+            if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
+                game->player.ent.hitFlashTimer = 0.15f;
+                CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", mon->name);
+            } else {
+                int damage = game->player.ent.attack + game->player.ent.str * 2 - mon->defense;
+                if (damage < 1) damage = 1;
+                if (GetRandomValue(1, 100) <= game->player.ent.lck) {
+                    damage = damage * 2;
+                    if (damage < 1) damage = 1;
+                    CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+                }
+                mon->hp -= damage;
+                PlayHitSound();
+                CombatLog_Add(&game->combatLog, BLACK, "You hit %s for %d!", mon->name, damage);
+                if (mon->hp <= 0) {
+                    mon->alive = false;
+                    mon->hp = 0;
+                    GainExperience(game, mon->expValue);
+                    CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", mon->name, mon->expValue);
+                }
+            }
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
-            if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
-                game->animTimer = MOVE_ANIM_DURATION;
-                game->animDuration = MOVE_ANIM_DURATION;
-                RevealFOW(game);
-            }
             game->state = STATE_ENEMY_TURN;
+            game->sprintBypassRoom = false;
+            game->selectedMonsterIdx = -1;
+        } else {
+            CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to attack there");
+        }
+    }
+
+    // Q: inspect tile in front of player
+    if (IsKeyPressed(KEY_Q)) {
+        Direction fdir = GetFacingDirection(&game->player.ent);
+        int tx = game->player.ent.x;
+        int ty = game->player.ent.y;
+        switch (fdir) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        if (tx >= 0 && tx < game->map->width && ty >= 0 && ty < game->map->height &&
+            game->visibility[ty][tx] == 1) {
+            game->selectedPotionTileX = tx;
+            game->selectedPotionTileY = ty;
+            game->selectedPotionTileActive = true;
+            // Also check for monster
+            Monster* mon = Monster_GetAt(tx, ty, NULL);
+            if (mon && mon->alive) {
+                Monster* arr = Monster_GetArray();
+                int count = Monster_GetCount();
+                game->selectedMonsterIdx = -1;
+                for (int i = 0; i < count; i++) {
+                    if (&arr[i] == mon) {
+                        game->selectedMonsterIdx = i;
+                        break;
+                    }
+                }
+            } else {
+                game->selectedMonsterIdx = -1;
+            }
         }
     }
 
@@ -532,6 +785,11 @@ void UpdateGame(Game* game) {
     if (game->player.ent.hitFlashTimer > 0.0f) {
         game->player.ent.hitFlashTimer -= GetFrameTime();
         if (game->player.ent.hitFlashTimer < 0.0f) game->player.ent.hitFlashTimer = 0.0f;
+    }
+
+    if (game->levelUpTimer > 0.0f) {
+        game->levelUpTimer -= GetFrameTime();
+        if (game->levelUpTimer < 0.0f) game->levelUpTimer = 0.0f;
     }
 
     Monster_UpdateAnimations(GetFrameTime());
@@ -633,11 +891,16 @@ void DescendFloor(Game* game) {
             if (d) {
                 game->player.ent.attack  += d->bonusAttack;
                 game->player.ent.defense += d->bonusDefense;
-                game->player.ent.maxHp   += d->bonusMaxHp;
-                game->player.ent.hp      += d->bonusMaxHp;
+                game->player.ent.str     += d->bonusStr;
+                game->player.ent.dex     += d->bonusDex;
+                game->player.ent.intel   += d->bonusInt;
+                game->player.ent.con     += d->bonusCon;
+                game->player.ent.lck     += d->bonusLck;
             }
         }
     }
+    game->player.ent.maxHp = 30 + game->player.ent.con * 5;
+    game->player.ent.hp = game->player.ent.maxHp;
     // Restore equipment inventory
     memcpy(game->equipInventory, savedEquipInventory, sizeof(savedEquipInventory));
     game->equipInventoryCount = savedEquipInvCount;
@@ -794,15 +1057,21 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.ent.y = 1;
     game->player.ent.prevX = 1;
     game->player.ent.prevY = 1;
+    game->player.ent.facingDir = DIR_DOWN;
     strcpy(game->player.ent.name, "Hero");
-    game->player.ent.hp = 20;
-    game->player.ent.maxHp = 20;
+    game->player.ent.str = 3;
+    game->player.ent.dex = 3;
+    game->player.ent.intel = 3;
+    game->player.ent.con = 3;
+    game->player.ent.lck = 2;
+    game->player.ent.statPoints = 0;
+    game->player.ent.maxHp = 30 + game->player.ent.con * 5;
+    game->player.ent.hp = game->player.ent.maxHp;
     game->player.ent.attack = 5;
     game->player.ent.defense = 1;
     game->player.ent.level = 1;
     game->player.ent.alive = true;
     game->player.ent.isPlayer = true;
-    game->player.ent.facingRight = true;
     game->player.ent.color = (Color){ 50, 200, 255, 255 };
     game->player.ent.spriteRow = 6;
 

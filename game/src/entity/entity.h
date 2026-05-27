@@ -29,10 +29,12 @@ typedef struct {
     int attack, defense;
     int level;
     int expValue;
+    int str, dex, intel, con, lck; // Core stats
+    int statPoints;                  // Unspent stat points (player only)
     bool alive;
     bool isPlayer;
     Color color;
-    bool facingRight;
+    Direction facingDir;
     int animFrame;         // Animation frame index (spritesheet row offset)
     float hitFlashTimer;   // >0 when entity was just hit (white flash)
     Texture2D spriteSheet; // Character spritesheet (player only)
@@ -54,6 +56,9 @@ Entity* GetEntityAt(Game* game, int x, int y, Entity* exclude);
 // Attempt to move an entity one tile in a direction.
 // Returns true if the move or an attack occurred.
 bool MoveEntity(Game* game, Entity* entity, Direction dir);
+
+// Get the entity's current facing direction
+Direction GetFacingDirection(const Entity* entity);
 
 // Draw a single tile from the tileset at layer layerIndex at (x, y)
 void DrawTile(const Game* game, int x, int y, int layerIndex);

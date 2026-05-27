@@ -14,5 +14,6 @@ void PlayHitSound(void);
 void PlayPickupSound(void);
 void PlayRangedAttackSound(void);
 void PlayMagicAttackSound(void);
+void PlayLevelUpSound(void);
 
 #endif

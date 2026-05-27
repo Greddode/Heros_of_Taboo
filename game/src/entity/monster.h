@@ -46,6 +46,7 @@ typedef struct {
     int defense;
     int expValue;
     int level;
+    int str, dex, intel, con, lck; // Base core stats
     Color color;               // fallback colour when no sprite is available
     const char* spritePath;    // path to PNG sprite sheet, or NULL
     int frameCount;            // horizontal frames in the sheet (0 = static)
@@ -69,6 +70,7 @@ typedef struct {
     int defense;
     int level;
     int expValue;
+    int str, dex, intel, con, lck; // Core stats with floor scaling applied
     bool alive;
     bool active;           // false = empty slot
     bool facingRight;

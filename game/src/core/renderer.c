@@ -1,7 +1,7 @@
 #include "game.h"
 #include "entity/monster.h"
 #include "ui/combat_log.h"
-#include "ui/monster_info.h"
+#include "ui/inspector.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +71,60 @@ void RenderGame(const Game* game) {
         }
     }
 
+    // Equipment sprites on the map
+    {
+        // Track which tiles we've already rendered (avoids duplicates)
+        bool renderedTiles[MAP_HEIGHT][MAP_WIDTH] = { false };
+        for (int i = 0; i < game->equipMapCount; i++) {
+            if (game->equipMapCollected[i]) continue;
+            int ex = game->equipMapTiles[i][0];
+            int ey = game->equipMapTiles[i][1];
+            if (game->visibility[ey][ex] != 1) continue;
+            if (renderedTiles[ey][ex]) continue;
+            renderedTiles[ey][ex] = true;
+
+            // Count how many equipment items are on this tile
+            int itemCount = 0;
+            for (int j = 0; j < game->equipMapCount; j++) {
+                if (game->equipMapCollected[j]) continue;
+                if (game->equipMapTiles[j][0] == ex && game->equipMapTiles[j][1] == ey)
+                    itemCount++;
+            }
+
+            Vector2 epos = TileToScreen(ex, ey, tw, th);
+
+            if (itemCount > 1) {
+                // Multiple items on same tile -> show loot.png
+                if (game->texLoot.id > 0) {
+                    Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
+                    DrawTexturePro(game->texLoot,
+                                   (Rectangle){ 0, 0, (float)game->texLoot.width, (float)game->texLoot.height },
+                                   dest, (Vector2){ 0, 0 }, 0, WHITE);
+                }
+                // Show item count on loot pile
+                char qty[8];
+                snprintf(qty, sizeof(qty), "x%d", itemCount);
+                DrawText(qty, epos.x + 2, epos.y + 2, 10, YELLOW);
+            } else {
+                // Single type -> show its own sprite
+                EquipType eType = game->equipMapTypes[i];
+                Texture2D tex = GetEquipSprite(eType);
+                if (tex.id > 0) {
+                    Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+                    Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
+                    DrawTexturePro(tex, src, dest, (Vector2){ 0 }, 0, WHITE);
+                }
+                // Show quantity label for stacked copies of same type
+                int qty = game->equipMapQuantities[i];
+                if (qty > 1) {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "x%d", qty);
+                    DrawText(buf, epos.x + 2, epos.y + 2, 10, YELLOW);
+                }
+            }
+        }
+    }
+
     // Interpolation factors
     float pd = (game->animDuration > 0.0f) ? game->animDuration : MOVE_ANIM_DURATION;
     float md = (game->monsterAnimDuration > 0.0f) ? game->monsterAnimDuration : MOVE_ANIM_DURATION;
@@ -104,11 +158,31 @@ void RenderGame(const Game* game) {
             DrawCircle(cx - 3, cy - 2, 2, WHITE);
             DrawCircle(cx + 3, cy - 2, 2, WHITE);
 
-            if (game->player.ent.facingRight) {
+            if (game->player.ent.facingDir == DIR_RIGHT) {
                 DrawCircle(cx + 5, cy + 4, 1, WHITE);
-            } else {
+            } else if (game->player.ent.facingDir == DIR_LEFT) {
                 DrawCircle(cx - 5, cy + 4, 1, WHITE);
+            } else if (game->player.ent.facingDir == DIR_UP) {
+                DrawCircle(cx, cy - 5, 1, WHITE);
+            } else {
+                DrawCircle(cx, cy + 5, 1, WHITE);
             }
+        }
+    }
+
+    // Direction indicator: show a 32x32 dot on the adjacent tile in the player's facing direction
+    if (game->player.ent.alive && game->state == STATE_PLAYER_TURN) {
+        int dx = game->player.ent.x, dy = game->player.ent.y;
+        switch (game->player.ent.facingDir) {
+            case DIR_UP:    dy--; break;
+            case DIR_DOWN:  dy++; break;
+            case DIR_LEFT:  dx--; break;
+            case DIR_RIGHT: dx++; break;
+            default: break;
+        }
+        if (dx >= 0 && dx < game->map->width && dy >= 0 && dy < game->map->height) {
+            Vector2 dpos = TileToScreen(dx, dy, tw, th);
+            DrawRectangle(dpos.x, dpos.y, tw, th, (Color){ 255, 50, 50, 100 });
         }
     }
 
@@ -160,7 +234,29 @@ void RenderGame(const Game* game) {
                 if (e2 < bdx)  { err += bdx; y += sy; }
             }
         } else {
-            DrawLine((int)game->projectile.sx, (int)game->projectile.sy, (int)cx, (int)cy, game->projectile.color);
+            // Pixel-art arrow for ranged attacks
+            float sx = game->projectile.sx, sy = game->projectile.sy;
+            float dx = cx - sx, dy = cy - sy;
+            float len = sqrtf(dx * dx + dy * dy);
+            if (len > 4.0f) {
+                float nx = dx / len, ny = dy / len;
+                // Shaft: thick line from source to near the head
+                float headLen = 12.0f;
+                float shaftEnd = len - headLen;
+                if (shaftEnd < 0) shaftEnd = 0;
+                float sx2 = sx + nx * shaftEnd, sy2 = sy + ny * shaftEnd;
+                DrawLineEx((Vector2){ sx, sy }, (Vector2){ sx2, sy2 }, 3.0f, game->projectile.color);
+                // Arrowhead: triangle at the tip
+                float tipX = sx + nx * len, tipY = sy + ny * len;
+                float px = -ny, py = nx; // perpendicular
+                float headW = 6.0f;
+                Vector2 v1 = { tipX, tipY };
+                Vector2 v2 = { sx2 + px * headW, sy2 + py * headW };
+                Vector2 v3 = { sx2 - px * headW, sy2 - py * headW };
+                DrawTriangle(v1, v2, v3, game->projectile.color);
+            } else {
+                DrawRectangle((int)sx - 2, (int)sy - 2, 4, 4, game->projectile.color);
+            }
         }
     }
 
@@ -212,11 +308,13 @@ void RenderGame(const Game* game) {
     DrawText(infoText, panelX, textY, (int)(14 * scale), BLACK);
 
     // Combat log (bottom-right)
-    CombatLog_Render(&game->combatLog, GetScreenWidth() - (int)(370 * scale), GetScreenHeight() - (int)(10 * scale), 14, (int)(18 * scale), game->texUiFrame, 16);
+    CombatLog_Render(&game->combatLog, GetScreenWidth() - (int)(370 * scale), GetScreenHeight() - (int)(10 * scale), 14, (int)(18 * scale), game->texUiFrame, 16, game->texUiSlot, 8);
 
-    MonsterInfo_Render(game);
+    // Monster info (top-right)
+    float iscale = GetUIScale();
+    Inspector_Render(game, INSPECTOR_MONSTER, GetScreenWidth() - (int)(200 * iscale), (int)(10 * iscale), (int)(190 * iscale), (int)(160 * iscale));
 
-    // Potion tile info (top-right, below monster info)
+    // Potion / equipment tile info (top-right, below monster info)
     if (game->selectedPotionTileActive) {
         int ptx = game->selectedPotionTileX;
         int pty = game->selectedPotionTileY;
@@ -232,14 +330,29 @@ void RenderGame(const Game* game) {
                 if (tileCount >= MAX_POTIONS) break;
             }
         }
+        // Also collect equipment at this tile
+        EquipType equipInfos[MAX_EQUIP_ON_MAP];
+        int equipQtys[MAX_EQUIP_ON_MAP];
+        int equipCount = 0;
+        for (int e = 0; e < game->equipMapCount; e++) {
+            if (game->equipMapCollected[e]) continue;
+            if (game->equipMapTiles[e][0] == ptx && game->equipMapTiles[e][1] == pty) {
+                equipInfos[equipCount] = game->equipMapTypes[e];
+                equipQtys[equipCount] = game->equipMapQuantities[e];
+                equipCount++;
+                if (equipCount >= MAX_EQUIP_ON_MAP) break;
+            }
+        }
 
-        if (tileCount > 0) {
+        if (tileCount > 0 || equipCount > 0) {
+            int totalItems = tileCount + equipCount;
             int pX = GetScreenWidth() - (int)(200 * scale);
             int pY = (int)(180 * scale);
             int pW = (int)(190 * scale);
             int fs = (int)(14 * scale);
             int lh = fs + (int)(4 * scale);
-            int pH = (int)(40 * scale) + tileCount * (fs + (int)(8 * scale));
+            int itemH = (int)(2 * lh) + (int)(4 * scale);
+            int pH = (int)(40 * scale) + totalItems * itemH;
             if (pH > GetScreenHeight() - pY - (int)(10 * scale)) pH = GetScreenHeight() - pY - (int)(10 * scale);
             int ly = pY + (int)(6 * scale);
             char buf[128];
@@ -257,10 +370,22 @@ void RenderGame(const Game* game) {
                 int qty = tileQtys[i];
 
                 snprintf(buf, sizeof(buf), "%s x%d", name, qty);
-                DrawText(buf, pX + (int)(6 * scale), ly, fs, YELLOW); ly += lh;
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, BLACK); ly += lh;
 
-                snprintf(buf, sizeof(buf), "Heals %d HP", heal);
-                DrawText(buf, pX + (int)(6 * scale), ly, fs, (Color){ 0, 90, 0, 255 }); ly += lh;
+                snprintf(buf, sizeof(buf), "Heals ~%d%% HP", heal);
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, BLACK); ly += lh;
+
+                ly += (int)(4 * scale);
+            }
+            for (int i = 0; i < equipCount; i++) {
+                const EquipData* d = GetEquipData(equipInfos[i]);
+                if (!d) continue;
+                int qty = equipQtys[i];
+                snprintf(buf, sizeof(buf), "%s%s", d->name, qty > 1 ? " x2" : "");
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, BLACK); ly += lh;
+
+                snprintf(buf, sizeof(buf), "%s", d->description);
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, BLACK); ly += lh;
 
                 ly += (int)(4 * scale);
             }
@@ -269,14 +394,43 @@ void RenderGame(const Game* game) {
 
     // State text (bottom center)
     const char* stateText = "";
-    if (game->state == STATE_GAME_OVER) stateText = "GAME OVER - Press R to restart";
-    else if (game->state == STATE_WIN) stateText = "YOU WIN! - Press R to restart";
+    if (game->state == STATE_GAME_OVER) stateText = "GAME OVER - Hold Shift+R to restart";
+    else if (game->state == STATE_WIN) stateText = "YOU WIN! - Hold Shift+R to restart";
     else if (game->state == STATE_PLAYER_TURN) stateText = "Your turn";
     else if (game->state == STATE_ENEMY_TURN) stateText = "Enemy turn...";
 
     if (stateText[0]) {
         int textWidth = MeasureText(stateText, (int)(20 * scale));
         DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - (int)(40 * scale), (int)(20 * scale), YELLOW);
+    }
+
+    // Level-up notification overlay (screen center, fades out)
+    if (game->levelUpTimer > 0.0f) {
+        float alpha = game->levelUpTimer / 3.0f; // 1.0 -> 0.0 over 3 seconds
+        float textScale = 1.0f + (1.0f - alpha) * 0.3f; // shrink from 1.3x to 1.0x
+        int fontSize = (int)(48 * scale * textScale);
+        int subSize = (int)(24 * scale * textScale);
+        const char* title = "LEVEL UP!";
+        const char* sub = "+3 Stat Points!";
+        int tw = MeasureText(title, fontSize);
+        int sw = MeasureText(sub, subSize);
+        int cx = GetScreenWidth() / 2;
+        int cy = GetScreenHeight() / 2;
+
+        // Background glow
+        int glowW = (int)(fmaxf(tw, sw) * 1.5f);
+        int glowH = (int)((fontSize + subSize + 40) * 1.5f);
+        Color bg = { 0, 0, 0, (unsigned char)(180 * alpha) };
+        DrawRectangle(cx - glowW / 2, cy - glowH / 2, glowW, glowH, bg);
+        DrawRectangleLines(cx - glowW / 2, cy - glowH / 2, glowW, glowH, (Color){ 255, 255, 0, (unsigned char)(200 * alpha) });
+
+        // Title text (gold with fade)
+        Color titleColor = { 255, 215, 0, (unsigned char)(255 * alpha) };
+        DrawText(title, cx - tw / 2, cy - fontSize - (int)(8 * scale), fontSize, titleColor);
+
+        // Subtitle text (white with fade)
+        Color subColor = { 255, 255, 255, (unsigned char)(255 * alpha) };
+        DrawText(sub, cx - sw / 2, cy + (int)(8 * scale), subSize, subColor);
     }
 
     // Inventory overlay

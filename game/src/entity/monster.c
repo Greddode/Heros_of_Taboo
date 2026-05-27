@@ -35,6 +35,11 @@ void Monster_InitTemplates(void) {
         .defense         = 1,
         .expValue        = 10,
         .level           = 1,
+        .str             = 4,
+        .dex             = 6,
+        .intel           = 2,
+        .con             = 3,
+        .lck             = 5,
         .color           = { 40, 0, 80, 255 },
         .spritePath      = "resources/sprites/monsters/Shadow.png",
         .frameCount      = 4,
@@ -56,6 +61,11 @@ void Monster_InitTemplates(void) {
         .defense         = 0,
         .expValue        = 10,
         .level           = 1,
+        .str             = 1,
+        .dex             = 3,
+        .intel           = 0,
+        .con             = 1,
+        .lck             = 1,
         .color           = { 100, 60, 140, 255 },
         .spritePath      = "resources/sprites/monsters/Bat.png",
         .frameCount      = 4,
@@ -76,6 +86,11 @@ void Monster_InitTemplates(void) {
         .defense         = 1,
         .expValue        = 12,
         .level           = 1,
+        .str             = 2,
+        .dex             = 2,
+        .intel           = 1,
+        .con             = 2,
+        .lck             = 2,
         .color           = { 80, 160, 80, 255 },
         .spritePath      = "resources/sprites/monsters/Goblin.png",
         .frameCount      = 4,
@@ -96,6 +111,11 @@ void Monster_InitTemplates(void) {
         .defense         = 1,
         .expValue        = 14,
         .level           = 1,
+        .str             = 2,
+        .dex             = 1,
+        .intel           = 0,
+        .con             = 3,
+        .lck             = 1,
         .color           = { 200, 200, 180, 255 },
         .spritePath      = "resources/sprites/monsters/Skeleton.png",
         .frameCount      = 4,
@@ -117,6 +137,11 @@ void Monster_InitTemplates(void) {
         .defense         = 1,
         .expValue        = 22,
         .level           = 1,
+        .str             = 3,
+        .dex             = 2,
+        .intel           = 2,
+        .con             = 3,
+        .lck             = 2,
         .color           = { 50, 220, 80, 255 },
         .spritePath      = "resources/sprites/monsters/Floating_Eye.png",
         .frameCount      = 4,
@@ -137,6 +162,11 @@ void Monster_InitTemplates(void) {
         .defense         = 2,
         .expValue        = 26,
         .level           = 1,
+        .str             = 2,
+        .dex             = 1,
+        .intel           = 0,
+        .con             = 5,
+        .lck             = 1,
         .color           = { 220, 220, 200, 255 },
         .spritePath      = "resources/sprites/monsters/Fungal_Myconid.png",
         .frameCount      = 4,
@@ -157,6 +187,11 @@ void Monster_InitTemplates(void) {
         .defense         = 1,
         .expValue        = 30,
         .level           = 1,
+        .str             = 1,
+        .dex             = 3,
+        .intel           = 5,
+        .con             = 2,
+        .lck             = 2,
         .color           = { 160, 40, 200, 255 },
         .spritePath      = "resources/sprites/monsters/Warp_Skull.png",
         .frameCount      = 4,
@@ -178,6 +213,11 @@ void Monster_InitTemplates(void) {
         .defense         = 2,
         .expValue        = 45,
         .level           = 1,
+        .str             = 5,
+        .dex             = 2,
+        .intel           = 3,
+        .con             = 4,
+        .lck             = 2,
         .color           = { 200, 50, 50, 255 },
         .spritePath      = "resources/sprites/monsters/Demon_Eye.png",
         .frameCount      = 4,
@@ -198,6 +238,11 @@ void Monster_InitTemplates(void) {
         .defense         = 3,
         .expValue        = 55,
         .level           = 1,
+        .str             = 7,
+        .dex             = 1,
+        .intel           = 0,
+        .con             = 7,
+        .lck             = 1,
         .color           = { 120, 60, 180, 255 },
         .spritePath      = "resources/sprites/monsters/Ogre.png",
         .frameCount      = 4,
@@ -218,6 +263,11 @@ void Monster_InitTemplates(void) {
         .defense         = 3,
         .expValue        = 70,
         .level           = 1,
+        .str             = 9,
+        .dex             = 3,
+        .intel           = 4,
+        .con             = 8,
+        .lck             = 3,
         .color           = { 180, 80, 20, 255 },
         .spritePath      = "resources/sprites/monsters/Dragon.png",
         .frameCount      = 4,
@@ -229,7 +279,7 @@ void Monster_InitTemplates(void) {
         .attackRange     = 1,
     };
 
-    // --- Ranger: early floor 1+ (shorter hp, ranged attack) -------------------
+    // --- Ranger: early floor 2+ (shorter hp, ranged attack) -------------------
     s_templates[MONSTER_RANGER_GOBLIN] = (MonsterTemplate){
         .type            = MONSTER_RANGER_GOBLIN,
         .tmxTypeName     = "goblin_archer",
@@ -239,6 +289,11 @@ void Monster_InitTemplates(void) {
         .defense         = 0,
         .expValue        = 14,
         .level           = 1,
+        .str             = 1,
+        .dex             = 5,
+        .intel           = 1,
+        .con             = 1,
+        .lck             = 3,
         .color           = { 100, 150, 60, 255 },
         .spritePath      = "resources/sprites/monsters/Goblin_Archer.png",
         .frameCount      = 4,
@@ -303,12 +358,30 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->y        = y;
     m->prevX    = x;
     m->prevY    = y;
-    m->hp       = tpl->hp;
-    m->maxHp    = tpl->hp;
-    m->attack      = tpl->attack;
-    m->defense     = tpl->defense;
-    m->level       = tpl->level;
-    m->expValue    = tpl->expValue;
+
+    // Determine floor-based scaling factor
+    int spawnFloor = tpl->minFloor;
+    if (spawnFloor < 1) spawnFloor = 1;
+    int floorDiff = floor - spawnFloor;
+    if (floorDiff < 0) floorDiff = 0;
+    float scale = powf(1.12f, (float)floorDiff);
+
+    // Base stats from template, scaled by floor
+    m->str       = (int)(tpl->str * scale);
+    m->dex       = (int)(tpl->dex * scale);
+    m->intel     = (int)(tpl->intel * scale);
+    m->con       = (int)(tpl->con * scale);
+    m->lck       = (int)(tpl->lck * scale);
+
+    // Derived stats
+    int baseHp = tpl->hp;
+    m->maxHp    = (int)(baseHp * scale) + m->con * 5;
+    m->hp       = m->maxHp;
+    m->attack   = (int)(tpl->attack * scale);
+    m->defense  = (int)(tpl->defense * scale) + m->con / 2;
+    m->level       = tpl->level + floorDiff;
+    if (m->level < 1) m->level = 1;
+    m->expValue    = (int)(tpl->expValue * scale) + m->lck * 3;
     m->attackType  = tpl->attackType;
     m->attackRange = tpl->attackRange;
     m->alive       = true;
@@ -319,16 +392,6 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->huntTurns   = 0;
     strncpy(m->name, tpl->name, MONSTER_NAME_LEN - 1);
     m->name[MONSTER_NAME_LEN - 1] = '\0';
-
-    if (floor > 1) {
-        int extra = (floor - 1) * GetRandomValue(1, 3);
-        m->level    = tpl->level + extra;
-        m->maxHp    = tpl->hp + extra * 2;
-        m->hp       = m->maxHp;
-        m->attack   = tpl->attack + extra;
-        m->defense  = tpl->defense + extra / 2;
-        m->expValue = tpl->expValue + extra * 5;
-    }
 
     return m;
 }
@@ -501,8 +564,34 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
         if (m->attackType != ATTACK_MELEE && dist <= m->attackRange &&
             (dx == 0 || dy == 0) &&
             MonsterLineOfSight(m->x, m->y, playerX, playerY, blocking, m->attackRange)) {
-            int dmg = m->attack - game->player.ent.defense;
+            // Player dodge check (DEX-based)
+            int dodgePct = game->player.ent.dex * 2;
+            if (dodgePct > 60) dodgePct = 60;
+            if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
+                m->hitFlashTimer = 0.15f;
+                CombatLog_Add(&game->combatLog, BLACK, "You dodge the %s's attack!", m->name);
+                TraceLog(LOG_INFO, "Player dodges %s's attack!", m->name);
+                return;
+            }
+
+            int dmg;
+            if (m->attackType == ATTACK_RANGED) {
+                dmg = m->attack + (int)(m->dex * 1.5f) - game->player.ent.defense;
+            } else { // ATTACK_MAGIC
+                dmg = m->attack + m->intel - game->player.ent.defense;
+                // Apply magic resistance (INT × 3) for magic attacks
+                int magicRes = game->player.ent.intel * 3;
+                dmg -= magicRes;
+            }
             if (dmg < 1) dmg = 1;
+
+            // Monster crit check
+            if (GetRandomValue(1, 100) <= m->lck) {
+                dmg = dmg * 2;
+                if (dmg < 1) dmg = 1;
+                CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+            }
+
             game->player.ent.hp -= dmg;
             if (game->player.ent.hp < 0) game->player.ent.hp = 0;
             m->hitFlashTimer = 0.15f;
@@ -549,8 +638,26 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
         int neighborY[] = { m->y - 1, m->y + 1, m->y, m->y };
         for (int i = 0; i < 4; i++) {
             if (neighborX[i] == playerX && neighborY[i] == playerY) {
-                int dmg = m->attack - game->player.ent.defense;
+                // Player dodge
+                int dodgePct = game->player.ent.dex * 2;
+                if (dodgePct > 60) dodgePct = 60;
+                if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
+                    m->hitFlashTimer = 0.15f;
+                    CombatLog_Add(&game->combatLog, BLACK, "You dodge the %s's attack!", m->name);
+                    TraceLog(LOG_INFO, "Player dodges %s's attack!", m->name);
+                    return;
+                }
+
+                int dmg = m->attack + m->str * 2 - game->player.ent.defense;
                 if (dmg < 1) dmg = 1;
+
+                // Monster crit
+                if (GetRandomValue(1, 100) <= m->lck) {
+                    dmg = dmg * 2;
+                    if (dmg < 1) dmg = 1;
+                    CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+                }
+
                 game->player.ent.hp -= dmg;
                 if (game->player.ent.hp < 0) game->player.ent.hp = 0;
                 PlayHitSound();
@@ -576,8 +683,20 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
         int neighborY[] = { m->y - 1, m->y + 1, m->y, m->y };
         for (int i = 0; i < 4; i++) {
             if (neighborX[i] == playerX && neighborY[i] == playerY) {
-                int dmg = m->attack - game->player.ent.defense;
+                int dodgePct = game->player.ent.dex * 2;
+                if (dodgePct > 60) dodgePct = 60;
+                if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
+                    m->hitFlashTimer = 0.15f;
+                    CombatLog_Add(&game->combatLog, BLACK, "You dodge the %s's attack!", m->name);
+                    return;
+                }
+                int dmg = m->attack + m->str * 2 - game->player.ent.defense;
                 if (dmg < 1) dmg = 1;
+                if (GetRandomValue(1, 100) <= m->lck) {
+                    dmg = dmg * 2;
+                    if (dmg < 1) dmg = 1;
+                    CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+                }
                 game->player.ent.hp -= dmg;
                 if (game->player.ent.hp < 0) game->player.ent.hp = 0;
                 PlayHitSound();

@@ -70,13 +70,20 @@ typedef struct Game {
     bool selectedPotionTileActive;
 
     Texture2D potionTextures[3];
+    Texture2D texLoot;
     Texture2D texUiFrame;
     Texture2D texUiSlot;
+    Texture2D texUiMarker;
     Texture2D magicAttacksTexture;
 
     InventorySlot inventory[MAX_INVENTORY_SLOTS];
     int inventorySlotCount;
     int inventorySelection;
+    int invScrollOffset;
+    int statsScrollCol1;
+    int statsScrollCol2;
+    int statsActiveCol;
+    int statsSelection;
     InventorySubState invSubState;
     int invActionSelection;
     InventoryTab inventoryTab;
@@ -84,6 +91,12 @@ typedef struct Game {
     EquipType equipped[EQUIP_SLOT_COUNT];
     EquipType equipInventory[MAX_INVENTORY_SLOTS];
     int equipInventoryCount;
+
+    int equipMapCount;
+    int equipMapTiles[MAX_EQUIP_ON_MAP][2];
+    bool equipMapCollected[MAX_EQUIP_ON_MAP];
+    EquipType equipMapTypes[MAX_EQUIP_ON_MAP];
+    int equipMapQuantities[MAX_EQUIP_ON_MAP];
 
     int currentFloor;
     int maxFloors;
@@ -109,6 +122,8 @@ typedef struct Game {
     Projectile projectile;
     float projectileTimer;
     float projectileDuration;
+
+    float levelUpTimer;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);

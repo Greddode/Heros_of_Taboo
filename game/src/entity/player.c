@@ -1,5 +1,6 @@
 #include "player.h"
 #include "core/game.h"
+#include "core/audio.h"
 #include "ui/combat_log.h"
 #include <stdio.h>
 
@@ -12,16 +13,30 @@ int ExpForLevel(int level) {
 static void ApplyLevelUp(Game* game) {
     Player* p = &game->player;
     p->ent.level++;
-    p->ent.maxHp += 5;
-    p->ent.hp += 5;
-    if (p->ent.hp > p->ent.maxHp)
-        p->ent.hp = p->ent.maxHp;
-    if (p->ent.level % 2 == 0)
-        p->ent.attack++;
-    if (p->ent.level % 3 == 0)
-        p->ent.defense++;
+    p->ent.statPoints += 3;
     p->expToNext = ExpForLevel(p->ent.level);
-    TraceLog(LOG_INFO, "Level up! Now level %d", p->ent.level);
+    game->levelUpTimer = 3.0f;
+    PlayLevelUpSound();
+    TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", p->ent.level, p->ent.statPoints);
+    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +3 stat points to allocate!", p->ent.level);
+}
+
+// Allocate one stat point to a specific stat
+bool AllocateStatPoint(Entity* ent, int statIdx) {
+    if (ent->statPoints <= 0) return false;
+    switch (statIdx) {
+        case 0: ent->str++;   break;
+        case 1: ent->dex++;   break;
+        case 2: ent->intel++; break;
+        case 3: ent->con++;   break;
+        case 4: ent->lck++;   break;
+        default: return false;
+    }
+    ent->statPoints--;
+    // Recalculate derived max HP from CON
+    ent->maxHp = 30 + ent->con * 5;
+    if (ent->hp > ent->maxHp) ent->hp = ent->maxHp;
+    return true;
 }
 
 // Add experience and trigger level-ups as needed
@@ -33,9 +48,5 @@ void GainExperience(Game* game, int amount) {
     while (p->exp >= p->expToNext) {
         p->exp -= p->expToNext;
         ApplyLevelUp(game);
-        CombatLog_Add(&game->combatLog, BLACK, "Level %d! HP+5 ATK+%d DEF+%d",
-                      p->ent.level,
-                      (p->ent.level % 2 == 0) ? 1 : 0,
-                      (p->ent.level % 3 == 0) ? 1 : 0);
     }
 }

@@ -13,3 +13,4 @@ obj
 *.slnx
 .continue
 /ignore
+.aider*

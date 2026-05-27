@@ -196,7 +196,7 @@ static void DecodeText(char* out, const unsigned char* data, int len) {
     out[len] = '\0';
 }
 
-void RenderTextScreen(const unsigned char* data, int len, const char* backHint) {
+void RenderTextScreen(const unsigned char* data, int len, const char* backHint, int scrollOffset) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
     float scale = GetUIScale();
@@ -208,15 +208,23 @@ void RenderTextScreen(const unsigned char* data, int len, const char* backHint) 
     DecodeText(buf, data, len);
 
     int lineH = (int)(22 * scale);
-    int y = sh / 6;
+    int startY = sh / 6;
+    int fontSize = (int)(18 * scale);
+    int viewTop = 0;
+    int viewBottom = sh;
+
+    BeginScissorMode(0, viewTop, sw, viewBottom - viewTop);
+
+    int y = startY - scrollOffset;
     char* line = buf;
     char* next = NULL;
     while (line && *line) {
         next = strchr(line, '\n');
         if (next) *next = '\0';
-        int fontSize = (int)(18 * scale);
         int textW = MeasureText(line, fontSize);
-        DrawText(line, (sw - textW) / 2, y, fontSize, LIGHTGRAY);
+        if (y + lineH >= viewTop && y < viewBottom) {
+            DrawText(line, (sw - textW) / 2, y, fontSize, LIGHTGRAY);
+        }
         y += lineH;
         if (next) {
             *next = '\n';
@@ -226,6 +234,7 @@ void RenderTextScreen(const unsigned char* data, int len, const char* backHint) 
         }
     }
 
+    EndScissorMode();
     RL_FREE(buf);
 
     if (backHint) {

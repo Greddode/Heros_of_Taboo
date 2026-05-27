@@ -9,6 +9,7 @@
 #define MAX_PICKUP_SOUNDS  16
 #define MAX_RANGED_SOUNDS  16
 #define MAX_MAGIC_SOUNDS   16
+#define MAX_LEVELUP_SOUNDS  16
 
 #define MENU_MUSIC_DIR  "resources/audio/music/main_menu"
 #define GAME_MUSIC_DIR  "resources/audio/music/game"
@@ -43,6 +44,9 @@ static int s_rangedSoundCount = 0;
 
 static Sound s_magicSounds[MAX_MAGIC_SOUNDS];
 static int s_magicSoundCount = 0;
+
+static Sound s_levelUpSounds[MAX_LEVELUP_SOUNDS];
+static int s_levelUpSoundCount = 0;
 
 static void LoadSoundsFromDir(const char *dirPath, Sound *sounds, int *count, int maxCount) {
     FilePathList files = LoadDirectoryFiles(dirPath);
@@ -87,6 +91,10 @@ static void LoadMagicSounds(void) {
     LoadSoundsFromDir("resources/audio/sounds/magic_attack", s_magicSounds, &s_magicSoundCount, MAX_MAGIC_SOUNDS);
 }
 
+static void LoadLevelUpSounds(void) {
+    LoadSoundsFromDir("resources/audio/sounds/levelup", s_levelUpSounds, &s_levelUpSoundCount, MAX_LEVELUP_SOUNDS);
+}
+
 void InitAudioSystem(void) {
     InitAudioDevice();
     if (!IsAudioDeviceReady()) return;
@@ -98,6 +106,7 @@ void InitAudioSystem(void) {
     LoadPickupSounds();
     LoadRangedSounds();
     LoadMagicSounds();
+    LoadLevelUpSounds();
 
     s_audioReady = true;
 }
@@ -227,6 +236,13 @@ void PlayMagicAttackSound(void) {
     PlaySound(s_magicSounds[idx]);
 }
 
+void PlayLevelUpSound(void) {
+    if (!s_audioReady || s_levelUpSoundCount == 0) return;
+    int idx = GetRandomValue(0, s_levelUpSoundCount - 1);
+    SetSoundVolume(s_levelUpSounds[idx], s_sfxVolume);
+    PlaySound(s_levelUpSounds[idx]);
+}
+
 void ShutdownAudioSystem(void) {
     if (!s_audioReady) return;
     for (int i = 0; i < s_menuTrackCount; i++)
@@ -241,6 +257,8 @@ void ShutdownAudioSystem(void) {
     s_rangedSoundCount = 0;
     for (int i = 0; i < s_magicSoundCount; i++) UnloadSound(s_magicSounds[i]);
     s_magicSoundCount = 0;
+    for (int i = 0; i < s_levelUpSoundCount; i++) UnloadSound(s_levelUpSounds[i]);
+    s_levelUpSoundCount = 0;
     for (int i = 0; i < s_menuTrackCount; i++) UnloadMusicStream(s_menuTracks[i]);
     s_menuTrackCount = 0;
     for (int i = 0; i < s_gameTrackCount; i++) UnloadMusicStream(s_gameTracks[i]);

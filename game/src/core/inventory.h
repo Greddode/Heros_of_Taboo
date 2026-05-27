@@ -7,6 +7,7 @@
 typedef struct Game Game;
 
 #define MAX_POTIONS 32
+#define MAX_EQUIP_ON_MAP 64
 #define MAX_INVENTORY_SLOTS 16
 #define EQUIP_SLOT_COUNT 5
 #define MAX_EQUIPMENT_TYPES 32
@@ -46,6 +47,7 @@ typedef enum {
     EQUIP_PLATE_MAIL,
     // Weapons
     EQUIP_SURVIVAL_KNIFE,
+    EQUIP_DAGGER,
     EQUIP_IRON_SWORD,
     EQUIP_STEEL_SWORD,
     EQUIP_WAR_HAMMER,
@@ -57,6 +59,10 @@ typedef enum {
     EQUIP_RING_OF_STRENGTH,
     EQUIP_AMULET_OF_WARDING,
     EQUIP_BOOTS_OF_SWIFTNESS,
+    EQUIP_RING_OF_THE_HAWK,
+    EQUIP_SAGES_PENDANT,
+    EQUIP_LUCKY_CHARM,
+    EQUIP_BERSERKER_BAND,
     EQUIP_COUNT
 } EquipType;
 
@@ -64,11 +70,18 @@ typedef struct {
     EquipType type;
     char name[32];
     const char* description;
+    const char* spritePath;
     EquipCategory category;
     EquipSlot slot;
     int bonusAttack;
     int bonusDefense;
     int bonusMaxHp;
+    int bonusStr;
+    int bonusDex;
+    int bonusInt;
+    int bonusCon;
+    int bonusLck;
+    bool twoHanded;
 } EquipData;
 
 typedef struct {
@@ -99,10 +112,11 @@ bool InventoryAdd(Game* game, ItemType type);
 bool InventoryUse(Game* game, int slot);
 
 // Equipment management
-void EquipItem(Game* game, EquipType type);
+bool EquipItem(Game* game, EquipType type);
 void EquipItemSilent(Game* game, EquipType type);
 void UnequipSlot(Game* game, EquipSlot slot);
 bool IsEquipSlotOccupied(const Game* game, EquipSlot slot);
+bool IsTwoHandedEquipped(const Game* game);
 bool AddEquipToInventory(Game* game, EquipType type);
 bool RemoveEquipFromInventory(Game* game, int slot);
 
@@ -110,5 +124,6 @@ bool RemoveEquipFromInventory(Game* game, int slot);
 void Inventory_Render(const Game* game);
 void LoadPotionTextures(Game* game);
 void UnloadPotionTextures(Game* game);
+Texture2D GetEquipSprite(EquipType type);
 
 #endif

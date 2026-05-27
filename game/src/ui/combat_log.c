@@ -53,7 +53,8 @@ static int WordWrapLine(const char* msg, int fontSize, int maxWidth, char outLin
 }
 
 void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int fontSize,
-                      Texture2D bgTex, int sliceMargin) {
+                      Texture2D bgTex, int sliceMargin,
+                      Texture2D slotTex, int slotMargin) {
     if (!log) return;
     int total = log->count;
     int available = (total < COMBAT_LOG_MAX) ? total : COMBAT_LOG_MAX;
@@ -95,17 +96,25 @@ void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int font
         }
     }
 
-    // Background sized to fit wrapped lines
-    int logH = wrapCount * lineH + 4;
+    // Background frame sized to fit wrapped lines
+    int pad = 4;
+    int logH = wrapCount * lineH + pad * 2;
     int bgY = y - logH;
 
     if (bgTex.id > 0)
-        Draw9Slice(bgTex, (Rectangle){ (float)(x - 4), (float)bgY, (float)logW, (float)logH },
+        Draw9Slice(bgTex, (Rectangle){ (float)(x - pad), (float)bgY, (float)logW, (float)logH },
                    sliceMargin, sliceMargin, sliceMargin, sliceMargin);
     else
-        DrawRectangle(x - 4, bgY, logW, logH, (Color){ 0, 0, 0, 180 });
+        DrawRectangle(x - pad, bgY, logW, logH, (Color){ 0, 0, 0, 70 });
 
-    // Draw wrapped text, first line gets the original indent
-    for (int i = 0; i < wrapCount; i++)
-        DrawText(wrapLines[i], x, bgY + 2 + i * lineH, fontSize, wrapColors[i]);
+    // Unified slot background inset 4px from each edge of the frame
+    int slotPad = 4;
+    if (slotTex.id > 0)
+        Draw9Slice(slotTex, (Rectangle){ (float)(x - pad + slotPad), (float)(bgY + slotPad), (float)(logW - slotPad * 2), (float)(logH - slotPad * 2) },
+                   slotMargin, slotMargin, slotMargin, slotMargin);
+
+    // Draw colored text lines (original colors)
+    for (int i = 0; i < wrapCount; i++) {
+        DrawText(wrapLines[i], x + pad + slotPad, bgY + pad + slotPad + i * lineH, fontSize, wrapColors[i]);
+    }
 }

@@ -35,7 +35,6 @@ int main(void)
     bool gameMenuOpen = false;
     bool settingsMenuOpen = false;
     bool prevEscDown = false;
-    bool prevRDown = false;
 
     while (!WindowShouldClose() && scene != SCENE_EXIT)
     {
@@ -64,7 +63,6 @@ int main(void)
                         gameMenuOpen = false;
                         settingsMenuOpen = false;
                         prevEscDown = false;
-                        prevRDown = false;
                         scene = SCENE_GAME;
                     }
                 } else if (action == MENU_SETTINGS) {
@@ -159,12 +157,9 @@ int main(void)
                     if (gmAction == MENU_PLAY) nextScene = SCENE_MENU;
                     if (gmAction == MENU_EXIT) nextScene = SCENE_EXIT;
                 } else {
-                    bool rDown = IsKeyDown(KEY_R);
-                    if (rDown && !prevRDown) {
-                        prevRDown = rDown;
+                    bool shiftHeld = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+                    if (shiftHeld && IsKeyPressed(KEY_R)) {
                         restartGame = true;
-                    } else {
-                        prevRDown = rDown;
                     }
 
                     if (!restartGame) {
