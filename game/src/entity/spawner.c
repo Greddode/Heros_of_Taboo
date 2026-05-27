@@ -92,7 +92,7 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
             Monster_Spawn(type, mx, my, floor);
         }
 
-        // --- Health potion: only in larger rooms, placed on the last shuffled tile ---
+        // --- Health potion: chance to spawn in larger rooms, with rarity based on random roll ---
         if (floorCount >= 40 && game->potionCount < MAX_POTIONS) {
             int fi = floorCount - 1;
             int hx = floorTiles[fi] % w;
@@ -102,9 +102,16 @@ void Spawner_Populate(Game* game, const ProceduralRoom* rooms, int roomCount) {
                 game->potionTiles[game->potionCount][1] = hy;
                 game->potionCollected[game->potionCount] = false;
                 game->potionQuantities[game->potionCount] = 1;
-                if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
-                else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
-                else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+                
+                // Random roll for potion rarity: 50% small, 30% medium, 20% large
+                int roll = GetRandomValue(1, 100);
+                if (roll <= 50) {
+                    game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
+                } else if (roll <= 80) { // 50+30=80
+                    game->potionTypes[game->potionCount] = ITEM_MEDIUM_HP_POTION;
+                } else {
+                    game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+                }
                 game->potionCount++;
             }
         }

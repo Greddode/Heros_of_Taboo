@@ -61,7 +61,7 @@ void CombatLog_Render(const CombatLog* log, int x, int y, int maxLines, int font
     if (visible <= 0) return;
 
     int lineH = fontSize + 3;
-    int logW = 350;
+    int logW = (int)(350 * GetUIScale());
 
     // Build word-wrapped display lines
     #define MAX_WRAP 64

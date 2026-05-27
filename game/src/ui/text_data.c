@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include <stdlib.h>
 #include <string.h>
+#include "../core/game.h"
 
 #define XOR_KEY 0xAB
 
@@ -198,6 +199,7 @@ static void DecodeText(char* out, const unsigned char* data, int len) {
 void RenderTextScreen(const unsigned char* data, int len, const char* backHint) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     ClearBackground((Color){ 15, 15, 25, 255 });
 
@@ -205,15 +207,16 @@ void RenderTextScreen(const unsigned char* data, int len, const char* backHint) 
     if (!buf) return;
     DecodeText(buf, data, len);
 
-    int lineH = 22;
+    int lineH = (int)(22 * scale);
     int y = sh / 6;
     char* line = buf;
     char* next = NULL;
     while (line && *line) {
         next = strchr(line, '\n');
         if (next) *next = '\0';
-        int textW = MeasureText(line, 18);
-        DrawText(line, (sw - textW) / 2, y, 18, LIGHTGRAY);
+        int fontSize = (int)(18 * scale);
+        int textW = MeasureText(line, fontSize);
+        DrawText(line, (sw - textW) / 2, y, fontSize, LIGHTGRAY);
         y += lineH;
         if (next) {
             *next = '\n';
@@ -226,7 +229,8 @@ void RenderTextScreen(const unsigned char* data, int len, const char* backHint) 
     RL_FREE(buf);
 
     if (backHint) {
-        int hintW = MeasureText(backHint, 16);
-        DrawText(backHint, (sw - hintW) / 2, sh - 40, 16, (Color){ 100, 100, 130, 255 });
+        int hintSize = (int)(16 * scale);
+        int hintW = MeasureText(backHint, hintSize);
+        DrawText(backHint, (sw - hintW) / 2, sh - (int)(40 * scale), hintSize, (Color){ 100, 100, 130, 255 });
     }
 }

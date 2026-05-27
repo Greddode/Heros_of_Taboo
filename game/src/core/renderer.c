@@ -167,51 +167,52 @@ void RenderGame(const Game* game) {
     EndMode2D();
 
     // HUD (screen space)
-    int panelX = 10;
-    int panelW = 260;
-    int barW = panelW - 20;
-    int barH = 16;
+    float scale = GetUIScale();
+    int panelX = (int)(10 * scale);
+    int panelW = (int)(260 * scale);
+    int barW = panelW - (int)(20 * scale);
+    int barH = (int)(16 * scale);
     int textY = 0;
 
     char levelText[64];
     snprintf(levelText, sizeof(levelText), "Lv %d", game->player.ent.level);
-    int panelH = 100;
-    int panelY = GetScreenHeight() - 10 - panelH;
+    int panelH = (int)(100 * scale);
+    int panelY = GetScreenHeight() - (int)(10 * scale) - panelH;
     if (game->texUiFrame.id > 0)
         Draw9Slice(game->texUiFrame, (Rectangle){ (float)(panelX - 4), (float)panelY, (float)panelW, (float)panelH }, 16, 16, 16, 16);
     else
         DrawRectangle(panelX - 4, panelY, panelW, panelH, (Color){ 0, 0, 0, 180 });
-    textY = panelY + 4;
-    DrawText(levelText, panelX, textY, 18, BLACK);
+    textY = panelY + (int)(4 * scale);
+    DrawText(levelText, panelX, textY, (int)(18 * scale), BLACK);
 
     // HP bar
-    textY += 24;
+    textY += (int)(24 * scale);
     float hpRatio = (float)game->player.ent.hp / (float)game->player.ent.maxHp;
     if (hpRatio < 0) hpRatio = 0;
     DrawRectangle(panelX, textY, barW, barH, (Color){ 60, 0, 0, 255 });
     DrawRectangle(panelX, textY, (int)(barW * hpRatio), barH, RED);
     char hpText[64];
     snprintf(hpText, sizeof(hpText), "HP: %d/%d", game->player.ent.hp, game->player.ent.maxHp);
-    DrawText(hpText, panelX + 4, textY + 1, 14, WHITE);
+    DrawText(hpText, panelX + (int)(4 * scale), textY + (int)(1 * scale), (int)(14 * scale), WHITE);
 
     // EXP bar
-    textY += barH + 6;
+    textY += barH + (int)(6 * scale);
     float expRatio = (float)game->player.exp / (float)game->player.expToNext;
     if (expRatio < 0) expRatio = 0;
     DrawRectangle(panelX, textY, barW, barH, (Color){ 0, 0, 60, 255 });
     DrawRectangle(panelX, textY, (int)(barW * expRatio), barH, (Color){ 80, 80, 255, 255 });
     char expText[64];
     snprintf(expText, sizeof(expText), "EXP: %d/%d", game->player.exp, game->player.expToNext);
-    DrawText(expText, panelX + 4, textY + 1, 14, WHITE);
+    DrawText(expText, panelX + (int)(4 * scale), textY + (int)(1 * scale), (int)(14 * scale), WHITE);
 
     // Floor info
-    textY += barH + 6;
+    textY += barH + (int)(6 * scale);
     char infoText[64];
     snprintf(infoText, sizeof(infoText), "Floor: %d/%d", game->currentFloor, game->maxFloors);
-    DrawText(infoText, panelX, textY, 14, BLACK);
+    DrawText(infoText, panelX, textY, (int)(14 * scale), BLACK);
 
     // Combat log (bottom-right)
-    CombatLog_Render(&game->combatLog, GetScreenWidth() - 370, GetScreenHeight() - 10, 14, 18, game->texUiFrame, 16);
+    CombatLog_Render(&game->combatLog, GetScreenWidth() - (int)(370 * scale), GetScreenHeight() - (int)(10 * scale), 14, (int)(18 * scale), game->texUiFrame, 16);
 
     MonsterInfo_Render(game);
 
@@ -233,14 +234,14 @@ void RenderGame(const Game* game) {
         }
 
         if (tileCount > 0) {
-            int pX = GetScreenWidth() - 200;
-            int pY = 180;
-            int pW = 190;
-            int pH = 40 + tileCount * 50;
-            if (pH > GetScreenHeight() - pY - 10) pH = GetScreenHeight() - pY - 10;
-            int ly = pY + 6;
-            int fs = 14;
-            int lh = fs + 4;
+            int pX = GetScreenWidth() - (int)(200 * scale);
+            int pY = (int)(180 * scale);
+            int pW = (int)(190 * scale);
+            int fs = (int)(14 * scale);
+            int lh = fs + (int)(4 * scale);
+            int pH = (int)(40 * scale) + tileCount * (fs + (int)(8 * scale));
+            if (pH > GetScreenHeight() - pY - (int)(10 * scale)) pH = GetScreenHeight() - pY - (int)(10 * scale);
+            int ly = pY + (int)(6 * scale);
             char buf[128];
 
             if (game->texUiSlot.id > 0)
@@ -256,12 +257,12 @@ void RenderGame(const Game* game) {
                 int qty = tileQtys[i];
 
                 snprintf(buf, sizeof(buf), "%s x%d", name, qty);
-                DrawText(buf, pX + 6, ly, fs, YELLOW); ly += lh;
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, YELLOW); ly += lh;
 
                 snprintf(buf, sizeof(buf), "Heals %d HP", heal);
-                DrawText(buf, pX + 6, ly, fs, (Color){ 0, 90, 0, 255 }); ly += lh;
+                DrawText(buf, pX + (int)(6 * scale), ly, fs, (Color){ 0, 90, 0, 255 }); ly += lh;
 
-                ly += 4;
+                ly += (int)(4 * scale);
             }
         }
     }
@@ -274,8 +275,8 @@ void RenderGame(const Game* game) {
     else if (game->state == STATE_ENEMY_TURN) stateText = "Enemy turn...";
 
     if (stateText[0]) {
-        int textWidth = MeasureText(stateText, 20);
-        DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - 40, 20, YELLOW);
+        int textWidth = MeasureText(stateText, (int)(20 * scale));
+        DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - (int)(40 * scale), (int)(20 * scale), YELLOW);
     }
 
     // Inventory overlay

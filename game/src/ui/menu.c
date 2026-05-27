@@ -1,6 +1,7 @@
 #include "menu.h"
 #include "text_data.h"
 #include "core/audio.h"
+#include "../core/game.h"
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@ static const char* s_gameMenuOptions[GAME_MENU_OPTION_COUNT] = {
 static int s_selection = 0;
 static int s_gameMenuSel = 0;
 static int s_settingsSel = 0;
+static float s_guiScale = 1.0f; // GUI scale multiplier (1.0 = default)
 
 
 
@@ -55,30 +57,36 @@ MenuAction Menu_Update(void) {
 void Menu_Render(void) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     ClearBackground((Color){ 15, 15, 25, 255 });
 
+    int titleSize = (int)(60 * scale);
     const char* title = "Heroes of Taboo";
-    int titleW = MeasureText(title, 60);
-    DrawText(title, (sw - titleW) / 2, sh / 4, 60, (Color){ 200, 180, 50, 255 });
+    int titleW = MeasureText(title, titleSize);
+    DrawText(title, (sw - titleW) / 2, sh / 4, titleSize, (Color){ 200, 180, 50, 255 });
 
+    int subSize = (int)(20 * scale);
     const char* subtitle = "A Roguelike Adventure";
-    int subW = MeasureText(subtitle, 20);
-    DrawText(subtitle, (sw - subW) / 2, sh / 4 + 70, 20, (Color){ 150, 150, 180, 255 });
+    int subW = MeasureText(subtitle, subSize);
+    DrawText(subtitle, (sw - subW) / 2, sh / 4 + (int)(70 * scale), subSize, (Color){ 150, 150, 180, 255 });
 
+    int optionSize = (int)(30 * scale);
+    int optionSpacing = (int)(45 * scale);
     int optionY = sh / 2;
     for (int i = 0; i < MENU_OPTION_COUNT; i++) {
         Color c = (i == s_selection) ? (Color){ 255, 255, 100, 255 } : LIGHTGRAY;
-        int textW = MeasureText(s_options[i], 30);
-        DrawText(s_options[i], (sw - textW) / 2, optionY + i * 45, 30, c);
+        int textW = MeasureText(s_options[i], optionSize);
+        DrawText(s_options[i], (sw - textW) / 2, optionY + i * optionSpacing, optionSize, c);
         if (i == s_selection) {
-            DrawText("> ", (sw - textW) / 2 - 30, optionY + i * 45, 30, (Color){ 255, 255, 100, 255 });
+            DrawText("> ", (sw - textW) / 2 - (int)(30 * scale), optionY + i * optionSpacing, optionSize, (Color){ 255, 255, 100, 255 });
         }
     }
 
+    int hintSize = (int)(14 * scale);
     const char* hint = "Use Arrow Keys / WASD to navigate, Enter to select";
-    int hintW = MeasureText(hint, 14);
-    DrawText(hint, (sw - hintW) / 2, sh - 30, 14, (Color){ 80, 80, 100, 255 });
+    int hintW = MeasureText(hint, hintSize);
+    DrawText(hint, (sw - hintW) / 2, sh - (int)(30 * scale), hintSize, (Color){ 80, 80, 100, 255 });
 }
 
 MenuAction Menu_CreditsUpdate(void) {
@@ -120,26 +128,30 @@ MenuAction GameMenu_Update(void) {
 void GameMenu_Render(void) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     DrawRectangle(0, 0, sw, sh, (Color){ 0, 0, 0, 160 });
 
-    int panelW = 360;
-    int panelH = GAME_MENU_OPTION_COUNT * 50 + 80;
+    int panelW = (int)(360 * scale);
+    int panelH = (int)((GAME_MENU_OPTION_COUNT * 50 + 80) * scale);
     int px = (sw - panelW) / 2;
     int py = (sh - panelH) / 2;
     DrawRectangle(px, py, panelW, panelH, (Color){ 20, 20, 35, 230 });
     DrawRectangleLines(px, py, panelW, panelH, (Color){ 100, 100, 140, 255 });
 
+    int titleSize = (int)(36 * scale);
     const char* title = "Paused";
-    int titleW = MeasureText(title, 36);
-    DrawText(title, (sw - titleW) / 2, py + 20, 36, (Color){ 200, 180, 50, 255 });
+    int titleW = MeasureText(title, titleSize);
+    DrawText(title, (sw - titleW) / 2, py + (int)(20 * scale), titleSize, (Color){ 200, 180, 50, 255 });
 
+    int optionSize = (int)(22 * scale);
+    int optionSpacing = (int)(45 * scale);
     for (int i = 0; i < GAME_MENU_OPTION_COUNT; i++) {
         Color c = (i == s_gameMenuSel) ? (Color){ 255, 255, 100, 255 } : LIGHTGRAY;
-        int textW = MeasureText(s_gameMenuOptions[i], 22);
-        DrawText(s_gameMenuOptions[i], (sw - textW) / 2, py + 70 + i * 45, 22, c);
+        int textW = MeasureText(s_gameMenuOptions[i], optionSize);
+        DrawText(s_gameMenuOptions[i], (sw - textW) / 2, py + (int)(70 * scale) + i * optionSpacing, optionSize, c);
         if (i == s_gameMenuSel) {
-            DrawText("> ", (sw - textW) / 2 - 25, py + 70 + i * 45, 22, (Color){ 255, 255, 100, 255 });
+            DrawText("> ", (sw - textW) / 2 - (int)(25 * scale), py + (int)(70 * scale) + i * optionSpacing, optionSize, (Color){ 255, 255, 100, 255 });
         }
     }
 }
@@ -203,8 +215,10 @@ static void Story_BuildVisualLines(int sw) {
     Story_FreeVisualLines();
     if (!s_storyLines) return;
 
-    int availW = sw - 60;
-    if (availW < 80) availW = 80;
+    float scale = GetUIScale();
+    int fontSize = (int)(18 * scale);
+    int availW = sw - (int)(60 * scale);
+    if (availW < (int)(80 * scale)) availW = (int)(80 * scale);
 
     for (int i = 0; i < s_storyLineCount; i++) {
         const char* src = s_storyLines[i];
@@ -240,8 +254,8 @@ static void Story_BuildVisualLines(int sw) {
         lineBuf[0] = '\0';
 
         for (int w = 0; w < wordCount; w++) {
-            int wordW = MeasureText(words[w], 18);
-            int spaceW = MeasureText(" ", 18);
+            int wordW = MeasureText(words[w], fontSize);
+            int spaceW = MeasureText(" ", fontSize);
             int needSep = linePx > 0 ? spaceW : 0;
 
             if (linePx + needSep + wordW > availW && linePx > 0) {
@@ -293,12 +307,14 @@ MenuAction Menu_StoryUpdate(void) {
 void Menu_StoryRender(void) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     ClearBackground((Color){ 15, 15, 25, 255 });
 
+    int titleSize = (int)(50 * scale);
     const char* title = "Story";
-    int titleW = MeasureText(title, 50);
-    DrawText(title, (sw - titleW) / 2, sh / 12, 50, (Color){ 200, 180, 50, 255 });
+    int titleW = MeasureText(title, titleSize);
+    DrawText(title, (sw - titleW) / 2, sh / 12, titleSize, (Color){ 200, 180, 50, 255 });
 
     Story_LoadFile();
 
@@ -307,16 +323,16 @@ void Menu_StoryRender(void) {
     if (s_visualLineCount > 0) {
         if (s_storyScroll >= s_visualLineCount) s_storyScroll = s_visualLineCount - 1;
 
-        int lineH = 22;
+        int lineH = (int)(22 * scale);
         int y = sh / 6;
-        int maxLines = (sh - y - 60) / lineH;
+        int maxLines = (sh - y - (int)(60 * scale)) / lineH;
 
         int end = s_storyScroll + maxLines;
         if (end > s_visualLineCount) end = s_visualLineCount;
 
         for (int i = s_storyScroll; i < end; i++) {
-            int textW = MeasureText(s_visualLines[i], 18);
-            DrawText(s_visualLines[i], (sw - textW) / 2, y, 18, LIGHTGRAY);
+            int textW = MeasureText(s_visualLines[i], (int)(18 * scale));
+            DrawText(s_visualLines[i], (sw - textW) / 2, y, (int)(18 * scale), LIGHTGRAY);
             y += lineH;
         }
 
@@ -327,16 +343,19 @@ void Menu_StoryRender(void) {
                 : (s_storyScroll >= totalScroll)
                     ? "At end - ESC - Back"
                     : "UP/DOWN - Scroll     ESC - Back";
-            int hintW = MeasureText(scrollHint, 16);
-            DrawText(scrollHint, (sw - hintW) / 2, sh - 40, 16, (Color){ 100, 100, 130, 255 });
+            int hintSize = (int)(16 * scale);
+            int hintW = MeasureText(scrollHint, hintSize);
+            DrawText(scrollHint, (sw - hintW) / 2, sh - (int)(40 * scale), hintSize, (Color){ 100, 100, 130, 255 });
         }
     } else {
         const char* err = "Could not load story.txt";
-        int errW = MeasureText(err, 20);
-        DrawText(err, (sw - errW) / 2, sh / 2, 20, RED);
+        int errSize = (int)(20 * scale);
+        int errW = MeasureText(err, errSize);
+        DrawText(err, (sw - errW) / 2, sh / 2, errSize, RED);
         const char* hint = "ESC - Back";
-        int hintW = MeasureText(hint, 16);
-        DrawText(hint, (sw - hintW) / 2, sh - 40, 16, (Color){ 100, 100, 130, 255 });
+        int hintSize = (int)(16 * scale);
+        int hintW = MeasureText(hint, hintSize);
+        DrawText(hint, (sw - hintW) / 2, sh - (int)(40 * scale), hintSize, (Color){ 100, 100, 130, 255 });
     }
 }
 
@@ -371,7 +390,7 @@ void Menu_CreditsRender(void) {
                      "ESC / BACKSPACE - Back to Menu");
 }
 
-static void DrawVolumeBarItem(int cx, int cy, const char* label, float vol, bool selected, int fontSize, int barW) {
+static void DrawVolumeBarItem(int cx, int cy, const char* label, float vol, bool selected, int fontSize, int barW, bool isGuiScale) {
     int labelW = MeasureText(label, fontSize);
 
     Color labelColor = selected ? (Color){ 255, 255, 100, 255 } : LIGHTGRAY;
@@ -382,29 +401,49 @@ static void DrawVolumeBarItem(int cx, int cy, const char* label, float vol, bool
     }
     DrawText(label, labelOffsetX, cy - fontSize - 8, fontSize, labelColor);
 
-    int volPercent = (int)(vol * 100.0f);
     int barH = fontSize;
     int barX = cx - barW / 2;
     int barY = cy;
     DrawRectangle(barX, barY, barW, barH, (Color){ 50, 50, 70, 255 });
     DrawRectangleLines(barX, barY, barW, barH, (Color){ 100, 100, 130, 255 });
 
-    int fillW = (int)(barW * vol);
-    if (fillW > 0) {
-        DrawRectangle(barX, barY, fillW, barH, (Color){ 100, 200, 100, 255 });
-    }
+    if (isGuiScale) {
+        // For GUI scale: vol is the actual scale (1.0-4.0)
+        // Convert to slider position: 1.0 -> 0.25, 2.0 -> 0.5, 3.0 -> 0.75, 4.0 -> 1.0
+        float sliderPos = (vol - 1.0f) / 3.0f; // Maps 1.0-4.0 to 0.0-1.0
+        sliderPos = sliderPos * 0.75f + 0.25f; // Maps 0.0-1.0 to 0.25-1.0
+        
+        int fillW = (int)(barW * sliderPos);
+        if (fillW > 0) {
+            DrawRectangle(barX, barY, fillW, barH, (Color){ 100, 200, 100, 255 });
+        }
+        
+        // Display as 1.00x, 1.25x, 2.00x, 3.00x, 4.00x etc. instead of percentage
+        char scaleText[16];
+        snprintf(scaleText, sizeof(scaleText), "%.2fx", vol);
+        int textFont = fontSize;
+        int textW = MeasureText(scaleText, textFont);
+        DrawText(scaleText, cx - textW / 2, barY + barH + 4, textFont, LIGHTGRAY);
+    } else {
+        // Regular percentage display for volume
+        int volPercent = (int)(vol * 100.0f);
+        int fillW = (int)(barW * vol);
+        if (fillW > 0) {
+            DrawRectangle(barX, barY, fillW, barH, (Color){ 100, 200, 100, 255 });
+        }
 
-    char pctText[8];
-    snprintf(pctText, sizeof(pctText), "%d%%", volPercent);
-    int pctFont = fontSize - 4;
-    int pctW = MeasureText(pctText, pctFont);
-    DrawText(pctText, cx - pctW / 2, barY + barH + 4, pctFont, LIGHTGRAY);
+        char pctText[8];
+        snprintf(pctText, sizeof(pctText), "%d%%", volPercent);
+        int pctFont = fontSize - 4;
+        int pctW = MeasureText(pctText, pctFont);
+        DrawText(pctText, cx - pctW / 2, barY + barH + 4, pctFont, LIGHTGRAY);
+    }
 }
 
 static void Settings_UpdateSel(bool inc) {
     if (inc) {
         s_settingsSel++;
-        if (s_settingsSel > 1) s_settingsSel = 1;
+        if (s_settingsSel > 2) s_settingsSel = 2;
     } else {
         s_settingsSel--;
         if (s_settingsSel < 0) s_settingsSel = 0;
@@ -412,17 +451,21 @@ static void Settings_UpdateSel(bool inc) {
 }
 
 static void Settings_AdjustVol(int dir) {
-    float step = 0.05f;
     if (s_settingsSel == 0) {
-        float vol = GetMusicVolume() + step * dir;
+        float vol = GetMusicVolume() + 0.05f * dir;
         if (vol < 0.0f) vol = 0.0f;
         if (vol > 1.0f) vol = 1.0f;
         SetAudioVolume(vol);
-    } else {
-        float vol = GetSFXVolume() + step * dir;
+    } else if (s_settingsSel == 1) {
+        float vol = GetSFXVolume() + 0.05f * dir;
         if (vol < 0.0f) vol = 0.0f;
         if (vol > 1.0f) vol = 1.0f;
         SetSFXVolume(vol);
+    } else if (s_settingsSel == 2) {
+        float scale = GetGuiScale() + 0.25f * dir; // Change by 0.25 increments
+        if (scale < 1.0f) scale = 1.0f;
+        if (scale > 4.0f) scale = 4.0f;
+        SetGuiScale(scale);
     }
 }
 
@@ -440,22 +483,39 @@ MenuAction Menu_SettingsUpdate(void) {
 void Menu_SettingsRender(void) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     ClearBackground((Color){ 15, 15, 25, 255 });
 
+    int titleSize = (int)(50 * scale);
     const char* title = "Settings";
-    int titleW = MeasureText(title, 50);
-    DrawText(title, (sw - titleW) / 2, sh / 5, 50, (Color){ 200, 180, 50, 255 });
+    int titleW = MeasureText(title, titleSize);
+    DrawText(title, (sw - titleW) / 2, sh / 5, titleSize, (Color){ 200, 180, 50, 255 });
 
     int cx = sw / 2;
-    int cy = sh / 2 - 30;
+    int cy = sh / 2 - (int)(30 * scale);
+    int itemSpacing = (int)(70 * scale);
+    int itemSize = (int)(22 * scale);
+    int barW = (int)(260 * scale);
 
-    DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), s_settingsSel == 0, 22, 260);
-    DrawVolumeBarItem(cx, cy + 70, "SFX Volume", GetSFXVolume(), s_settingsSel == 1, 22, 260);
+    if (s_settingsSel == 0) {
+        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
+    } else if (s_settingsSel == 1) {
+        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
+    } else if (s_settingsSel == 2) {
+        DrawVolumeBarItem(cx, cy, "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, cy + itemSpacing * 2, "GUI Scale", GetGuiScale(), true, itemSize, barW, true);
+    }
 
+    int hintSize = (int)(14 * scale);
     const char* hint = "UP / DOWN - select     LEFT / RIGHT or A / D - adjust     ESC - Back";
-    int hintW = MeasureText(hint, 14);
-    DrawText(hint, (sw - hintW) / 2, sh - 30, 14, (Color){ 80, 80, 100, 255 });
+    int hintW = MeasureText(hint, hintSize);
+    DrawText(hint, (sw - hintW) / 2, sh - (int)(30 * scale), hintSize, (Color){ 80, 80, 100, 255 });
 }
 
 void Menu_SettingsUpdateGame(void) {
@@ -468,25 +528,43 @@ void Menu_SettingsUpdateGame(void) {
 void Menu_SettingsRenderGame(void) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
+    float scale = GetUIScale();
 
     DrawRectangle(0, 0, sw, sh, (Color){ 0, 0, 0, 160 });
 
-    int panelW = 360;
-    int panelH = 185;
+    int panelW = (int)(360 * scale);
+    int panelH = (int)(235 * scale);
     int px = (sw - panelW) / 2;
     int py = (sh - panelH) / 2;
     DrawRectangle(px, py, panelW, panelH, (Color){ 20, 20, 35, 230 });
     DrawRectangleLines(px, py, panelW, panelH, (Color){ 100, 100, 140, 255 });
 
+    int titleSize = (int)(20 * scale);
     const char* title = "Settings";
-    int titleW = MeasureText(title, 20);
-    DrawText(title, (sw - titleW) / 2, py + 8, 20, (Color){ 200, 180, 50, 255 });
+    int titleW = MeasureText(title, titleSize);
+    DrawText(title, (sw - titleW) / 2, py + (int)(8 * scale), titleSize, (Color){ 200, 180, 50, 255 });
 
     int cx = sw / 2;
-    DrawVolumeBarItem(cx, py + 68, "Music Volume", GetMusicVolume(), s_settingsSel == 0, 13, 170);
-    DrawVolumeBarItem(cx, py + 118, "SFX Volume", GetSFXVolume(), s_settingsSel == 1, 13, 170);
+    int itemSize = (int)(13 * scale);
+    int itemSpacing = (int)(50 * scale);
+    int barW = (int)(170 * scale);
 
+    if (s_settingsSel == 0) {
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
+    } else if (s_settingsSel == 1) {
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
+    } else if (s_settingsSel == 2) {
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), true, itemSize, barW, true);
+    }
+
+    int hintSize = (int)(10 * scale);
     const char* hint = "UP/DOWN select    L/R adjust    ESC - Back";
-    int hintW = MeasureText(hint, 10);
-    DrawText(hint, (sw - hintW) / 2, py + panelH - 14, 10, (Color){ 80, 80, 100, 255 });
+    int hintW = MeasureText(hint, hintSize);
+    DrawText(hint, (sw - hintW) / 2, py + panelH - (int)(14 * scale), hintSize, (Color){ 80, 80, 100, 255 });
 }

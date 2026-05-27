@@ -11,6 +11,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+static float s_guiScaleSetting = 1.0f; // GUI scale multiplier (default 1.0)
+
+// UI scaling helper function
+float GetUIScale(void) {
+    // Base resolution for UI design (1024x768)
+    const float baseWidth = 1024.0f;
+    const float baseHeight = 768.0f;
+    float widthScale = (float)GetScreenWidth() / baseWidth;
+    float heightScale = (float)GetScreenHeight() / baseHeight;
+    // Use the smaller scale to maintain aspect ratio, but with a minimum
+    float scale = fminf(widthScale, heightScale);
+    scale = fmaxf(scale, 0.75f); // Don't scale below 75% of base size
+    return scale * s_guiScaleSetting;
+}
+
+void SetGuiScale(float scale) {
+    if (scale < 1.0f) scale = 1.0f;
+    if (scale > 4.0f) scale = 4.0f;
+    s_guiScaleSetting = scale;
+}
+
+float GetGuiScale(void) {
+    return s_guiScaleSetting;
+}
+
 void HandleInput(Game* game) {
     if (game->state == STATE_INVENTORY) {
         if (IsKeyPressed(KEY_I)) {

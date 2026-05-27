@@ -3,6 +3,7 @@
 
 #include "raylib.h"
 #include <stdbool.h>
+#include <math.h>
 
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
@@ -18,6 +19,10 @@
 #include "inventory.h"
 #include "renderer.h"
 #include "map_helpers.h"
+
+float GetUIScale(void);
+void SetGuiScale(float scale);
+float GetGuiScale(void);
 
 typedef enum {
     STATE_PLAYER_TURN,

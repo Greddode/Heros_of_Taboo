@@ -14,7 +14,7 @@ typedef struct Game Game;
 typedef enum {
     ITEM_NONE = 0,
     ITEM_SMALL_HP_POTION,
-    ITEM_BIG_HP_POTION,
+    ITEM_MEDIUM_HP_POTION,
     ITEM_LARGE_HP_POTION,
     ITEM_COUNT
 } ItemType;

@@ -210,19 +210,26 @@ void SpawnEntitiesFromObjects(Game* game) {
             game->player.ent.prevY = tileY;
             TraceLog(LOG_INFO, "Player spawned at (%d, %d)", tileX, tileY);
         }
-        // Health potion
+            // Health potion
         else if (strcmp(obj->type, "healing") == 0 || strcmp(obj->type, "Healing") == 0 ||
-                 strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0 ||
-                 strcmp(obj->type, "health_potion") == 0 ||
-                 strcmp(obj->name, "health_potion") == 0 || strcmp(obj->name, "HealthPotion") == 0) {
+                  strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0 ||
+                  strcmp(obj->type, "health_potion") == 0 ||
+                  strcmp(obj->name, "health_potion") == 0 || strcmp(obj->name, "HealthPotion") == 0) {
             if (game->potionCount >= MAX_POTIONS) continue;
             game->potionTiles[game->potionCount][0] = tileX;
             game->potionTiles[game->potionCount][1] = tileY;
             game->potionCollected[game->potionCount] = false;
             game->potionQuantities[game->potionCount] = 1;
-            if (game->currentFloor <= 2)      game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
-            else if (game->currentFloor <= 5) game->potionTypes[game->potionCount] = ITEM_BIG_HP_POTION;
-            else                              game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+            
+            // Random roll for potion rarity: 50% small, 30% medium, 20% large
+            int roll = GetRandomValue(1, 100);
+            if (roll <= 50) {
+                game->potionTypes[game->potionCount] = ITEM_SMALL_HP_POTION;
+            } else if (roll <= 80) { // 50+30=80
+                game->potionTypes[game->potionCount] = ITEM_MEDIUM_HP_POTION;
+            } else {
+                game->potionTypes[game->potionCount] = ITEM_LARGE_HP_POTION;
+            }
             game->potionCount++;
             TraceLog(LOG_INFO, "Health potion at (%d, %d)", tileX, tileY);
         }

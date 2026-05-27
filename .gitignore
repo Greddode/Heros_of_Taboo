@@ -12,6 +12,4 @@ obj
 /*.sln
 *.slnx
 .continue
-Description.html
-DEVlog.html
-screenshot.png
+/ignore
