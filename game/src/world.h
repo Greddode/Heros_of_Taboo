@@ -1,6 +1,7 @@
 #ifndef WORLD_H
 #define WORLD_H
 
+#include "raylib.h"
 #include "ecs.h"
 #include "tmx/tmx.h"
 #include "ui/combat_log.h"
@@ -14,6 +15,7 @@ typedef struct GameWorld {
 
     // Map
     MapData* map;
+    Texture2D tilesetTextures[MAX_TILESETS];
 
     // Turn-based state machine
     GameState state;
@@ -52,8 +54,8 @@ typedef struct GameWorld {
     // Level-up flash
     float levelUpTimer;
 
-    // Inspector
-    int selectedMonsterIdx;
+    // Inspector (ECS entity id, ENTITY_NONE if none)
+    EntityId selectedMonsterEntity;
 
     // Inventory data (UI state will be extracted later)
     InventorySlot inventory[MAX_INVENTORY_SLOTS];

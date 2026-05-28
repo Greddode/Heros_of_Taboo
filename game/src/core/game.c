@@ -2,8 +2,12 @@
 #include "entity/entity.h"
 #include "entity/player.h"
 #include "systems/spawner_system.h"
-#include "entity/monster.h"
-#include "entity/spawner.h"
+#include "world.h"
+#include "data/monster_data.h"
+#include "systems/ai_system.h"
+#include "systems/combat_system.h"
+#include "systems/world_monster.h"
+#include "systems/player_system.h"
 #include "ui/combat_log.h"
 #include "core/audio.h"
 #include "procedural.h"
@@ -13,6 +17,98 @@
 #include <string.h>
 
 static float s_guiScaleSetting = 1.0f; // GUI scale multiplier (default 1.0)
+
+static void SyncPlayerToEcs(Game* game) {
+    GameWorld* gw = &game->ecsWorld;
+    if (gw->playerEntity == ENTITY_NONE) {
+        PlayerSystem_Spawn(gw);
+    }
+    EntityId e = gw->playerEntity;
+    if (e == ENTITY_NONE) return;
+
+    CPosition* p = World_GetPosition(&gw->ecs, e);
+    p->x = game->player.ent.x;
+    p->y = game->player.ent.y;
+    p->prevX = game->player.ent.prevX;
+    p->prevY = game->player.ent.prevY;
+    p->facingDir = game->player.ent.facingDir;
+
+    CStats* s = World_GetStats(&gw->ecs, e);
+    s->hp = game->player.ent.hp;
+    s->maxHp = game->player.ent.maxHp;
+    s->attack = game->player.ent.attack;
+    s->defense = game->player.ent.defense;
+    s->level = game->player.ent.level;
+    s->str = game->player.ent.str;
+    s->dex = game->player.ent.dex;
+    s->intel = game->player.ent.intel;
+    s->con = game->player.ent.con;
+    s->lck = game->player.ent.lck;
+    s->statPoints = game->player.ent.statPoints;
+    s->alive = game->player.ent.alive;
+    s->exp = game->player.exp;
+    s->expToNext = game->player.expToNext;
+
+    if (World_HasComponents(&gw->ecs, e, COMP_HIT_FLASH)) {
+        World_GetHitFlash(&gw->ecs, e)->timer = game->player.ent.hitFlashTimer;
+    }
+}
+
+static void SyncPlayerFromEcs(Game* game) {
+    GameWorld* gw = &game->ecsWorld;
+    if (gw->playerEntity == ENTITY_NONE) return;
+
+    EntityId e = gw->playerEntity;
+    CPosition* p = World_GetPosition(&gw->ecs, e);
+    game->player.ent.x = p->x;
+    game->player.ent.y = p->y;
+    game->player.ent.prevX = p->prevX;
+    game->player.ent.prevY = p->prevY;
+    game->player.ent.facingDir = p->facingDir;
+
+    CStats* s = World_GetStats(&gw->ecs, e);
+    game->player.ent.hp = s->hp;
+    game->player.ent.maxHp = s->maxHp;
+    game->player.ent.attack = s->attack;
+    game->player.ent.defense = s->defense;
+    game->player.ent.level = s->level;
+    game->player.ent.str = s->str;
+    game->player.ent.dex = s->dex;
+    game->player.ent.intel = s->intel;
+    game->player.ent.con = s->con;
+    game->player.ent.lck = s->lck;
+    game->player.ent.statPoints = s->statPoints;
+    game->player.ent.alive = s->alive;
+    game->player.exp = s->exp;
+    game->player.expToNext = s->expToNext;
+
+    if (World_HasComponents(&gw->ecs, e, COMP_HIT_FLASH)) {
+        game->player.ent.hitFlashTimer = World_GetHitFlash(&gw->ecs, e)->timer;
+    }
+}
+
+void SyncGameWorldFromGame(Game* game) {
+    GameWorld* gw = &game->ecsWorld;
+    gw->map = game->map;
+    gw->currentFloor = game->currentFloor;
+    gw->maxFloors = game->maxFloors;
+    gw->state = game->state;
+    gw->camera = game->camera;
+    gw->animTimer = game->animTimer;
+    gw->animDuration = game->animDuration;
+    gw->monsterAnimTimer = game->monsterAnimTimer;
+    gw->monsterAnimDuration = game->monsterAnimDuration;
+    gw->levelUpTimer = game->levelUpTimer;
+    gw->projectile = game->projectile;
+    gw->projectileTimer = game->projectileTimer;
+    gw->projectileDuration = game->projectileDuration;
+    gw->selectedMonsterEntity = game->selectedMonsterEntity;
+    gw->combatLog = game->combatLog;
+    memcpy(gw->tilesetTextures, game->tilesetTextures, sizeof(gw->tilesetTextures));
+    memcpy(gw->visibility, game->visibility, sizeof(gw->visibility));
+    memcpy(gw->blocking, game->blocking, sizeof(gw->blocking));
+    SyncPlayerToEcs(game);
+}
 
 // UI scaling helper function
 float GetUIScale(void) {
@@ -226,28 +322,7 @@ void HandleInput(Game* game) {
                                 game->player.ent.hp = game->player.ent.maxHp;
                         }
                         game->equipped[(int)slot] = EQUIP_NONE;
-                        // Place on map at player position
-                        {
-                            bool stacked = false;
-                            for (int e = 0; e < game->equipMapCount; e++) {
-                                if (game->equipMapCollected[e]) continue;
-                                if (game->equipMapTiles[e][0] == game->player.ent.x &&
-                                    game->equipMapTiles[e][1] == game->player.ent.y &&
-                                    game->equipMapTypes[e] == oldType) {
-                                    game->equipMapQuantities[e]++;
-                                    stacked = true;
-                                    break;
-                                }
-                            }
-                            if (!stacked && game->equipMapCount < MAX_EQUIP_ON_MAP) {
-                                game->equipMapTiles[game->equipMapCount][0] = game->player.ent.x;
-                                game->equipMapTiles[game->equipMapCount][1] = game->player.ent.y;
-                                game->equipMapCollected[game->equipMapCount] = false;
-                                game->equipMapTypes[game->equipMapCount] = oldType;
-                                game->equipMapQuantities[game->equipMapCount] = 1;
-                                game->equipMapCount++;
-                            }
-                        }
+                        SpawnerSystem_AddEquipAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, oldType, 1);
                         CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", data ? data->name : "item");
                     }
                     game->invSubState = INV_BROWSE;
@@ -325,26 +400,7 @@ void HandleInput(Game* game) {
                             const EquipData* d = GetEquipData(eType);
                             RemoveEquipFromInventory(game, equipIdx);
                             if (d) {
-                                // Place on map at player position (stack same type)
-                                bool stacked = false;
-                                for (int e = 0; e < game->equipMapCount; e++) {
-                                    if (game->equipMapCollected[e]) continue;
-                                    if (game->equipMapTiles[e][0] == game->player.ent.x &&
-                                        game->equipMapTiles[e][1] == game->player.ent.y &&
-                                        game->equipMapTypes[e] == eType) {
-                                        game->equipMapQuantities[e]++;
-                                        stacked = true;
-                                        break;
-                                    }
-                                }
-                                if (!stacked && game->equipMapCount < MAX_EQUIP_ON_MAP) {
-                                    game->equipMapTiles[game->equipMapCount][0] = game->player.ent.x;
-                                    game->equipMapTiles[game->equipMapCount][1] = game->player.ent.y;
-                                    game->equipMapCollected[game->equipMapCount] = false;
-                                    game->equipMapTypes[game->equipMapCount] = eType;
-                                    game->equipMapQuantities[game->equipMapCount] = 1;
-                                    game->equipMapCount++;
-                                }
+                                SpawnerSystem_AddEquipAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, eType, 1);
                                 CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", d->name);
                             }
                             game->invSubState = INV_BROWSE;
@@ -368,25 +424,7 @@ void HandleInput(Game* game) {
                             InventorySlot* slot = &game->inventory[game->inventorySelection];
                             ItemType type = slot->type;
                             slot->quantity--;
-                            bool stacked = false;
-                            for (int p = 0; p < game->potionCount; p++) {
-                                if (game->potionCollected[p]) continue;
-                                if (game->potionTiles[p][0] == game->player.ent.x &&
-                                    game->potionTiles[p][1] == game->player.ent.y &&
-                                    game->potionTypes[p] == type) {
-                                    game->potionQuantities[p]++;
-                                    stacked = true;
-                                    break;
-                                }
-                            }
-                            if (!stacked && game->potionCount < MAX_POTIONS) {
-                                game->potionTiles[game->potionCount][0] = game->player.ent.x;
-                                game->potionTiles[game->potionCount][1] = game->player.ent.y;
-                                game->potionCollected[game->potionCount] = false;
-                                game->potionTypes[game->potionCount] = type;
-                                game->potionQuantities[game->potionCount] = 1;
-                                game->potionCount++;
-                            }
+                            SpawnerSystem_AddPotionAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, type, 1);
                             CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", GetItemName(type));
                             if (slot->quantity <= 0) {
                                 for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
@@ -401,25 +439,7 @@ void HandleInput(Game* game) {
                             ItemType type = slot->type;
                             int total = slot->quantity;
                             slot->quantity = 0;
-                            bool stacked = false;
-                            for (int p = 0; p < game->potionCount; p++) {
-                                if (game->potionCollected[p]) continue;
-                                if (game->potionTiles[p][0] == game->player.ent.x &&
-                                    game->potionTiles[p][1] == game->player.ent.y &&
-                                    game->potionTypes[p] == type) {
-                                    game->potionQuantities[p] += total;
-                                    stacked = true;
-                                    break;
-                                }
-                            }
-                            if (!stacked && game->potionCount < MAX_POTIONS) {
-                                game->potionTiles[game->potionCount][0] = game->player.ent.x;
-                                game->potionTiles[game->potionCount][1] = game->player.ent.y;
-                                game->potionCollected[game->potionCount] = false;
-                                game->potionTypes[game->potionCount] = type;
-                                game->potionQuantities[game->potionCount] = total;
-                                game->potionCount++;
-                            }
+                            SpawnerSystem_AddPotionAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, type, total);
                             CombatLog_Add(&game->combatLog, BLACK, "Dropped %d x %s", total, GetItemName(type));
                             for (int i = game->inventorySelection; i < game->inventorySlotCount - 1; i++)
                                 game->inventory[i] = game->inventory[i + 1];
@@ -471,22 +491,29 @@ void HandleInput(Game* game) {
                 int ny = endY + dy;
                 if (nx < 0 || nx >= game->map->width || ny < 0 || ny >= game->map->height) break;
                 if (game->blocking[ny][nx]) break;
-                if (Monster_GetAt(nx, ny, NULL)) break;
+                if (World_FindMonsterAt(&game->ecsWorld, nx, ny, ENTITY_NONE) != ENTITY_NONE) break;
                 endX = nx;
                 endY = ny;
             }
 
             int steps = abs(endX - startX) + abs(endY - startY);
             if (steps > 0) {
-                Monster* monArray = Monster_GetArray();
-                int monCount = Monster_GetCount();
-                typedef struct { int x, y; float hitFlash; } MonSnap;
+                typedef struct { EntityId id; int prevX, prevY; float hitFlash; } MonSnap;
                 MonSnap monSnap[64];
-                int snapCount = monCount < 64 ? monCount : 64;
-                for (int i = 0; i < snapCount; i++) {
-                    monSnap[i].x = monArray[i].x;
-                    monSnap[i].y = monArray[i].y;
-                    monSnap[i].hitFlash = monArray[i].hitFlashTimer;
+                int snapCount = 0;
+                SyncGameWorldFromGame(game);
+                for (EntityId e = 1; e < (EntityId)game->ecsWorld.ecs.count && snapCount < 64; e++) {
+                    if (!game->ecsWorld.ecs.alive[e]) continue;
+                    if (!World_HasComponents(&game->ecsWorld.ecs, e, COMP_POSITION | COMP_STATS | COMP_AI)) continue;
+                    CStats* ms = World_GetStats(&game->ecsWorld.ecs, e);
+                    if (!ms->alive) continue;
+                    CPosition* mp = World_GetPosition(&game->ecsWorld.ecs, e);
+                    monSnap[snapCount].id = e;
+                    monSnap[snapCount].prevX = mp->x;
+                    monSnap[snapCount].prevY = mp->y;
+                    monSnap[snapCount].hitFlash = World_HasComponents(&game->ecsWorld.ecs, e, COMP_HIT_FLASH)
+                        ? World_GetHitFlash(&game->ecsWorld.ecs, e)->timer : 0.0f;
+                    snapCount++;
                 }
 
                 game->player.ent.prevX = startX;
@@ -494,7 +521,7 @@ void HandleInput(Game* game) {
                 game->player.ent.x = startX;
                 game->player.ent.y = startY;
                 if (sprintDir != DIR_NONE) game->player.ent.facingDir = sprintDir;
-                game->selectedMonsterIdx = -1;
+                game->selectedMonsterEntity = ENTITY_NONE;
 
                 for (int s = 0; s < steps; s++) {
                     int nx = game->player.ent.x + dx;
@@ -502,7 +529,7 @@ void HandleInput(Game* game) {
 
                     if (nx < 0 || nx >= game->map->width || ny < 0 || ny >= game->map->height) break;
                     if (game->blocking[ny][nx]) break;
-                    if (Monster_GetAt(nx, ny, NULL)) break;
+                    if (World_FindMonsterAt(&game->ecsWorld, nx, ny, ENTITY_NONE) != ENTITY_NONE) break;
 
                     if (IsInRoom(game->player.ent.x, game->player.ent.y) != IsInRoom(nx, ny)) {
                         if (game->sprintBypassRoom) {
@@ -519,7 +546,9 @@ void HandleInput(Game* game) {
                     game->turnCount++;
 
                     int hpBefore = game->player.ent.hp;
-                    bool alive = Monster_ProcessAllAI(game, game->timeWaited);
+                    SyncGameWorldFromGame(game);
+                    bool alive = AISystem_ProcessAll(&game->ecsWorld, game->timeWaited);
+                    SyncPlayerFromEcs(game);
 
                     if (!alive) {
                         game->state = STATE_GAME_OVER;
@@ -534,7 +563,7 @@ void HandleInput(Game* game) {
                     {
                         ItemType pTypes[MAX_POTIONS];
                         int pQtys[MAX_POTIONS];
-                        int pCount = SpawnerSystem_CollectPickupsAt(game->ecsWorld, game->player.ent.x, game->player.ent.y, pTypes, pQtys, MAX_POTIONS);
+                        int pCount = SpawnerSystem_CollectPickupsAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, pTypes, pQtys, MAX_POTIONS);
                         for (int i = 0; i < pCount; i++) {
                             int picked = 0;
                             for (int q = 0; q < pQtys[i]; q++) {
@@ -553,7 +582,7 @@ void HandleInput(Game* game) {
                     {
                         EquipType eTypes[MAX_EQUIP_ON_MAP];
                         int eQtys[MAX_EQUIP_ON_MAP];
-                        int eCount = SpawnerSystem_CollectEquipAt(game->ecsWorld, game->player.ent.x, game->player.ent.y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
+                        int eCount = SpawnerSystem_CollectEquipAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
                         for (int i = 0; i < eCount; i++) {
                             int picked = 0;
                             for (int q = 0; q < eQtys[i]; q++) {
@@ -565,6 +594,7 @@ void HandleInput(Game* game) {
                                 TraceLog(LOG_INFO, "Picked up %s", d ? d->name : "equipment");
                                 CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
                                 PlayPickupSound();
+                                SpawnerSystem_ReduceEquipAt(&game->ecsWorld, game->player.ent.x, game->player.ent.y, eTypes[i], picked);
                             }
                         }
                     }
@@ -573,9 +603,12 @@ void HandleInput(Game* game) {
                 if (!stoppedAtRoom) game->sprintBypassRoom = false;
 
                 for (int i = 0; i < snapCount; i++) {
-                    monArray[i].prevX = monSnap[i].x;
-                    monArray[i].prevY = monSnap[i].y;
-                    monArray[i].hitFlashTimer = monSnap[i].hitFlash;
+                    CPosition* mp = World_GetPosition(&game->ecsWorld.ecs, monSnap[i].id);
+                    mp->prevX = monSnap[i].prevX;
+                    mp->prevY = monSnap[i].prevY;
+                    if (World_HasComponents(&game->ecsWorld.ecs, monSnap[i].id, COMP_HIT_FLASH)) {
+                        World_GetHitFlash(&game->ecsWorld.ecs, monSnap[i].id)->timer = monSnap[i].hitFlash;
+                    }
                 }
 
                 game->animTimer = 0.30f;
@@ -616,14 +649,14 @@ void HandleInput(Game* game) {
         game->player.ent.facingDir = dir;
         if (ctrlHeld) {
             // Ctrl + direction: just face that way, no turn cost
-            game->selectedMonsterIdx = -1;
+            game->selectedMonsterEntity = ENTITY_NONE;
         } else {
             game->sprintBypassRoom = false;
             int oldX = game->player.ent.x;
             int oldY = game->player.ent.y;
             bool moved = MoveEntity(game, &game->player.ent, dir);
             if (moved) {
-                game->selectedMonsterIdx = -1;
+                game->selectedMonsterEntity = ENTITY_NONE;
                 game->turnCount++;
                 game->enemyTurnCooldown = 0.15f;
                 if (game->player.ent.x != oldX || game->player.ent.y != oldY) {
@@ -666,37 +699,13 @@ void HandleInput(Game* game) {
             case DIR_RIGHT: tx++; break;
             default: break;
         }
-        Monster* mon = Monster_GetAt(tx, ty, NULL);
-        if (mon && mon->alive) {
-            // Monster dodge
-            int dodgePct = mon->dex * 2;
-            if (dodgePct > 60) dodgePct = 60;
-            if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
-                game->player.ent.hitFlashTimer = 0.15f;
-                CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", mon->name);
-            } else {
-                int damage = game->player.ent.attack + game->player.ent.str * 2 - mon->defense;
-                if (damage < 1) damage = 1;
-                if (GetRandomValue(1, 100) <= game->player.ent.lck) {
-                    damage = damage * 2;
-                    if (damage < 1) damage = 1;
-                    CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
-                }
-                mon->hp -= damage;
-                PlayHitSound();
-                CombatLog_Add(&game->combatLog, BLACK, "You hit %s for %d!", mon->name, damage);
-                if (mon->hp <= 0) {
-                    mon->alive = false;
-                    mon->hp = 0;
-                    GainExperience(game, mon->expValue);
-                    CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", mon->name, mon->expValue);
-                }
-            }
+        SyncGameWorldFromGame(game);
+        if (CombatSystem_PlayerMeleeAttack(&game->ecsWorld, game, &game->player.ent, tx, ty)) {
             game->turnCount++;
             game->enemyTurnCooldown = 0.15f;
             game->state = STATE_ENEMY_TURN;
             game->sprintBypassRoom = false;
-            game->selectedMonsterIdx = -1;
+            game->selectedMonsterEntity = ENTITY_NONE;
         } else {
             CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to attack there");
         }
@@ -719,20 +728,11 @@ void HandleInput(Game* game) {
             game->selectedPotionTileX = tx;
             game->selectedPotionTileY = ty;
             game->selectedPotionTileActive = true;
-            // Also check for monster
-            Monster* mon = Monster_GetAt(tx, ty, NULL);
-            if (mon && mon->alive) {
-                Monster* arr = Monster_GetArray();
-                int count = Monster_GetCount();
-                game->selectedMonsterIdx = -1;
-                for (int i = 0; i < count; i++) {
-                    if (&arr[i] == mon) {
-                        game->selectedMonsterIdx = i;
-                        break;
-                    }
-                }
+            EntityId mon = World_FindMonsterAt(&game->ecsWorld, tx, ty, ENTITY_NONE);
+            if (mon != ENTITY_NONE && World_GetStats(&game->ecsWorld.ecs, mon)->alive) {
+                game->selectedMonsterEntity = mon;
             } else {
-                game->selectedMonsterIdx = -1;
+                game->selectedMonsterEntity = ENTITY_NONE;
             }
         }
     }
@@ -796,7 +796,7 @@ void UpdateGame(Game* game) {
         if (game->levelUpTimer < 0.0f) game->levelUpTimer = 0.0f;
     }
 
-    Monster_UpdateAnimations(GetFrameTime());
+    World_UpdateMonsterAnimations(&game->ecsWorld, GetFrameTime());
 
     if (game->state == STATE_GAME_OVER || game->state == STATE_WIN) return;
 
@@ -815,7 +815,9 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        bool playerAlive = Monster_ProcessAllAI(game, game->timeWaited);
+        SyncGameWorldFromGame(game);
+        bool playerAlive = AISystem_ProcessAll(&game->ecsWorld, game->timeWaited);
+        SyncPlayerFromEcs(game);
 
         if (!playerAlive) {
             game->player.ent.alive = false;
@@ -824,7 +826,7 @@ void UpdateGame(Game* game) {
             return;
         }
 
-        if (Monster_GetCount() > 0 && Monster_AreAllDead()) {
+        if (World_CountAliveMonsters(&game->ecsWorld) > 0 && World_AreAllMonstersDead(&game->ecsWorld)) {
             if (game->currentFloor >= game->maxFloors) {
                 if (!game->escapeSpawned) {
                     SpawnEscapeTile(game);
@@ -868,9 +870,6 @@ void DescendFloor(Game* game) {
     int savedEquipInvCount = game->equipInventoryCount;
     memcpy(savedEquipInventory, game->equipInventory, sizeof(savedEquipInventory));
 
-    Monster_UnloadSprites();
-    Monster_ResetAll();
-
     if (game->map) {
         UnloadTMX(game->map);
     }
@@ -881,8 +880,9 @@ void DescendFloor(Game* game) {
     game->player = savedPlayer;
     memcpy(game->inventory, savedInventory, sizeof(savedInventory));
     game->inventorySlotCount = savedInvCount;
-    game->selectedMonsterIdx = -1;
+    game->selectedMonsterEntity = ENTITY_NONE;
     game->currentFloor = floor;
+    GameWorld_Init(&game->ecsWorld);
     game->maxFloors = 10;
     {
         Texture2D* t = Resources_LoadTexture("resources/sprites/player.png");
@@ -970,13 +970,14 @@ void DescendFloor(Game* game) {
 
     ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
     int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
+    SyncGameWorldFromGame(game);
     if (spawnRoomCount > 0) {
-        Spawner_Populate(game, spawnRooms, spawnRoomCount);
+        SpawnerSystem_SpawnMonsters(&game->ecsWorld, spawnRooms, spawnRoomCount,
+                                    game->player.ent.x, game->player.ent.y);
     }
-
-    if (game->ecsWorld) SpawnerSystem_SpawnPickups(game->ecsWorld, game);
-
-    Monster_LoadSprites();
+    SpawnerSystem_SpawnPickups(&game->ecsWorld, spawnRooms, spawnRoomCount,
+                               game->player.ent.x, game->player.ent.y,
+                               game->currentFloor, game->player.ent.lck);
 
     game->stairX = GetStairX();
     game->stairY = GetStairY();
@@ -1008,6 +1009,8 @@ void DescendFloor(Game* game) {
     game->camera.rotation = 0;
     game->camera.zoom = 4.0f;
 
+    SyncGameWorldFromGame(game);
+
     char floorMsg[64];
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
     CombatLog_Add(&game->combatLog, BLACK, floorMsg);
@@ -1017,6 +1020,7 @@ void DescendFloor(Game* game) {
 bool InitGame(Game* game, const char* tmxFile) {
     if (!game) return false;
     memset(game, 0, sizeof(Game));
+    GameWorld_Init(&game->ecsWorld);
 
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
@@ -1131,15 +1135,17 @@ bool InitGame(Game* game, const char* tmxFile) {
 
     ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
     int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
+
+    SyncGameWorldFromGame(game);
     if (spawnRoomCount > 0) {
-        Spawner_Populate(game, spawnRooms, spawnRoomCount);
+        SpawnerSystem_SpawnMonsters(&game->ecsWorld, spawnRooms, spawnRoomCount,
+                                    game->player.ent.x, game->player.ent.y);
     }
+    SpawnerSystem_SpawnPickups(&game->ecsWorld, spawnRooms, spawnRoomCount,
+                               game->player.ent.x, game->player.ent.y,
+                               game->currentFloor, game->player.ent.lck);
 
-    if (game->ecsWorld) SpawnerSystem_SpawnPickups(game->ecsWorld, game);
-
-    Monster_LoadSprites();
-
-    game->selectedMonsterIdx = -1;
+    game->selectedMonsterEntity = ENTITY_NONE;
     game->timeWaited = 0;
     game->escapeSpawned = false;
     game->maxFloors = 10;
@@ -1169,14 +1175,12 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->camera.rotation = 0;
     game->camera.zoom = 4.0f;
 
+    SyncGameWorldFromGame(game);
     return true;
 }
 
 void CleanupGame(Game* game) {
     if (!game) return;
-
-    Monster_UnloadSprites();
-    Monster_ResetAll();
 
     Resources_UnloadAll();
 

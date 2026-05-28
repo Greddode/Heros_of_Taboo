@@ -11,11 +11,12 @@
 #include "tmx/tmx.h"
 #include "entity/entity.h"
 #include "entity/player.h"
-#include "entity/monster.h"
+#include "data/monster_data.h"
 #include "ui/combat_log.h"
 #include "inventory.h"
 #include "renderer.h"
 #include "map_helpers.h"
+#include "world.h"
 
 float GetUIScale(void);
 void SetGuiScale(float scale);
@@ -37,11 +38,6 @@ typedef struct Game {
 
     CombatLog combatLog;
 
-    int potionCount;
-    int potionTiles[MAX_POTIONS][2];
-    bool potionCollected[MAX_POTIONS];
-    ItemType potionTypes[MAX_POTIONS];
-    int potionQuantities[MAX_POTIONS];
     int selectedPotionTileX;
     int selectedPotionTileY;
     bool selectedPotionTileActive;
@@ -69,12 +65,6 @@ typedef struct Game {
     EquipType equipInventory[MAX_INVENTORY_SLOTS];
     int equipInventoryCount;
 
-    int equipMapCount;
-    int equipMapTiles[MAX_EQUIP_ON_MAP][2];
-    bool equipMapCollected[MAX_EQUIP_ON_MAP];
-    EquipType equipMapTypes[MAX_EQUIP_ON_MAP];
-    int equipMapQuantities[MAX_EQUIP_ON_MAP];
-
     int currentFloor;
     int maxFloors;
     int stairX;
@@ -83,7 +73,7 @@ typedef struct Game {
     bool escapeSpawned;
 
     int timeWaited;
-    int selectedMonsterIdx;
+    EntityId selectedMonsterEntity;
 
     int escapeX;
     int escapeY;
@@ -102,10 +92,11 @@ typedef struct Game {
 
     float levelUpTimer;
 
-    // Transition shim: pointer to ECS world (set by caller, used by bridge functions)
-    struct GameWorld* ecsWorld;
+    // ECS world (pickups, monsters when migrated, player entity)
+    GameWorld ecsWorld;
 } Game;
 
+void SyncGameWorldFromGame(Game* game);
 bool InitGame(Game* game, const char* tmxFile);
 void CleanupGame(Game* game);
 void HandleInput(Game* game);

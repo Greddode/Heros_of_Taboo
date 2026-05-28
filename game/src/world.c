@@ -5,5 +5,5 @@ void GameWorld_Init(GameWorld* gw) {
     memset(gw, 0, sizeof(GameWorld));
     World_Init(&gw->ecs);
     gw->playerEntity = ENTITY_NONE;
-    gw->selectedMonsterIdx = -1;
+    gw->selectedMonsterEntity = ENTITY_NONE;
 }

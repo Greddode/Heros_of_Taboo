@@ -32,8 +32,6 @@ static const char* ITEM_SPRITES[ITEM_COUNT] = {
     "resources/sprites/items/health_potions/large_health_potion.png"
 };
 
-static Texture2D s_equipSprites[EQUIP_COUNT]; // one per EquipType, [0] = empty
-
 // ---- Equipment data table --------------------------------------------------
 static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     // NONE
@@ -137,9 +135,10 @@ bool InventoryUse(Game* game, int slot) {
     return true;
 }
 
-Texture2D GetEquipSprite(EquipType type) {
-    if (type < 0 || type >= EQUIP_COUNT) return (Texture2D){ 0 };
-    return s_equipSprites[type];
+Texture2D* Inventory_LoadEquipTexture(EquipType type) {
+    const EquipData* d = GetEquipData(type);
+    if (!d || !d->spritePath || d->spritePath[0] == '\0') return NULL;
+    return Resources_LoadTexture(d->spritePath);
 }
 
 void LoadPotionTextures(Game* game) {
@@ -160,21 +159,6 @@ void LoadPotionTextures(Game* game) {
     {
         Texture2D* t = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameMarker01a.png");
         if (t) game->texUiMarker = *t;
-    }
-
-    // Load equipment sprites
-    for (int i = 0; i < EQUIP_COUNT; i++) {
-        s_equipSprites[i] = (Texture2D){ 0 };
-        const EquipData* d = GetEquipData((EquipType)i);
-        if (d && d->spritePath) {
-            Texture2D* t = Resources_LoadTexture(d->spritePath);
-            if (t) {
-                s_equipSprites[i] = *t;
-                if (s_equipSprites[i].id == 0) {
-                    TraceLog(LOG_WARNING, "Could not load equip sprite: %s", d->spritePath);
-                }
-            }
-        }
     }
 
     {

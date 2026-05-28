@@ -1,6 +1,7 @@
 #include "spawner_system.h"
-#include "core/game.h"
-#include "entity/monster.h"
+#include "data/loot_data.h"
+#include "data/monster_data.h"
+#include "world_monster.h"
 #include "resources.h"
 #include <stdlib.h>
 #include <string.h>
@@ -14,16 +15,118 @@ static int DistSq(int ax, int ay, int bx, int by) {
     return dx * dx + dy * dy;
 }
 
-void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int roomCount) {
+EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int y, int floor) {
+    const MonsterTemplate* tpl = Monster_GetTemplate(type);
+    if (!tpl || !gw) return ENTITY_NONE;
+
+    EntityId e = World_CreateEntity(&gw->ecs);
+    if (e == ENTITY_NONE) return ENTITY_NONE;
+
+    World_AddComponent(&gw->ecs, e, COMP_POSITION);
+    CPosition* pos = World_GetPosition(&gw->ecs, e);
+    pos->x = x;
+    pos->y = y;
+    pos->prevX = x;
+    pos->prevY = y;
+    pos->facingDir = DIR_DOWN;
+
+    float scale = powf(1.12f, (float)floor);
+    int str = (int)(tpl->str * scale);
+    int con = (int)(tpl->con * scale);
+    int lck = (int)(tpl->lck * scale);
+
+    World_AddComponent(&gw->ecs, e, COMP_STATS);
+    CStats* s = World_GetStats(&gw->ecs, e);
+    s->str = str;
+    s->dex = (int)(tpl->dex * scale);
+    s->intel = (int)(tpl->intel * scale);
+    s->con = con;
+    s->lck = lck;
+    s->maxHp = (int)(tpl->hp * scale) + con * 5;
+    s->hp = s->maxHp;
+    s->attack = (int)(tpl->attack * scale);
+    s->defense = (int)(tpl->defense * scale) + con / 2;
+    s->level = tpl->level + floor * GetRandomValue(1, 3);
+    if (s->level < 1) s->level = 1;
+    s->expValue = (int)(tpl->expValue * scale) + lck * 3;
+    s->alive = true;
+    s->statPoints = 0;
+    s->exp = 0;
+    s->expToNext = 0;
+
+    World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
+    CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
+    spr->tex = (tpl->spritePath && tpl->frameCount > 0) ? Resources_LoadTexture(tpl->spritePath) : NULL;
+    spr->row = 0;
+    spr->frame = 0;
+    spr->frameCount = tpl->frameCount;
+    spr->animTimer = 0;
+    spr->animSpeed = tpl->animSpeed;
+
+    World_AddComponent(&gw->ecs, e, COMP_AI);
+    CAI* ai = World_GetAI(&gw->ecs, e);
+    ai->type = type;
+    ai->attackType = tpl->attackType;
+    ai->attackRange = tpl->attackRange;
+    ai->detectionRange = tpl->detectionRange;
+    ai->lastSeenX = -1;
+    ai->lastSeenY = -1;
+    ai->huntTurns = 0;
+    ai->shadowTurnCounter = 0;
+
+    World_AddComponent(&gw->ecs, e, COMP_NAME);
+    CName* n = World_GetName(&gw->ecs, e);
+    strncpy(n->name, tpl->name, sizeof(n->name) - 1);
+    n->name[sizeof(n->name) - 1] = '\0';
+
+    World_AddComponent(&gw->ecs, e, COMP_FALLBACK_COLOR);
+    World_GetColor(&gw->ecs, e)->color = tpl->color;
+
+    World_AddComponent(&gw->ecs, e, COMP_HIT_FLASH);
+    World_GetHitFlash(&gw->ecs, e)->timer = 0;
+
+    return e;
+}
+
+EntityId SpawnerSystem_SpawnByTypeName(GameWorld* gw, const char* tmxTypeName, int x, int y, int floor) {
+    MonsterType type = Monster_FindTypeByTmxName(tmxTypeName);
+    if (type >= MONSTER_TYPE_COUNT) return ENTITY_NONE;
+    return SpawnerSystem_SpawnMonster(gw, type, x, y, floor);
+}
+
+void SpawnerSystem_ConfigureShadow(GameWorld* gw, EntityId shadow, int playerLevel) {
+    if (!gw || shadow == ENTITY_NONE) return;
+    if (!World_HasComponents(&gw->ecs, shadow, COMP_STATS | COMP_AI)) return;
+
+    int targetLevel = playerLevel * 2;
+    if (targetLevel < 10) targetLevel = 10;
+
+    float scale = powf(1.12f, (float)(targetLevel - 1));
+    CStats* s = World_GetStats(&gw->ecs, shadow);
+    s->str = (int)(4 * scale);
+    s->dex = (int)(6 * scale);
+    s->intel = (int)(2 * scale);
+    s->con = (int)(3 * scale);
+    s->lck = (int)(5 * scale);
+    s->level = targetLevel;
+    s->maxHp = 10 + s->con * 5;
+    s->hp = s->maxHp;
+    s->attack = 4 + s->str * 2;
+    s->defense = 1 + s->con / 2;
+    s->expValue = 10 + s->lck * 3;
+
+    CAI* ai = World_GetAI(&gw->ecs, shadow);
+    ai->shadowTurnCounter = 0;
+}
+
+void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int roomCount,
+                                 int playerX, int playerY) {
     if (!gw || !gw->map || roomCount == 0) return;
 
     int* tiles = gw->map->layers[0].data;
     int w = gw->map->width;
-    int h = gw->map->height;
-
-    CPosition* playerPos = World_GetPosition(&gw->ecs, gw->playerEntity);
-    int px = playerPos->x;
-    int py = playerPos->y;
+    int px = playerX;
+    int py = playerY;
     int minDist = MIN_PLAYER_DIST * MIN_PLAYER_DIST;
 
     #define ROOM_MAX_FLOORS 256
@@ -55,18 +158,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 
             if (DistSq(mx, my, px, py) < minDist) continue;
 
-            // Check if any monster already at this tile
-            bool occupied = false;
-            for (EntityId check = 1; check < (EntityId)gw->ecs.count; check++) {
-                if (!gw->ecs.alive[check]) continue;
-                if (!World_HasComponents(&gw->ecs, check, COMP_POSITION | COMP_STATS)) continue;
-                if (World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
-                if (!World_HasComponents(&gw->ecs, check, COMP_AI)) continue;
-                if (World_GetAI(&gw->ecs, check)->type == 0) continue;
-                CPosition* cp = World_GetPosition(&gw->ecs, check);
-                if (cp->x == mx && cp->y == my) { occupied = true; break; }
-            }
-            if (occupied) continue;
+            if (World_FindMonsterAt(gw, mx, my, ENTITY_NONE) != ENTITY_NONE) continue;
 
             MonsterType type = MONSTER_BAT;
             float totalWeight = 0;
@@ -93,127 +185,117 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
                 }
             }
 
-            const MonsterTemplate* tpl = Monster_GetTemplate(type);
-            if (!tpl) continue;
+            SpawnerSystem_SpawnMonster(gw, type, mx, my, floor);
+        }
+    }
+
+    #undef ROOM_MAX_FLOORS
+
+    TraceLog(LOG_INFO, "Spawner: %d monsters placed", World_CountAliveMonsters(gw));
+}
+
+void SpawnerSystem_SpawnPickups(GameWorld* gw, const ProceduralRoom* rooms, int roomCount,
+                                int playerX, int playerY, int currentFloor, int playerLck) {
+    if (!gw || !gw->map || roomCount == 0) return;
+
+    int* tiles = gw->map->layers[0].data;
+    int w = gw->map->width;
+    int minDist = MIN_PLAYER_DIST * MIN_PLAYER_DIST;
+
+    #define ROOM_MAX_FLOORS 256
+
+    for (int r = 0; r < roomCount; r++) {
+        int floorTiles[ROOM_MAX_FLOORS];
+        int floorCount = 0;
+
+        for (int y = rooms[r].y; y < rooms[r].y + rooms[r].h; y++)
+            for (int x = rooms[r].x; x < rooms[r].x + rooms[r].w; x++)
+                if (IsFloorGID(tiles[y * w + x]) && tiles[y * w + x] != TILE_STAIRS && floorCount < ROOM_MAX_FLOORS)
+                    floorTiles[floorCount++] = y * w + x;
+
+        if (floorCount < 4) continue;
+
+        for (int i = floorCount - 1; i > 0; i--) {
+            int j = GetRandomValue(0, i);
+            int t = floorTiles[i]; floorTiles[i] = floorTiles[j]; floorTiles[j] = t;
+        }
+
+        int lootSlots = (floorCount >= 60) ? 2 : 1;
+        for (int li = 0; li < lootSlots; li++) {
+            int fi = floorCount - 1 - li;
+            if (fi < 0) break;
+            int lx = floorTiles[fi] % w;
+            int ly = floorTiles[fi] / w;
+            if (DistSq(lx, ly, playerX, playerY) < minDist) continue;
+
+            int tierMinFloor[4] = { 1, 1, 4, 6 };
+            float tierWeights[4] = { 0, 0, 0, 0 };
+            for (int te = 0; te < (int)LOOT_TABLE_COUNT; te++) {
+                const LootEntry* entry = &LOOT_TABLE[te];
+                int ti = entry->tier - 1;
+                if (currentFloor < tierMinFloor[ti]) continue;
+                float luckBonus = (float)playerLck * 2.0f * (float)(ti + 1);
+                float floorBonus = (float)currentFloor * 3.0f * (float)(ti + 1);
+                float effectiveWeight = (float)entry->baseWeight + luckBonus + floorBonus;
+                if (effectiveWeight < 0) effectiveWeight = 0;
+                tierWeights[ti] += effectiveWeight;
+            }
+
+            float tierTotal = tierWeights[0] + tierWeights[1] + tierWeights[2] + tierWeights[3];
+            if (tierTotal <= 0) continue;
+
+            float tierRoll = (float)GetRandomValue(0, (int)(tierTotal * 100)) / 100.0f;
+            int chosenTier = 0;
+            float accTier = 0;
+            for (int ti = 0; ti < 4; ti++) {
+                accTier += tierWeights[ti];
+                if (tierRoll <= accTier) { chosenTier = ti + 1; break; }
+            }
+            if (chosenTier == 0) chosenTier = 1;
+
+            int tierEntryCount = 0;
+            int tierEntryIndices[32];
+            float tierEntryBaseWeights[32];
+            float tierEntryTotal = 0;
+            for (int te = 0; te < (int)LOOT_TABLE_COUNT; te++) {
+                if (LOOT_TABLE[te].tier == chosenTier && tierEntryCount < 32) {
+                    tierEntryIndices[tierEntryCount] = te;
+                    float fw = (float)LOOT_TABLE[te].baseWeight;
+                    tierEntryBaseWeights[tierEntryCount] = fw;
+                    tierEntryTotal += fw;
+                    tierEntryCount++;
+                }
+            }
+            if (tierEntryCount == 0) continue;
+
+            float itemRoll = (float)GetRandomValue(0, (int)(tierEntryTotal * 100)) / 100.0f;
+            float accItem = 0;
+            int chosenEntryIdx = 0;
+            for (int te = 0; te < tierEntryCount; te++) {
+                accItem += tierEntryBaseWeights[te];
+                if (itemRoll <= accItem) { chosenEntryIdx = tierEntryIndices[te]; break; }
+            }
+
+            const LootEntry* chosen = &LOOT_TABLE[chosenEntryIdx];
 
             EntityId e = World_CreateEntity(&gw->ecs);
             if (e == ENTITY_NONE) continue;
 
             World_AddComponent(&gw->ecs, e, COMP_POSITION);
             CPosition* pos = World_GetPosition(&gw->ecs, e);
-            pos->x = mx; pos->y = my;
-            pos->prevX = mx; pos->prevY = my;
-            pos->facingDir = DIR_DOWN;
+            pos->x = lx; pos->y = ly;
+            pos->prevX = lx; pos->prevY = ly;
 
-            float scale = powf(1.12f, (float)floor);
-            int str = (int)(tpl->str * scale);
-            int con = (int)(tpl->con * scale);
-            int lck = (int)(tpl->lck * scale);
-
-            World_AddComponent(&gw->ecs, e, COMP_STATS);
-            CStats* s = World_GetStats(&gw->ecs, e);
-            s->str = str;
-            s->dex = (int)(tpl->dex * scale);
-            s->intel = (int)(tpl->intel * scale);
-            s->con = con;
-            s->lck = lck;
-            s->maxHp = (int)(tpl->hp * scale) + con * 5;
-            s->hp = s->maxHp;
-            s->attack = (int)(tpl->attack * scale);
-            s->defense = (int)(tpl->defense * scale) + con / 2;
-            s->level = tpl->level + floor * GetRandomValue(1, 3);
-            if (s->level < 1) s->level = 1;
-            s->expValue = (int)(tpl->expValue * scale) + lck * 3;
-            s->alive = true;
-            s->statPoints = 0;
-            s->exp = 0; s->expToNext = 0;
-
-            World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
-            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-            spr->tex = (tpl->spritePath && tpl->frameCount > 0) ? Resources_LoadTexture(tpl->spritePath) : NULL;
-            spr->row = 0;
-            spr->frame = 0;
-            spr->frameCount = tpl->frameCount;
-            spr->animTimer = 0;
-            spr->animSpeed = tpl->animSpeed;
-
-            World_AddComponent(&gw->ecs, e, COMP_AI);
-            CAI* ai = World_GetAI(&gw->ecs, e);
-            ai->type = type;
-            ai->attackType = tpl->attackType;
-            ai->attackRange = tpl->attackRange;
-            ai->detectionRange = tpl->detectionRange;
-            ai->lastSeenX = -1;
-            ai->lastSeenY = -1;
-            ai->huntTurns = 0;
-            ai->shadowTurnCounter = 0;
-
-            World_AddComponent(&gw->ecs, e, COMP_NAME);
-            CName* n = World_GetName(&gw->ecs, e);
-            strncpy(n->name, tpl->name, sizeof(n->name) - 1);
-            n->name[sizeof(n->name) - 1] = '\0';
-
-            World_AddComponent(&gw->ecs, e, COMP_FALLBACK_COLOR);
-            CFallbackColor* col = World_GetColor(&gw->ecs, e);
-            col->color = tpl->color;
-
-            World_AddComponent(&gw->ecs, e, COMP_HIT_FLASH);
-            CHitFlash* hf = World_GetHitFlash(&gw->ecs, e);
-            hf->timer = 0;
+            World_AddComponent(&gw->ecs, e, COMP_PICKUP);
+            CPickup* pk = World_GetPickup(&gw->ecs, e);
+            pk->isEquip = (chosen->cat == LOOT_TYPE_EQUIP);
+            if (pk->isEquip) pk->equipType = (EquipType)chosen->typeId;
+            else pk->itemType = (ItemType)chosen->typeId;
+            pk->quantity = 1;
         }
     }
 
     #undef ROOM_MAX_FLOORS
-}
-
-void SpawnerSystem_SpawnPickups(GameWorld* gw, Game* game) {
-    if (!gw || !game) return;
-
-    // Spawn potion entities from old arrays
-    for (int i = 0; i < game->potionCount; i++) {
-        if (game->potionCollected[i]) continue;
-        if (game->potionQuantities[i] <= 0) continue;
-
-        int px = game->potionTiles[i][0];
-        int py = game->potionTiles[i][1];
-
-        EntityId e = World_CreateEntity(&gw->ecs);
-        if (e == ENTITY_NONE) continue;
-
-        World_AddComponent(&gw->ecs, e, COMP_POSITION);
-        CPosition* pos = World_GetPosition(&gw->ecs, e);
-        pos->x = px; pos->y = py;
-        pos->prevX = px; pos->prevY = py;
-
-        World_AddComponent(&gw->ecs, e, COMP_PICKUP);
-        CPickup* pk = World_GetPickup(&gw->ecs, e);
-        pk->isEquip = false;
-        pk->itemType = game->potionTypes[i];
-        pk->quantity = game->potionQuantities[i];
-    }
-
-    // Spawn equipment entities from old arrays
-    for (int i = 0; i < game->equipMapCount; i++) {
-        if (game->equipMapCollected[i]) continue;
-        if (game->equipMapQuantities[i] <= 0) continue;
-
-        int px = game->equipMapTiles[i][0];
-        int py = game->equipMapTiles[i][1];
-
-        EntityId e = World_CreateEntity(&gw->ecs);
-        if (e == ENTITY_NONE) continue;
-
-        World_AddComponent(&gw->ecs, e, COMP_POSITION);
-        CPosition* pos = World_GetPosition(&gw->ecs, e);
-        pos->x = px; pos->y = py;
-        pos->prevX = px; pos->prevY = py;
-
-        World_AddComponent(&gw->ecs, e, COMP_PICKUP);
-        CPickup* pk = World_GetPickup(&gw->ecs, e);
-        pk->isEquip = true;
-        pk->equipType = game->equipMapTypes[i];
-        pk->quantity = game->equipMapQuantities[i];
-    }
 }
 
 EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y) {
@@ -254,7 +336,121 @@ int SpawnerSystem_CollectEquipAt(GameWorld* gw, int x, int y, EquipType* outType
         if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->equipType;
             outQtys[found] = pk->quantity;
-            pk->quantity = 0;
+            found++;
+        }
+    }
+    return found;
+}
+
+void SpawnerSystem_ReduceEquipAt(GameWorld* gw, int x, int y, EquipType type, int amount) {
+    if (amount <= 0) return;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        if (pk->quantity > 0 && pk->isEquip && pk->equipType == type &&
+            p->x == x && p->y == y) {
+            pk->quantity -= amount;
+            if (pk->quantity < 0) pk->quantity = 0;
+            return;
+        }
+    }
+}
+
+static EntityId FindStackablePickup(GameWorld* gw, int x, int y, bool isEquip, int typeId) {
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        if (pk->quantity <= 0 || p->x != x || p->y != y || pk->isEquip != isEquip) continue;
+        if (isEquip) {
+            if ((int)pk->equipType == typeId) return e;
+        } else {
+            if ((int)pk->itemType == typeId) return e;
+        }
+    }
+    return ENTITY_NONE;
+}
+
+static EntityId CreatePickupEntity(GameWorld* gw, int x, int y, bool isEquip, int typeId, int qty) {
+    EntityId e = World_CreateEntity(&gw->ecs);
+    if (e == ENTITY_NONE) return ENTITY_NONE;
+
+    World_AddComponent(&gw->ecs, e, COMP_POSITION);
+    CPosition* pos = World_GetPosition(&gw->ecs, e);
+    pos->x = x;
+    pos->y = y;
+    pos->prevX = x;
+    pos->prevY = y;
+
+    World_AddComponent(&gw->ecs, e, COMP_PICKUP);
+    CPickup* pk = World_GetPickup(&gw->ecs, e);
+    pk->isEquip = isEquip;
+    if (isEquip) pk->equipType = (EquipType)typeId;
+    else pk->itemType = (ItemType)typeId;
+    pk->quantity = qty;
+    return e;
+}
+
+void SpawnerSystem_AddPotionAt(GameWorld* gw, int x, int y, ItemType type, int qty) {
+    if (!gw || qty <= 0) return;
+    EntityId existing = FindStackablePickup(gw, x, y, false, (int)type);
+    if (existing != ENTITY_NONE) {
+        World_GetPickup(&gw->ecs, existing)->quantity += qty;
+        return;
+    }
+    CreatePickupEntity(gw, x, y, false, (int)type, qty);
+}
+
+void SpawnerSystem_AddEquipAt(GameWorld* gw, int x, int y, EquipType type, int qty) {
+    if (!gw || qty <= 0) return;
+    EntityId existing = FindStackablePickup(gw, x, y, true, (int)type);
+    if (existing != ENTITY_NONE) {
+        World_GetPickup(&gw->ecs, existing)->quantity += qty;
+        return;
+    }
+    CreatePickupEntity(gw, x, y, true, (int)type, qty);
+}
+
+void SpawnerSystem_SpawnHealingPotionAt(GameWorld* gw, int x, int y) {
+    int roll = GetRandomValue(1, 100);
+    ItemType type;
+    if (roll <= 50) type = ITEM_SMALL_HP_POTION;
+    else if (roll <= 80) type = ITEM_MEDIUM_HP_POTION;
+    else type = ITEM_LARGE_HP_POTION;
+    SpawnerSystem_AddPotionAt(gw, x, y, type, 1);
+}
+
+int SpawnerSystem_ListPotionsAt(const GameWorld* gw, int x, int y,
+                                ItemType* outTypes, int* outQtys, int maxSlots) {
+    int found = 0;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (pk->quantity > 0 && !pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
+            outTypes[found] = pk->itemType;
+            outQtys[found] = pk->quantity;
+            found++;
+        }
+    }
+    return found;
+}
+
+int SpawnerSystem_ListEquipAt(const GameWorld* gw, int x, int y,
+                              EquipType* outTypes, int* outQtys, int maxSlots) {
+    int found = 0;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
+            outTypes[found] = pk->equipType;
+            outQtys[found] = pk->quantity;
             found++;
         }
     }

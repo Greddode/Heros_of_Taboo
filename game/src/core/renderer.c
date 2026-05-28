@@ -1,5 +1,6 @@
 #include "game.h"
-#include "entity/monster.h"
+#include "systems/render_system.h"
+#include "systems/spawner_system.h"
 #include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include <stdio.h>
@@ -29,97 +30,82 @@ void RenderGame(const Game* game) {
     int tw = game->map->tileWidth;
     int th = game->map->tileHeight;
 
+    SyncGameWorldFromGame((Game*)game);
+
     BeginMode2D(game->camera);
 
-    for (int layer = 0; layer < game->map->layerCount; layer++) {
-        if (!game->map->layers[layer].visible) continue;
+    RenderSystem_DrawMap(&game->ecsWorld);
 
-        for (int y = 0; y < game->map->height; y++) {
-            for (int x = 0; x < game->map->width; x++) {
-                unsigned char vis = game->visibility[y][x];
-                if (vis == 0) continue;
-
-                DrawTile(game, x, y, layer);
-
-                if (vis == 2) {
-                    Vector2 pos = TileToScreen(x, y, tw, th);
-                    DrawRectangle(pos.x, pos.y, tw, th, (Color){ 0, 0, 0, 180 });
-                }
-            }
-        }
-    }
-
-    // Potion sprites on the map
-    for (int i = 0; i < game->potionCount; i++) {
-        if (game->potionCollected[i]) continue;
-        int hx = game->potionTiles[i][0];
-        int hy = game->potionTiles[i][1];
-        if (game->visibility[hy][hx] != 1) continue;
-
-        int texIdx = game->potionTypes[i] - 1;
-        if (texIdx >= 0 && texIdx < 3 && game->potionTextures[texIdx].id > 0) {
-            Vector2 hpos = TileToScreen(hx, hy, tw, th);
-            Rectangle dest = { hpos.x, hpos.y, (float)tw, (float)th };
-            DrawTexturePro(game->potionTextures[texIdx],
-                           (Rectangle){ 0, 0, (float)game->potionTextures[texIdx].width, (float)game->potionTextures[texIdx].height },
-                           dest, (Vector2){ 0, 0 }, 0, WHITE);
-            if (game->potionQuantities[i] > 1) {
-                char qty[8];
-                snprintf(qty, sizeof(qty), "x%d", game->potionQuantities[i]);
-                DrawText(qty, hpos.x + 2, hpos.y + 2, 10, YELLOW);
-            }
-        }
-    }
-
-    // Equipment sprites on the map
+    // Pickups (ECS)
     {
-        // Track which tiles we've already rendered (avoids duplicates)
-        bool renderedTiles[MAP_HEIGHT][MAP_WIDTH] = { false };
-        for (int i = 0; i < game->equipMapCount; i++) {
-            if (game->equipMapCollected[i]) continue;
-            int ex = game->equipMapTiles[i][0];
-            int ey = game->equipMapTiles[i][1];
-            if (game->visibility[ey][ex] != 1) continue;
-            if (renderedTiles[ey][ex]) continue;
-            renderedTiles[ey][ex] = true;
+        const GameWorld* gw = &game->ecsWorld;
+        bool renderedEquipTiles[MAP_HEIGHT][MAP_WIDTH] = { false };
 
-            // Count how many equipment items are on this tile
-            int itemCount = 0;
-            for (int j = 0; j < game->equipMapCount; j++) {
-                if (game->equipMapCollected[j]) continue;
-                if (game->equipMapTiles[j][0] == ex && game->equipMapTiles[j][1] == ey)
-                    itemCount++;
-            }
+        for (EntityId eid = 1; eid < (EntityId)gw->ecs.count; eid++) {
+            if (!gw->ecs.alive[eid]) continue;
+            if (!World_HasComponents(&((GameWorld*)gw)->ecs, eid, COMP_POSITION | COMP_PICKUP)) continue;
 
-            Vector2 epos = TileToScreen(ex, ey, tw, th);
+            CPosition* pos = World_GetPosition(&((GameWorld*)gw)->ecs, eid);
+            CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, eid);
+            if (pk->quantity <= 0) continue;
+            if (pos->y < 0 || pos->y >= game->map->height || pos->x < 0 || pos->x >= game->map->width) continue;
+            if (game->visibility[pos->y][pos->x] != 1) continue;
 
-            if (itemCount > 1) {
-                // Multiple items on same tile -> show loot.png
-                if (game->texLoot.id > 0) {
-                    Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
-                    DrawTexturePro(game->texLoot,
-                                   (Rectangle){ 0, 0, (float)game->texLoot.width, (float)game->texLoot.height },
+            if (!pk->isEquip) {
+                int texIdx = (int)pk->itemType - 1;
+                if (texIdx >= 0 && texIdx < 3 && game->potionTextures[texIdx].id > 0) {
+                    Vector2 hpos = TileToScreen(pos->x, pos->y, tw, th);
+                    Rectangle dest = { hpos.x, hpos.y, (float)tw, (float)th };
+                    DrawTexturePro(game->potionTextures[texIdx],
+                                   (Rectangle){ 0, 0, (float)game->potionTextures[texIdx].width, (float)game->potionTextures[texIdx].height },
                                    dest, (Vector2){ 0, 0 }, 0, WHITE);
+                    if (pk->quantity > 1) {
+                        char qty[8];
+                        snprintf(qty, sizeof(qty), "x%d", pk->quantity);
+                        DrawText(qty, hpos.x + 2, hpos.y + 2, 10, YELLOW);
+                    }
                 }
-                // Show item count on loot pile
-                char qty[8];
-                snprintf(qty, sizeof(qty), "x%d", itemCount);
-                DrawText(qty, epos.x + 2, epos.y + 2, 10, YELLOW);
-            } else {
-                // Single type -> show its own sprite
-                EquipType eType = game->equipMapTypes[i];
-                Texture2D tex = GetEquipSprite(eType);
-                if (tex.id > 0) {
-                    Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
-                    Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
-                    DrawTexturePro(tex, src, dest, (Vector2){ 0 }, 0, WHITE);
+            } else if (!renderedEquipTiles[pos->y][pos->x]) {
+                renderedEquipTiles[pos->y][pos->x] = true;
+                int ex = pos->x;
+                int ey = pos->y;
+                int entityCount = 0;
+                int stackQty = 0;
+                EquipType singleType = EQUIP_NONE;
+                for (EntityId ej = 1; ej < (EntityId)gw->ecs.count; ej++) {
+                    if (!gw->ecs.alive[ej]) continue;
+                    if (!World_HasComponents(&((GameWorld*)gw)->ecs, ej, COMP_POSITION | COMP_PICKUP)) continue;
+                    CPosition* pj = World_GetPosition(&((GameWorld*)gw)->ecs, ej);
+                    CPickup* pkj = World_GetPickup(&((GameWorld*)gw)->ecs, ej);
+                    if (pkj->quantity <= 0 || !pkj->isEquip || pj->x != ex || pj->y != ey) continue;
+                    entityCount++;
+                    stackQty += pkj->quantity;
+                    singleType = pkj->equipType;
                 }
-                // Show quantity label for stacked copies of same type
-                int qty = game->equipMapQuantities[i];
-                if (qty > 1) {
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "x%d", qty);
-                    DrawText(buf, epos.x + 2, epos.y + 2, 10, YELLOW);
+
+                Vector2 epos = TileToScreen(ex, ey, tw, th);
+                if (entityCount > 1) {
+                    if (game->texLoot.id > 0) {
+                        Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
+                        DrawTexturePro(game->texLoot,
+                                       (Rectangle){ 0, 0, (float)game->texLoot.width, (float)game->texLoot.height },
+                                       dest, (Vector2){ 0, 0 }, 0, WHITE);
+                    }
+                    char qty[8];
+                    snprintf(qty, sizeof(qty), "x%d", entityCount);
+                    DrawText(qty, epos.x + 2, epos.y + 2, 10, YELLOW);
+                } else {
+                    Texture2D* tex = Inventory_LoadEquipTexture(singleType);
+                    if (tex && tex->id > 0) {
+                        Rectangle src = { 0, 0, (float)tex->width, (float)tex->height };
+                        Rectangle dest = { epos.x, epos.y, (float)tw, (float)th };
+                        DrawTexturePro(*tex, src, dest, (Vector2){ 0 }, 0, WHITE);
+                    }
+                    if (stackQty > 1) {
+                        char buf[8];
+                        snprintf(buf, sizeof(buf), "x%d", stackQty);
+                        DrawText(buf, epos.x + 2, epos.y + 2, 10, YELLOW);
+                    }
                 }
             }
         }
@@ -130,8 +116,7 @@ void RenderGame(const Game* game) {
     float md = (game->monsterAnimDuration > 0.0f) ? game->monsterAnimDuration : MOVE_ANIM_DURATION;
     float playerT = (game->animTimer <= 0.0f) ? 1.0f : 1.0f - (game->animTimer / pd);
     float monsterT = (game->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (game->monsterAnimTimer / md);
-
-    Monster_RenderAll(game->visibility, game->map->width, game->map->height, tw, th, monsterT);
+    RenderSystem_DrawMonsters(&game->ecsWorld, monsterT);
 
     // Player rendering
     if (game->player.ent.alive) {
@@ -322,29 +307,10 @@ void RenderGame(const Game* game) {
         int pty = game->selectedPotionTileY;
         ItemType tileTypes[MAX_POTIONS];
         int tileQtys[MAX_POTIONS];
-        int tileCount = 0;
-        for (int p = 0; p < game->potionCount; p++) {
-            if (game->potionCollected[p]) continue;
-            if (game->potionTiles[p][0] == ptx && game->potionTiles[p][1] == pty) {
-                tileTypes[tileCount] = game->potionTypes[p];
-                tileQtys[tileCount] = game->potionQuantities[p];
-                tileCount++;
-                if (tileCount >= MAX_POTIONS) break;
-            }
-        }
-        // Also collect equipment at this tile
+        int tileCount = SpawnerSystem_ListPotionsAt(&game->ecsWorld, ptx, pty, tileTypes, tileQtys, MAX_POTIONS);
         EquipType equipInfos[MAX_EQUIP_ON_MAP];
         int equipQtys[MAX_EQUIP_ON_MAP];
-        int equipCount = 0;
-        for (int e = 0; e < game->equipMapCount; e++) {
-            if (game->equipMapCollected[e]) continue;
-            if (game->equipMapTiles[e][0] == ptx && game->equipMapTiles[e][1] == pty) {
-                equipInfos[equipCount] = game->equipMapTypes[e];
-                equipQtys[equipCount] = game->equipMapQuantities[e];
-                equipCount++;
-                if (equipCount >= MAX_EQUIP_ON_MAP) break;
-            }
-        }
+        int equipCount = SpawnerSystem_ListEquipAt(&game->ecsWorld, ptx, pty, equipInfos, equipQtys, MAX_EQUIP_ON_MAP);
 
         if (tileCount > 0 || equipCount > 0) {
             int totalItems = tileCount + equipCount;

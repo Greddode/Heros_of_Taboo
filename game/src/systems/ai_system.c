@@ -1,7 +1,8 @@
 #include "ai_system.h"
 #include "core/audio.h"
 #include "ui/combat_log.h"
-#include "entity/monster.h"
+#include "data/monster_data.h"
+#include "world_monster.h"
 #include <math.h>
 
 static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
@@ -24,19 +25,6 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
     return true;
 }
 
-static EntityId FindMonsterAt(GameWorld* gw, int x, int y, EntityId exclude) {
-    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
-        if (!gw->ecs.alive[e]) continue;
-        if (e == exclude) continue;
-        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS)) continue;
-        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
-        CPosition* p = World_GetPosition(&gw->ecs, e);
-        CStats* s = World_GetStats(&gw->ecs, e);
-        if (s->alive && p->x == x && p->y == y) return e;
-    }
-    return ENTITY_NONE;
-}
-
 static Direction MoveToward(GameWorld* gw, EntityId mover, int targetX, int targetY) {
     CPosition* mp = World_GetPosition(&gw->ecs, mover);
     int mapWidth = gw->map->width;
@@ -55,7 +43,7 @@ static Direction MoveToward(GameWorld* gw, EntityId mover, int targetX, int targ
             default: break;
         }
         if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
-            !gw->blocking[ty][tx] && FindMonsterAt(gw, tx, ty, mover) == ENTITY_NONE) {
+            !gw->blocking[ty][tx] && World_FindMonsterAt(gw, tx, ty, mover) == ENTITY_NONE) {
             int nd = abs(targetX - tx) + abs(targetY - ty);
             if (nd < bestDist) { bestDist = nd; bestDir = dirs[d]; }
         }
@@ -253,7 +241,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 default: break;
             }
             if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
-                !gw->blocking[ty][tx] && FindMonsterAt(gw, tx, ty, monster) == ENTITY_NONE) {
+                !gw->blocking[ty][tx] && World_FindMonsterAt(gw, tx, ty, monster) == ENTITY_NONE) {
                 mp->x = tx;
                 mp->y = ty;
                 break;

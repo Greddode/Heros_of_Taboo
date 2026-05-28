@@ -1,7 +1,11 @@
 #include "entity.h"
 #include "core/game.h"
+#include "world.h"
 #include "core/audio.h"
-#include "monster.h"
+#include "systems/spawner_system.h"
+#include "data/monster_data.h"
+#include "systems/combat_system.h"
+#include "systems/world_monster.h"
 #include "player.h"
 #include "ui/combat_log.h"
 #include <stdio.h>
@@ -15,8 +19,7 @@ bool IsWalkable(const Game* game, int x, int y) {
     if (!game->map) return false;
     if (x < 0 || x >= game->map->width || y < 0 || y >= game->map->height) return false;
     if (game->blocking[y][x]) return false;
-    Monster* m = Monster_GetAt(x, y, NULL);
-    if (m && m->alive) return false;
+    if (World_FindMonsterAt(&game->ecsWorld, x, y, ENTITY_NONE) != ENTITY_NONE) return false;
     return true;
 }
 
@@ -77,42 +80,8 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
 
     // Player attacks a monster at the target tile
     if (entity->isPlayer) {
-        Monster* mon = Monster_GetAt(newX, newY, NULL);
-        if (mon && mon->alive) {
-            // Monster dodge check
-            int dodgePct = mon->dex * 2;
-            if (dodgePct > 60) dodgePct = 60;
-            if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
-                entity->hitFlashTimer = 0.15f;
-                CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", mon->name);
-                TraceLog(LOG_INFO, "%s dodges your attack!", mon->name);
-                return true;
-            }
-
-            // Base damage: entity->attack (weapon) + STR * 2
-            int damage = entity->attack + entity->str * 2 - mon->defense;
-            if (damage < 1) damage = 1;
-
-            // Player crit check
-            if (GetRandomValue(1, 100) <= entity->lck) {
-                damage = damage * 2;
-                if (damage < 1) damage = 1;
-                CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
-            }
-
-            mon->hp -= damage;
-            PlayHitSound();
-            entity->hitFlashTimer = 0.15f;
-            mon->hitFlashTimer = 0.15f;
-            TraceLog(LOG_INFO, "%s attacks %s for %d damage! (HP: %d/%d)",
-                     entity->name, mon->name, damage, mon->hp, mon->maxHp);
-            CombatLog_Add(&game->combatLog, BLACK, "%s hits %s for %d!", entity->name, mon->name, damage);
-            if (mon->hp <= 0) {
-                mon->alive = false;
-                GainExperience(game, mon->expValue);
-                TraceLog(LOG_INFO, "%s has been slain!", mon->name);
-                CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", mon->name, mon->expValue);
-            }
+        SyncGameWorldFromGame(game);
+        if (CombatSystem_PlayerMeleeAttack(&game->ecsWorld, game, entity, newX, newY)) {
             return true;
         }
     }
@@ -125,42 +94,38 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     entity->y = newY;
 
     if (entity->isPlayer) {
-        for (int h = 0; h < game->potionCount; h++) {
-            if (!game->potionCollected[h] &&
-                game->potionTiles[h][0] == newX &&
-                game->potionTiles[h][1] == newY) {
-                game->potionCollected[h] = true;
-                ItemType ptype = game->potionTypes[h];
-                int qty = game->potionQuantities[h];
+        GameWorld* gw = &game->ecsWorld;
+        for (EntityId eid = 1; eid < (EntityId)gw->ecs.count; eid++) {
+            if (!gw->ecs.alive[eid]) continue;
+            if (!World_HasComponents(&gw->ecs, eid, COMP_POSITION | COMP_PICKUP)) continue;
+            CPosition* pos = World_GetPosition(&gw->ecs, eid);
+            CPickup* pk = World_GetPickup(&gw->ecs, eid);
+            if (pk->quantity <= 0 || pos->x != newX || pos->y != newY) continue;
+
+            if (!pk->isEquip) {
+                ItemType ptype = pk->itemType;
+                int qty = pk->quantity;
                 int picked = 0;
                 for (int i = 0; i < qty; i++) {
                     if (InventoryAdd(game, ptype)) picked++;
                     else break;
                 }
+                pk->quantity = 0;
                 if (picked > 0) {
                     TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(ptype));
                     CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(ptype));
                     PlayPickupSound();
                 }
-            }
-        }
-        // Pick up on-map equipment
-        for (int e = 0; e < game->equipMapCount; e++) {
-            if (!game->equipMapCollected[e] &&
-                game->equipMapTiles[e][0] == newX &&
-                game->equipMapTiles[e][1] == newY) {
-                EquipType eType = game->equipMapTypes[e];
-                int qty = game->equipMapQuantities[e];
+            } else {
+                EquipType eType = pk->equipType;
+                int qty = pk->quantity;
                 int picked = 0;
                 for (int i = 0; i < qty; i++) {
                     if (AddEquipToInventory(game, eType)) picked++;
                     else break;
                 }
-                if (picked >= qty) {
-                    game->equipMapCollected[e] = true;
-                } else {
-                    game->equipMapQuantities[e] -= picked;
-                }
+                pk->quantity -= picked;
+                if (pk->quantity < 0) pk->quantity = 0;
                 if (picked > 0) {
                     const EquipData* d = GetEquipData(eType);
                     TraceLog(LOG_INFO, "Picked up %s", d ? d->name : "equipment");
@@ -174,9 +139,29 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
     return true;
 }
 
+void DrawTileWorld(const GameWorld* gw, int x, int y, int layerIndex) {
+    if (!gw || !gw->map || !gw->map->layers) return;
+
+    int gid = GetTileGID(gw->map, layerIndex, x, y);
+    if (gid <= 0) return;
+
+    Rectangle src = GetTileSourceRect(gw->map, gid);
+    if (src.width <= 0 || src.height <= 0) return;
+
+    int tsIndex = FindTilesetForGID(gw->map, gid);
+    if (tsIndex < 0 || tsIndex >= gw->map->tilesetCount) return;
+
+    Texture2D tex = gw->tilesetTextures[tsIndex];
+    if (tex.id == 0) return;
+
+    Vector2 pos = TileToScreen(x, y, gw->map->tileWidth, gw->map->tileHeight);
+    Rectangle dest = { pos.x, pos.y, (float)gw->map->tileWidth, (float)gw->map->tileHeight };
+    DrawTexturePro(tex, src, dest, (Vector2){ 0, 0 }, 0, WHITE);
+}
+
 // Draw a single tile from the tileset at (x, y) on the given layer
 void DrawTile(const Game* game, int x, int y, int layerIndex) {
-    if (!game->map || !game->map->layers) return;
+    if (!game || !game->map || !game->map->layers) return;
 
     int gid = GetTileGID(game->map, layerIndex, x, y);
     if (gid <= 0) return;
@@ -185,11 +170,12 @@ void DrawTile(const Game* game, int x, int y, int layerIndex) {
     if (src.width <= 0 || src.height <= 0) return;
 
     int tsIndex = FindTilesetForGID(game->map, gid);
-    if (tsIndex < 0) return;
+    if (tsIndex < 0 || tsIndex >= game->map->tilesetCount) return;
+
     Texture2D tex = game->tilesetTextures[tsIndex];
+    if (tex.id == 0) return;
 
     Vector2 pos = TileToScreen(x, y, game->map->tileWidth, game->map->tileHeight);
     Rectangle dest = { pos.x, pos.y, (float)game->map->tileWidth, (float)game->map->tileHeight };
-
-    DrawTexturePro(tex, src, dest, (Vector2){0, 0}, 0, WHITE);
+    DrawTexturePro(tex, src, dest, (Vector2){ 0, 0 }, 0, WHITE);
 }

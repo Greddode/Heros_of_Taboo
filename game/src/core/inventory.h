@@ -71,6 +71,7 @@ bool RemoveEquipFromInventory(Game* game, int slot);
 void Inventory_Render(const Game* game);
 void LoadPotionTextures(Game* game);
 void UnloadPotionTextures(Game* game);
-Texture2D GetEquipSprite(EquipType type);
+// Cached equip icon from the resource manager (NULL if none / load failed).
+Texture2D* Inventory_LoadEquipTexture(EquipType type);
 
 #endif

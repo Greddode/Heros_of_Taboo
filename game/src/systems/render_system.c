@@ -1,21 +1,21 @@
 #include "render_system.h"
 #include "core/game.h"
+#include "core/inventory.h"
+#include "core/map_helpers.h"
 #include "core/renderer.h"
-#include "entity/monster.h"
+#include "entity/entity.h"
+#include "data/monster_data.h"
 #include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include <stdio.h>
 #include <math.h>
 
-void RenderSystem_World(const GameWorld* gw) {
+void RenderSystem_DrawMap(const GameWorld* gw) {
     if (!gw || !gw->map) return;
 
     int tw = gw->map->tileWidth;
     int th = gw->map->tileHeight;
 
-    BeginMode2D(gw->camera);
-
-    // Tile layers
     for (int layer = 0; layer < gw->map->layerCount; layer++) {
         if (!gw->map->layers[layer].visible) continue;
         for (int y = 0; y < gw->map->height; y++) {
@@ -23,32 +23,23 @@ void RenderSystem_World(const GameWorld* gw) {
                 unsigned char vis = gw->visibility[y][x];
                 if (vis == 0) continue;
 
-                // DrawTile needs Game* — temporarily cast (will be fixed when DrawTile is ported)
-                // For now, draw tiles directly from the map data
-                int gid = GetTileGID(gw->map, layer, x, y);
-                if (gid == 0) continue;
-                Rectangle src = GetTileSourceRect(gw->map, gid);
-                Vector2 pos = { (float)(x * tw), (float)(y * th) };
-                Rectangle dest = { pos.x, pos.y, (float)tw, (float)th };
-                int tsIdx = FindTilesetForGID(gw->map, gid);
-                if (tsIdx >= 0 && tsIdx < gw->map->tilesetCount) {
-                    // Tileset textures are not yet in GameWorld — skip tile rendering for now
-                    // This will be fixed when tileset textures move to GameWorld
-                }
+                DrawTileWorld(gw, x, y, layer);
 
                 if (vis == 2) {
+                    Vector2 pos = TileToScreen(x, y, tw, th);
                     DrawRectangle((int)pos.x, (int)pos.y, tw, th, (Color){ 0, 0, 0, 180 });
                 }
             }
         }
     }
+}
 
-    float pd = (gw->animDuration > 0.0f) ? gw->animDuration : MOVE_ANIM_DURATION;
-    float md = (gw->monsterAnimDuration > 0.0f) ? gw->monsterAnimDuration : MOVE_ANIM_DURATION;
-    float playerT = (gw->animTimer <= 0.0f) ? 1.0f : 1.0f - (gw->animTimer / pd);
-    float monsterT = (gw->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (gw->monsterAnimTimer / md);
+void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
+    if (!gw || !gw->map) return;
 
-    // Render monsters (ECS entities with COMP_POSITION + COMP_AI)
+    int tw = gw->map->tileWidth;
+    int th = gw->map->tileHeight;
+
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
         if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
@@ -99,6 +90,24 @@ void RenderSystem_World(const GameWorld* gw) {
             }
         }
     }
+}
+
+void RenderSystem_World(const GameWorld* gw) {
+    if (!gw || !gw->map) return;
+
+    int tw = gw->map->tileWidth;
+    int th = gw->map->tileHeight;
+
+    BeginMode2D(gw->camera);
+
+    RenderSystem_DrawMap(gw);
+
+    float pd = (gw->animDuration > 0.0f) ? gw->animDuration : MOVE_ANIM_DURATION;
+    float md = (gw->monsterAnimDuration > 0.0f) ? gw->monsterAnimDuration : MOVE_ANIM_DURATION;
+    float playerT = (gw->animTimer <= 0.0f) ? 1.0f : 1.0f - (gw->animTimer / pd);
+    float monsterT = (gw->monsterAnimTimer <= 0.0f) ? 1.0f : 1.0f - (gw->monsterAnimTimer / md);
+
+    RenderSystem_DrawMonsters(gw, monsterT);
 
     // Pickup rendering (ECS entities with COMP_POSITION | COMP_PICKUP)
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
@@ -116,11 +125,11 @@ void RenderSystem_World(const GameWorld* gw) {
         int pixelY2 = pp2->y * th;
 
         if (pk->isEquip) {
-            Texture2D eqTex = GetEquipSprite(pk->equipType);
-            if (eqTex.id > 0) {
-                Rectangle src = { 0, 0, (float)eqTex.width, (float)eqTex.height };
+            Texture2D* eqTex = Inventory_LoadEquipTexture(pk->equipType);
+            if (eqTex && eqTex->id > 0) {
+                Rectangle src = { 0, 0, (float)eqTex->width, (float)eqTex->height };
                 Rectangle dest = { (float)pixelX2, (float)pixelY2, (float)tw, (float)th };
-                DrawTexturePro(eqTex, src, dest, (Vector2){ 0 }, 0, WHITE);
+                DrawTexturePro(*eqTex, src, dest, (Vector2){ 0 }, 0, WHITE);
             } else {
                 DrawRectangle(pixelX2 + 2, pixelY2 + 2, tw - 4, th - 4, (Color){ 200, 150, 50, 255 });
             }

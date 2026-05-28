@@ -1,5 +1,5 @@
 #include "inspector.h"
-#include "entity/monster.h"
+#include "systems/world_monster.h"
 #include "core/inventory.h"
 #include <stdio.h>
 #include <string.h>
@@ -57,15 +57,12 @@ static int DrawDesc(const char* desc, int x, int y, int maxWidth, int fontSize, 
 }
 
 void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w, int h) {
-    Monster* monsterArr = NULL;
-    int monsterCount = 0;
-
     // Early-out: don't draw anything if there's nothing to inspect
     if (type == INSPECTOR_MONSTER) {
-        if (game->selectedMonsterIdx < 0) return;
-        monsterArr = Monster_GetArray();
-        monsterCount = Monster_GetCount();
-        if (game->selectedMonsterIdx >= monsterCount || !monsterArr[game->selectedMonsterIdx].alive) return;
+        if (game->selectedMonsterEntity == ENTITY_NONE) return;
+        if (!game->ecsWorld.ecs.alive[game->selectedMonsterEntity]) return;
+        if (!World_HasComponents(&game->ecsWorld.ecs, game->selectedMonsterEntity, COMP_STATS)) return;
+        if (!World_GetStats(&game->ecsWorld.ecs, game->selectedMonsterEntity)->alive) return;
     } else if (type == INSPECTOR_ITEM) {
         if (game->state != STATE_INVENTORY) return;
     }
@@ -86,24 +83,28 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
     }
 
     if (type == INSPECTOR_MONSTER) {
-        Monster* m = &monsterArr[game->selectedMonsterIdx];
+        EntityId m = game->selectedMonsterEntity;
+        CStats* s = World_GetStats(&game->ecsWorld.ecs, m);
+        CName* n = World_HasComponents(&game->ecsWorld.ecs, m, COMP_NAME)
+            ? World_GetName(&game->ecsWorld.ecs, m) : NULL;
+        const char* name = n ? n->name : "Monster";
 
-        snprintf(buf, sizeof(buf), "%s", m->name);
+        snprintf(buf, sizeof(buf), "%s", name);
         DrawText(buf, lx, ly, fs + 2, BLACK); ly += lh + 4;
 
-        snprintf(buf, sizeof(buf), "Lv %d", m->level);
+        snprintf(buf, sizeof(buf), "Lv %d", s->level);
         DrawText(buf, lx, ly, fs, BLACK); ly += lh;
 
-        snprintf(buf, sizeof(buf), "HP %d/%d", m->hp, m->maxHp);
+        snprintf(buf, sizeof(buf), "HP %d/%d", s->hp, s->maxHp);
         DrawText(buf, lx, ly, fs, BLACK); ly += lh;
 
-        snprintf(buf, sizeof(buf), "ATK %d", m->attack);
+        snprintf(buf, sizeof(buf), "ATK %d", s->attack);
         DrawText(buf, lx, ly, fs, BLACK); ly += lh;
 
-        snprintf(buf, sizeof(buf), "DEF %d", m->defense);
+        snprintf(buf, sizeof(buf), "DEF %d", s->defense);
         DrawText(buf, lx, ly, fs, BLACK); ly += lh;
 
-        snprintf(buf, sizeof(buf), "EXP %d", m->expValue);
+        snprintf(buf, sizeof(buf), "EXP %d", s->expValue);
         DrawText(buf, lx, ly, fs, BLACK);
 
     } else if (type == INSPECTOR_ITEM) {
@@ -124,12 +125,12 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
             DrawText(displayName, cx - tw / 2, ly, titleSize, BLACK);
             ly += (int)(24 * scale);
 
-            Texture2D sprite = GetEquipSprite(eType);
-            if (sprite.id > 0) {
+            Texture2D* sprite = Inventory_LoadEquipTexture(eType);
+            if (sprite && sprite->id > 0) {
                 float spriteSize = (int)(48 * scale);
-                Rectangle src = { 0, 0, (float)sprite.width, (float)sprite.height };
+                Rectangle src = { 0, 0, (float)sprite->width, (float)sprite->height };
                 Rectangle dest = { cx - spriteSize / 2, (float)ly, spriteSize, spriteSize };
-                DrawTexturePro(sprite, src, dest, (Vector2){ 0 }, 0, WHITE);
+                DrawTexturePro(*sprite, src, dest, (Vector2){ 0 }, 0, WHITE);
                 ly += (int)(spriteSize + 8 * scale);
             }
 
