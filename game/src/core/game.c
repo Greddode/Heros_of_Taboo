@@ -845,6 +845,15 @@ void UpdateGame(Game* game) {
 }
 
 void DescendFloor(Game* game) {
+    // Show loading screen before heavy work
+    BeginDrawing();
+    ClearBackground(BLACK);
+    const char* loadText = "LOADING...";
+    int fontSize = 40;
+    int tw = MeasureText(loadText, fontSize);
+    DrawText(loadText, GetScreenWidth() / 2 - tw / 2, GetScreenHeight() / 2 - fontSize / 2, fontSize, WHITE);
+    EndDrawing();
+
     Player savedPlayer = game->player;
     InventorySlot savedInventory[MAX_INVENTORY_SLOTS];
     memcpy(savedInventory, game->inventory, sizeof(savedInventory));
