@@ -530,46 +530,38 @@ void HandleInput(Game* game) {
                         break;
                     }
 
-                    // Pick up any potion at the current tile
-                    for (int h = 0; h < game->potionCount; h++) {
-                        if (!game->potionCollected[h] &&
-                            game->potionTiles[h][0] == game->player.ent.x &&
-                            game->potionTiles[h][1] == game->player.ent.y) {
-                            game->potionCollected[h] = true;
-                            ItemType ptype = game->potionTypes[h];
-                            int qty = game->potionQuantities[h];
+                    // Pick up any potions at the current tile
+                    {
+                        ItemType pTypes[MAX_POTIONS];
+                        int pQtys[MAX_POTIONS];
+                        int pCount = SpawnerSystem_CollectPickupsAt(game->ecsWorld, game->player.ent.x, game->player.ent.y, pTypes, pQtys, MAX_POTIONS);
+                        for (int i = 0; i < pCount; i++) {
                             int picked = 0;
-                            for (int i = 0; i < qty; i++) {
-                                if (InventoryAdd(game, ptype)) picked++;
+                            for (int q = 0; q < pQtys[i]; q++) {
+                                if (InventoryAdd(game, pTypes[i])) picked++;
                                 else break;
                             }
                             if (picked > 0) {
-                                TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(ptype));
-                                CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(ptype));
+                                TraceLog(LOG_INFO, "Picked up %d x %s", picked, GetItemName(pTypes[i]));
+                                CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i]));
                                 PlayPickupSound();
                             }
                         }
                     }
 
                     // Pick up any equipment at the current tile
-                    for (int e = 0; e < game->equipMapCount; e++) {
-                        if (!game->equipMapCollected[e] &&
-                            game->equipMapTiles[e][0] == game->player.ent.x &&
-                            game->equipMapTiles[e][1] == game->player.ent.y) {
-                            EquipType eType = game->equipMapTypes[e];
-                            int qty = game->equipMapQuantities[e];
+                    {
+                        EquipType eTypes[MAX_EQUIP_ON_MAP];
+                        int eQtys[MAX_EQUIP_ON_MAP];
+                        int eCount = SpawnerSystem_CollectEquipAt(game->ecsWorld, game->player.ent.x, game->player.ent.y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
+                        for (int i = 0; i < eCount; i++) {
                             int picked = 0;
-                            for (int i = 0; i < qty; i++) {
-                                if (AddEquipToInventory(game, eType)) picked++;
+                            for (int q = 0; q < eQtys[i]; q++) {
+                                if (AddEquipToInventory(game, eTypes[i])) picked++;
                                 else break;
                             }
-                            if (picked >= qty) {
-                                game->equipMapCollected[e] = true;
-                            } else {
-                                game->equipMapQuantities[e] -= picked;
-                            }
                             if (picked > 0) {
-                                const EquipData* d = GetEquipData(eType);
+                                const EquipData* d = GetEquipData(eTypes[i]);
                                 TraceLog(LOG_INFO, "Picked up %s", d ? d->name : "equipment");
                                 CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
                                 PlayPickupSound();
