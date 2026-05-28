@@ -1,6 +1,7 @@
 #include "game.h"
 #include "ui/combat_log.h"
 #include "ui/inspector.h"
+#include "resources.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -143,42 +144,47 @@ Texture2D GetEquipSprite(EquipType type) {
 
 void LoadPotionTextures(Game* game) {
     for (int i = 1; i < ITEM_COUNT; i++) {
-        if (ITEM_SPRITES[i][0])
-            game->potionTextures[i - 1] = LoadTexture(ITEM_SPRITES[i]);
+        if (ITEM_SPRITES[i][0]) {
+            Texture2D* t = Resources_LoadTexture(ITEM_SPRITES[i]);
+            if (t) game->potionTextures[i - 1] = *t;
+        }
     }
-    game->texUiFrame = LoadTexture("resources/sprites/ui/UI_Flat_Frame01a.png");
-    game->texUiSlot  = LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
-    game->texUiMarker = LoadTexture("resources/sprites/ui/UI_Flat_FrameMarker01a.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/ui/UI_Flat_Frame01a.png");
+        if (t) game->texUiFrame = *t;
+    }
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
+        if (t) game->texUiSlot = *t;
+    }
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameMarker01a.png");
+        if (t) game->texUiMarker = *t;
+    }
 
     // Load equipment sprites
     for (int i = 0; i < EQUIP_COUNT; i++) {
         s_equipSprites[i] = (Texture2D){ 0 };
         const EquipData* d = GetEquipData((EquipType)i);
         if (d && d->spritePath) {
-            s_equipSprites[i] = LoadTexture(d->spritePath);
-            if (s_equipSprites[i].id == 0) {
-                TraceLog(LOG_WARNING, "Could not load equip sprite: %s", d->spritePath);
+            Texture2D* t = Resources_LoadTexture(d->spritePath);
+            if (t) {
+                s_equipSprites[i] = *t;
+                if (s_equipSprites[i].id == 0) {
+                    TraceLog(LOG_WARNING, "Could not load equip sprite: %s", d->spritePath);
+                }
             }
         }
     }
 
-    game->texLoot = LoadTexture("resources/sprites/items/loot.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/items/loot.png");
+        if (t) game->texLoot = *t;
+    }
 }
 
 void UnloadPotionTextures(Game* game) {
-    for (int i = 0; i < 3; i++) {
-        if (game->potionTextures[i].id > 0)
-            UnloadTexture(game->potionTextures[i]);
-    }
-    if (game->texUiFrame.id > 0) UnloadTexture(game->texUiFrame);
-    if (game->texUiSlot.id > 0)  UnloadTexture(game->texUiSlot);
-    if (game->texUiMarker.id > 0) UnloadTexture(game->texUiMarker);
-
-    for (int i = 0; i < EQUIP_COUNT; i++) {
-        if (s_equipSprites[i].id > 0)
-            UnloadTexture(s_equipSprites[i]);
-    }
-    if (game->texLoot.id > 0) UnloadTexture(game->texLoot);
+    // Handled by Resources_UnloadAll
 }
 
 // ---- Equipment management --------------------------------------------------

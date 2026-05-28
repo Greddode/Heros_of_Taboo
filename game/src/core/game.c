@@ -6,6 +6,7 @@
 #include "ui/combat_log.h"
 #include "core/audio.h"
 #include "procedural.h"
+#include "resources.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -866,13 +867,8 @@ void DescendFloor(Game* game) {
 
     Monster_UnloadSprites();
     Monster_ResetAll();
-    UnloadPotionTextures(game);
 
     if (game->map) {
-        for (int t = 0; t < game->map->tilesetCount; t++) {
-            if (game->tilesetTextures[t].id > 0)
-                UnloadTexture(game->tilesetTextures[t]);
-        }
         UnloadTMX(game->map);
     }
 
@@ -885,7 +881,10 @@ void DescendFloor(Game* game) {
     game->selectedMonsterIdx = -1;
     game->currentFloor = floor;
     game->maxFloors = 10;
-    game->player.ent.spriteSheet = LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+        if (t) game->player.ent.spriteSheet = *t;
+    }
     if (game->player.ent.spriteSheet.id == 0) {
         TraceLog(LOG_WARNING, "Could not load player spritesheet during descend");
     }
@@ -914,7 +913,10 @@ void DescendFloor(Game* game) {
     memcpy(game->equipInventory, savedEquipInventory, sizeof(savedEquipInventory));
     game->equipInventoryCount = savedEquipInvCount;
 
-    game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/tilesets/magic_attacks.png");
+        if (t) game->magicAttacksTexture = *t;
+    }
     if (game->magicAttacksTexture.id == 0) {
         TraceLog(LOG_WARNING, "Could not load magic attacks tileset");
     }
@@ -932,7 +934,10 @@ void DescendFloor(Game* game) {
         if (imgPath[0] == '\0' || !FileExists(imgPath)) {
             snprintf(imgPath, sizeof(imgPath), "resources/%s", game->map->tilesets[t].imageSource);
         }
-        game->tilesetTextures[t] = LoadTexture(imgPath);
+        {
+            Texture2D* tex = Resources_LoadTexture(imgPath);
+            if (tex) game->tilesetTextures[t] = *tex;
+        }
         if (game->tilesetTextures[t].id == 0) {
             TraceLog(LOG_WARNING, "Could not load tileset texture: %s", imgPath);
             if (t == 0) {
@@ -1038,7 +1043,10 @@ bool InitGame(Game* game, const char* tmxFile) {
         }
 
         TraceLog(LOG_INFO, "Loading tileset texture [%d]: %s", t, imgPath);
-        game->tilesetTextures[t] = LoadTexture(imgPath);
+        {
+            Texture2D* tex = Resources_LoadTexture(imgPath);
+            if (tex) game->tilesetTextures[t] = *tex;
+        }
         if (game->tilesetTextures[t].id == 0) {
             TraceLog(LOG_WARNING, "Could not load tileset texture: %s", imgPath);
             if (t == 0) {
@@ -1084,7 +1092,10 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.ent.color = (Color){ 50, 200, 255, 255 };
     game->player.ent.spriteRow = 6;
 
-    game->player.ent.spriteSheet = LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+        if (t) game->player.ent.spriteSheet = *t;
+    }
     if (game->player.ent.spriteSheet.id == 0) {
         TraceLog(LOG_WARNING, "Could not load player spritesheet, using fallback rendering");
     }
@@ -1096,7 +1107,10 @@ bool InitGame(Game* game, const char* tmxFile) {
     EquipItemSilent(game, EQUIP_SURVIVAL_KNIFE);
     InventoryAdd(game, ITEM_SMALL_HP_POTION);
 
-    game->magicAttacksTexture = LoadTexture("resources/tilesets/magic_attacks.png");
+    {
+        Texture2D* t = Resources_LoadTexture("resources/tilesets/magic_attacks.png");
+        if (t) game->magicAttacksTexture = *t;
+    }
     if (game->magicAttacksTexture.id == 0) {
         TraceLog(LOG_WARNING, "Could not load magic attacks tileset");
     }
@@ -1157,15 +1171,8 @@ void CleanupGame(Game* game) {
     Monster_UnloadSprites();
     Monster_ResetAll();
 
-    if (game->map) {
-        for (int t = 0; t < game->map->tilesetCount; t++) {
-            if (game->tilesetTextures[t].id > 0)
-                UnloadTexture(game->tilesetTextures[t]);
-        }
-    }
-    if (game->player.ent.spriteSheet.id > 0) UnloadTexture(game->player.ent.spriteSheet);
-    if (game->magicAttacksTexture.id > 0) UnloadTexture(game->magicAttacksTexture);
-    UnloadPotionTextures(game);
+    Resources_UnloadAll();
+
     if (game->map) {
         UnloadTMX(game->map);
         game->map = NULL;

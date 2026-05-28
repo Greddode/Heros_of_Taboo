@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <math.h>
 
-#define MAP_WIDTH 100
-#define MAP_HEIGHT 100
 #define MOVE_ANIM_DURATION 0.15f
 #define FOG_RADIUS 7
 #define PROJECTILE_ANIM_DURATION 0.25f
@@ -23,26 +21,6 @@
 float GetUIScale(void);
 void SetGuiScale(float scale);
 float GetGuiScale(void);
-
-typedef enum {
-    STATE_PLAYER_TURN,
-    STATE_ENEMY_TURN,
-    STATE_GAME_OVER,
-    STATE_WIN,
-    STATE_INVENTORY
-} GameState;
-
-typedef struct {
-    bool active;
-    float sx, sy;    // start pixel coords (world space)
-    float ex, ey;    // end pixel coords (world space)
-    Color color;
-    int tileSX, tileSY;  // caster tile coords
-    int tileEX, tileEY;  // target tile coords
-    AttackType attackType;
-    int startFrame;       // first frame index (0-based) in magic texture
-    int animFrameCount;   // number of animation frames
-} Projectile;
 
 typedef struct Game {
     MapData* map;

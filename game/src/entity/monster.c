@@ -1,6 +1,7 @@
 #include "monster.h"
 #include "core/game.h"
 #include "core/audio.h"
+#include "resources.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -321,24 +322,22 @@ void Monster_LoadSprites(void) {
         s_monsterTextures[i] = (Texture2D){ 0 };
         const MonsterTemplate* tpl = &s_templates[i];
         if (tpl->spritePath && tpl->frameCount > 0) {
-            s_monsterTextures[i] = LoadTexture(tpl->spritePath);
-            if (s_monsterTextures[i].id == 0) {
-                TraceLog(LOG_WARNING, "Monster: Could not load sprite %s", tpl->spritePath);
-            } else {
-                TraceLog(LOG_INFO, "Monster: Loaded %s (%dx%d)",
-                         tpl->name, s_monsterTextures[i].width, s_monsterTextures[i].height);
+            Texture2D* t = Resources_LoadTexture(tpl->spritePath);
+            if (t) {
+                s_monsterTextures[i] = *t;
+                if (s_monsterTextures[i].id == 0) {
+                    TraceLog(LOG_WARNING, "Monster: Could not load sprite %s", tpl->spritePath);
+                } else {
+                    TraceLog(LOG_INFO, "Monster: Loaded %s (%dx%d)",
+                             tpl->name, s_monsterTextures[i].width, s_monsterTextures[i].height);
+                }
             }
         }
     }
 }
 
 void Monster_UnloadSprites(void) {
-    for (int i = 0; i < MONSTER_TYPE_COUNT; i++) {
-        if (s_monsterTextures[i].id > 0) {
-            UnloadTexture(s_monsterTextures[i]);
-            s_monsterTextures[i] = (Texture2D){ 0 };
-        }
-    }
+    // Handled by Resources_UnloadAll
 }
 
 // ============================================================================

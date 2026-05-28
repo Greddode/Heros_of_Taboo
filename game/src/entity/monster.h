@@ -2,7 +2,7 @@
 #define MONSTER_H
 
 #include "raylib.h"
-#include "core/game.h"
+#include "game_types.h"
 #include <stdbool.h>
 
 #define MAX_MONSTERS 64
@@ -19,22 +19,6 @@
 //   4. Set minFloor (first floor it can appear) and spawnWeight (relative rarity).
 // No changes to game.c needed — Monster_SpawnByTypeName() auto-maps TMX objects.
 // ============================================================================
-
-// -- Monster type identifiers ------------------------------------------------
-typedef enum {
-    MONSTER_FLOATING_EYE,
-    MONSTER_FUNGAL_MYCONID,
-    MONSTER_OGRE,
-    MONSTER_SHADOW,
-    MONSTER_BAT,
-    MONSTER_DEMON_EYE,
-    MONSTER_DRAGON,
-    MONSTER_GOBLIN,
-    MONSTER_SKELETON,
-    MONSTER_WARP_SKULL,
-    MONSTER_RANGER_GOBLIN,
-    MONSTER_TYPE_COUNT
-} MonsterType;
 
 // -- Template: shared definition for all monsters of a given type ------------
 typedef struct {

@@ -21,8 +21,10 @@ project (workspaceName)
         ["Header Files/*"] = { "include/**.h",  "include/**.hpp", "src/**.h", "src/**.hpp", "**.h", "**.hpp"},
         ["Source Files/*"] = {"src/**.c", "src/**.cpp","**.c", "**.cpp"},
         ["Application Resource Files/*"] = {"src/**.rc", "src/**.ico"},
+        ["Engine/*"] = {"../engine/**.h", "../engine/**.c"},
     }
     files {"**.c", "**.cpp", "**.h", "**.hpp"}
+    files {"../engine/**.c", "../engine/**.h"}
 
     filter {"system:windows", "action:vs*"}
         files {"src/**.rc", "src/**.ico"}
@@ -38,6 +40,7 @@ project (workspaceName)
     includedirs { "./" }
     includedirs { "src" }
     includedirs { "include" }
+    includedirs { "../engine" }
     
     link_raylib()
 -- To link to a lib use link_to("LIB_FOLDER_NAME")

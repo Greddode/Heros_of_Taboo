@@ -3,22 +3,7 @@
 
 #include "raylib.h"
 #include <stdbool.h>
-
-// -- Attack type identifiers -------------------------------------------------
-typedef enum {
-    ATTACK_MELEE = 0,
-    ATTACK_RANGED,
-    ATTACK_MAGIC
-} AttackType;
-
-// Direction an entity can move
-typedef enum {
-    DIR_NONE = 0,
-    DIR_UP,
-    DIR_DOWN,
-    DIR_LEFT,
-    DIR_RIGHT
-} Direction;
+#include "game_types.h"
 
 // Shared entity type used for the player
 typedef struct {
