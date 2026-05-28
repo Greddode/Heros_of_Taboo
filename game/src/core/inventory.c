@@ -423,8 +423,8 @@ static void DrawInventoryTab(const Game* game, int ix, int iy, int iw, int ih) {
 
     int rx = ix + lw + 24;
     int rw = iw - lw - 40;
-    int rtop = iy + tabH + 40;
-    int rh = ih - tabH - 70;
+    int rtop = iy + tabH + (int)(40 * scale);
+    int rh = ih - tabH - (int)(70 * scale);
 
     if (total > 0) {
         if (game->texUiSlot.id > 0)

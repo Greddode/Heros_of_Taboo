@@ -13,12 +13,12 @@ int ExpForLevel(int level) {
 static void ApplyLevelUp(Game* game) {
     Player* p = &game->player;
     p->ent.level++;
-    p->ent.statPoints += 3;
+    p->ent.statPoints += 2;
     p->expToNext = ExpForLevel(p->ent.level);
     game->levelUpTimer = 3.0f;
     PlayLevelUpSound();
     TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", p->ent.level, p->ent.statPoints);
-    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +3 stat points to allocate!", p->ent.level);
+    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +2 stat points to allocate!", p->ent.level);
 }
 
 // Allocate one stat point to a specific stat

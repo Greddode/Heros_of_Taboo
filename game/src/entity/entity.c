@@ -112,40 +112,6 @@ bool MoveEntity(Game* game, Entity* entity, Direction dir) {
                 GainExperience(game, mon->expValue);
                 TraceLog(LOG_INFO, "%s has been slain!", mon->name);
                 CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", mon->name, mon->expValue);
-
-                // Equipment drop chance (20% base, increased by LCK)
-                int dropChance = 20 + entity->lck * 2;
-                if (dropChance > 50) dropChance = 50;
-                if (GetRandomValue(1, 100) <= dropChance) {
-                    // Pick a random accessory available on this floor
-                    EquipType pool[] = {
-                        EQUIP_RING_OF_STRENGTH,
-                        EQUIP_AMULET_OF_WARDING,
-                        EQUIP_BOOTS_OF_SWIFTNESS,
-                        EQUIP_RING_OF_THE_HAWK,
-                        EQUIP_SAGES_PENDANT,
-                        EQUIP_LUCKY_CHARM,
-                        EQUIP_BERSERKER_BAND,
-                    };
-                    int poolSize = 7;
-                    int floor = game->currentFloor;
-                    // Filter by floor availability
-                    EquipType valid[7];
-                    int validCount = 0;
-                    for (int p = 0; p < poolSize; p++) {
-                        int minF = 1;
-                        if (pool[p] >= EQUIP_RING_OF_THE_HAWK) minF = 3;
-                        if (pool[p] >= EQUIP_BERSERKER_BAND) minF = 5;
-                        if (floor >= minF) valid[validCount++] = pool[p];
-                    }
-                    if (validCount > 0) {
-                        EquipType drop = valid[GetRandomValue(0, validCount - 1)];
-                        if (AddEquipToInventory(game, drop)) {
-                            const EquipData* ed = GetEquipData(drop);
-                            CombatLog_Add(&game->combatLog, BLACK, "%s dropped %s!", mon->name, ed ? ed->name : "item");
-                        }
-                    }
-                }
             }
             return true;
         }

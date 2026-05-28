@@ -8,7 +8,7 @@
 
 - **Equipment system** — 17 equipment types across 3 categories (Armor, Weapon, Accessory) with 5 equip slots (Head, Chest, Weapon, Off-hand, Accessory). Each item provides stat bonuses (ATK, DEF, STR, DEX, INT, CON, LCK). Two-handed weapons (War Hammer) block the off-hand slot.
 - **Inventory UI tabs** — inventory screen now has 3 tabs (Inventory / Equipment / Stats) switchable with Q/E. Inventory tab shows potions and unequipped gear; Equipment tab shows equipped items with Unequip/Drop/Back actions; Stats tab displays base stats, derived stats, and unspent stat points.
-- **Stat point allocation** — gain +3 stat points per level. Allocate to STR (damage), DEX (dodge), INT (potion healing), CON (max HP), or LCK (crit chance, loot rarity). Max HP is now derived from CON (30 + CON x 5).
+- **Stat point allocation** — gain +2 stat points per level. Allocate to STR (damage), DEX (dodge), MGC (potion healing), CON (max HP), or LCK (crit chance, loot rarity). Max HP is now derived from CON (30 + CON x 5).
 - **Loot system overhaul** — unified loot table with 4 rarity tiers: Common (Tier 1), Uncommon (Tier 2), Rare (Tier 3, floor 4+), Legendary (Tier 4, floor 6+). Luck and floor depth boost higher tier drops. Equipment drops from monsters on death (20% base + LCK x 2, max 50%).
 - **Equipment on the ground** — equipment items now spawn on dungeon floors with their own sprites. Stacked items show a loot pile icon with quantity badge. Click to inspect.
 - **Monster equipment drops** — defeating a monster has a chance to drop a random accessory (filtered by floor availability).
@@ -45,7 +45,7 @@
 
 - `Entity` struct: added `str`, `dex`, `intel`, `con`, `lck` core stats and `statPoints` counter.
 - `AllocateStatPoint()` — increments one stat, decrements `statPoints`, recalculates max HP from CON.
-- `GainExperience()` — triggers level-ups, awards +3 stat points per level.
+- `GainExperience()` — triggers level-ups, awards +2 stat points per level.
 - `ExpForLevel()` — base formula: `20 + level * 10`.
 - Combat formula updated: player damage = `attack + STR * 2 - monster.defense`. Crit chance = LCK%. Monster dodge = DEX * 2% (max 60%).
 

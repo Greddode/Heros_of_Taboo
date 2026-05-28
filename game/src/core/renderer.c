@@ -411,7 +411,7 @@ void RenderGame(const Game* game) {
         int fontSize = (int)(48 * scale * textScale);
         int subSize = (int)(24 * scale * textScale);
         const char* title = "LEVEL UP!";
-        const char* sub = "+3 Stat Points!";
+        const char* sub = "+2 Stat Points!";
         int tw = MeasureText(title, fontSize);
         int sw = MeasureText(sub, subSize);
         int cx = GetScreenWidth() / 2;

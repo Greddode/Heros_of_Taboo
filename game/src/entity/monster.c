@@ -379,7 +379,7 @@ Monster* Monster_Spawn(MonsterType type, int x, int y, int floor) {
     m->hp       = m->maxHp;
     m->attack   = (int)(tpl->attack * scale);
     m->defense  = (int)(tpl->defense * scale) + m->con / 2;
-    m->level       = tpl->level + floorDiff;
+    m->level       = tpl->level + floorDiff * GetRandomValue(1, 3);
     if (m->level < 1) m->level = 1;
     m->expValue    = (int)(tpl->expValue * scale) + m->lck * 3;
     m->attackType  = tpl->attackType;
