@@ -194,9 +194,21 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
     TraceLog(LOG_INFO, "Spawner: %d monsters placed", World_CountAliveMonsters(gw));
 }
 
-void SpawnerSystem_SpawnPickups(GameWorld* gw, const ProceduralRoom* rooms, int roomCount,
-                                int playerX, int playerY, int currentFloor, int playerLck) {
-    if (!gw || !gw->map || roomCount == 0) return;
+void SpawnerSystem_SpawnPickups(GameWorld* gw) {
+    if (!gw || !gw->map) return;
+
+    int roomCount = 0;
+    const ProceduralRoom* rooms = GetGeneratedRooms(&roomCount);
+    if (roomCount == 0) return;
+
+    int playerX = 0, playerY = 0;
+    int playerLck = 0;
+    if (gw->playerEntity != ENTITY_NONE) {
+        CPosition* pPos = World_GetPosition(&gw->ecs, gw->playerEntity);
+        if (pPos) { playerX = pPos->x; playerY = pPos->y; }
+        CStats* ps = World_GetStats(&gw->ecs, gw->playerEntity);
+        if (ps) playerLck = ps->lck;
+    }
 
     int* tiles = gw->map->layers[0].data;
     int w = gw->map->width;
@@ -233,9 +245,9 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw, const ProceduralRoom* rooms, int 
             for (int te = 0; te < (int)LOOT_TABLE_COUNT; te++) {
                 const LootEntry* entry = &LOOT_TABLE[te];
                 int ti = entry->tier - 1;
-                if (currentFloor < tierMinFloor[ti]) continue;
+                if (gw->currentFloor < tierMinFloor[ti]) continue;
                 float luckBonus = (float)playerLck * 2.0f * (float)(ti + 1);
-                float floorBonus = (float)currentFloor * 3.0f * (float)(ti + 1);
+                float floorBonus = (float)gw->currentFloor * 3.0f * (float)(ti + 1);
                 float effectiveWeight = (float)entry->baseWeight + luckBonus + floorBonus;
                 if (effectiveWeight < 0) effectiveWeight = 0;
                 tierWeights[ti] += effectiveWeight;
@@ -292,6 +304,15 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw, const ProceduralRoom* rooms, int 
             if (pk->isEquip) pk->equipType = (EquipType)chosen->typeId;
             else pk->itemType = (ItemType)chosen->typeId;
             pk->quantity = 1;
+
+            // FIX: Add Sprite component so RenderSystem can see the pickup
+            World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
+            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
+            // Assuming you have a central sheet for items or specific paths
+            spr->tex = Resources_LoadTexture("resources/tilesets/items.png"); 
+            spr->frameCount = 0; // Static
+            spr->row = pk->isEquip ? 1 : 0;
+            spr->frame = chosen->typeId;
         }
     }
 
@@ -319,8 +340,9 @@ int SpawnerSystem_CollectPickupsAt(GameWorld* gw, int x, int y, ItemType* outTyp
         if (pk->quantity > 0 && !pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->itemType;
             outQtys[found] = pk->quantity;
-            pk->quantity = 0;
             found++;
+            // FIX: Destroy entity after collection to prevent ghost entities
+            World_DestroyEntity(&gw->ecs, e);
         }
     }
     return found;
@@ -336,6 +358,8 @@ int SpawnerSystem_CollectEquipAt(GameWorld* gw, int x, int y, EquipType* outType
         if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->equipType;
             outQtys[found] = pk->quantity;
+            // Note: Caller must call World_DestroyEntity if add is successful
+            // or we can destroy here if the caller guarantees space.
             found++;
         }
     }
@@ -391,6 +415,15 @@ static EntityId CreatePickupEntity(GameWorld* gw, int x, int y, bool isEquip, in
     if (isEquip) pk->equipType = (EquipType)typeId;
     else pk->itemType = (ItemType)typeId;
     pk->quantity = qty;
+
+    // Add visuals for manual additions
+    World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
+    CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
+    spr->tex = Resources_LoadTexture("resources/tilesets/items.png");
+    spr->frameCount = 0;
+    spr->row = isEquip ? 1 : 0;
+    spr->frame = typeId;
+
     return e;
 }
 
@@ -451,6 +484,8 @@ int SpawnerSystem_ListEquipAt(const GameWorld* gw, int x, int y,
         if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->equipType;
             outQtys[found] = pk->quantity;
+            // Note: Caller must call World_DestroyEntity if add is successful
+            // or we can destroy here if the caller guarantees space.
             found++;
         }
     }

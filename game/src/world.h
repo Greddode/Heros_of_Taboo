@@ -55,7 +55,7 @@ typedef struct GameWorld {
     float levelUpTimer;
 
     // Inspector (ECS entity id, ENTITY_NONE if none)
-    EntityId selectedMonsterEntity;
+    EntityId selectedEntity; // Rename to be more generic for ECS
 
     // Inventory data (UI state will be extracted later)
     InventorySlot inventory[MAX_INVENTORY_SLOTS];

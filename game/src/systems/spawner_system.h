@@ -15,8 +15,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
                                  int playerX, int playerY);
 
 // Spawn loot pickups directly into ECS from room data.
-void SpawnerSystem_SpawnPickups(GameWorld* gw, const ProceduralRoom* rooms, int roomCount,
-                                int playerX, int playerY, int currentFloor, int playerLck);
+void SpawnerSystem_SpawnPickups(GameWorld* gw);
 
 // Find a pickup entity at (x, y). Returns ENTITY_NONE if none.
 EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y);

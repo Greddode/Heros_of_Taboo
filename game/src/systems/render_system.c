@@ -1,5 +1,4 @@
 #include "render_system.h"
-#include "core/game.h"
 #include "core/inventory.h"
 #include "core/map_helpers.h"
 #include "core/renderer.h"
@@ -9,6 +8,8 @@
 #include "ui/inspector.h"
 #include <stdio.h>
 #include <math.h>
+
+float GetUIScale(void); // Declared in game.h, required for HUD scaling
 
 void RenderSystem_DrawMap(const GameWorld* gw) {
     if (!gw || !gw->map) return;
@@ -23,7 +24,15 @@ void RenderSystem_DrawMap(const GameWorld* gw) {
                 unsigned char vis = gw->visibility[y][x];
                 if (vis == 0) continue;
 
-                DrawTileWorld(gw, x, y, layer);
+                int gid = gw->map->layers[layer].data[y * gw->map->width + x];
+                if (gid > 0) {
+                    int tsIdx = FindTilesetForGID(gw->map, gid);
+                    if (tsIdx >= 0) {
+                        Rectangle src = GetTileSrcRect(gw->map, gid, tsIdx);
+                        Vector2 pos = TileToScreen(x, y, tw, th);
+                        DrawTextureRec(gw->tilesetTextures[tsIdx], src, pos, WHITE);
+                    }
+                }
 
                 if (vis == 2) {
                     Vector2 pos = TileToScreen(x, y, tw, th);
@@ -45,8 +54,8 @@ void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
         if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
         if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS)) continue;
 
-        CPosition* p = World_GetPosition(&gw->ecs, e);
-        CStats* s = World_GetStats(&gw->ecs, e);
+        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CStats* s = World_GetStats(&((GameWorld*)gw)->ecs, e);
         if (!s->alive) continue;
 
         if (p->y < 0 || p->y >= gw->map->height || p->x < 0 || p->x >= gw->map->width) continue;
@@ -61,12 +70,12 @@ void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
             pixelY = p->y * th;
         }
 
-        CHitFlash* hf = World_GetHitFlash(&gw->ecs, e);
+        CHitFlash* hf = World_GetHitFlash(&((GameWorld*)gw)->ecs, e);
 
         if (World_HasComponents(&gw->ecs, e, COMP_AI)) {
-            CAI* ai = World_GetAI(&gw->ecs, e);
+            CAI* ai = World_GetAI(&((GameWorld*)gw)->ecs, e);
             const MonsterTemplate* tpl = Monster_GetTemplate(ai->type);
-            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
+            CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, e);
 
             bool drewSprite = false;
             if (spr && spr->tex && spr->tex->id > 0 && tpl && tpl->frameCount > 0) {
@@ -112,43 +121,40 @@ void RenderSystem_World(const GameWorld* gw) {
     // Pickup rendering (ECS entities with COMP_POSITION | COMP_PICKUP)
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP | COMP_SPRITE_ANIM)) continue;
 
-        CPosition* pp2 = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
         CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, e);
+
         if (pk->quantity <= 0) continue;
 
-        if (pp2->y < 0 || pp2->y >= gw->map->height || pp2->x < 0 || pp2->x >= gw->map->width) continue;
-        if (gw->visibility[pp2->y][pp2->x] != 1) continue;
+        if (p->y < 0 || p->y >= gw->map->height || p->x < 0 || p->x >= gw->map->width) continue;
+        if (gw->visibility[p->y][p->x] != 1) continue;
 
-        int pixelX2 = pp2->x * tw;
-        int pixelY2 = pp2->y * th;
+        int px = p->x * tw;
+        int py = p->y * th;
 
-        if (pk->isEquip) {
-            Texture2D* eqTex = Inventory_LoadEquipTexture(pk->equipType);
-            if (eqTex && eqTex->id > 0) {
-                Rectangle src = { 0, 0, (float)eqTex->width, (float)eqTex->height };
-                Rectangle dest = { (float)pixelX2, (float)pixelY2, (float)tw, (float)th };
-                DrawTexturePro(*eqTex, src, dest, (Vector2){ 0 }, 0, WHITE);
-            } else {
-                DrawRectangle(pixelX2 + 2, pixelY2 + 2, tw - 4, th - 4, (Color){ 200, 150, 50, 255 });
-            }
+        if (spr->tex && spr->tex->id > 0) {
+            Rectangle src = { (float)spr->frame * 16, (float)spr->row * 16, 16, 16 };
+            Rectangle dest = { (float)px, (float)py, (float)tw, (float)th };
+            DrawTexturePro(*spr->tex, src, dest, (Vector2){ 0 }, 0, WHITE);
         } else {
-            DrawRectangle(pixelX2 + 2, pixelY2 + 2, tw - 4, th - 4, (Color){ 50, 200, 100, 255 });
+            DrawRectangle(px + 2, py + 2, tw - 4, th - 4, pk->isEquip ? (Color){ 200, 150, 50, 255 } : (Color){ 50, 200, 100, 255 });
         }
 
         if (pk->quantity > 1) {
             char qty[8];
             snprintf(qty, sizeof(qty), "x%d", pk->quantity);
-            DrawText(qty, pixelX2 + 2, pixelY2 + 2, 10, YELLOW);
+            DrawText(qty, px + 2, py + 2, 10, YELLOW);
         }
     }
 
     // Player rendering
-    if (World_IsAlive(&gw->ecs, gw->playerEntity)) {
-        CPosition* pp = World_GetPosition(&gw->ecs, gw->playerEntity);
-        CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
-        CSpriteAnim* spr = World_GetSprite(&gw->ecs, gw->playerEntity);
+    if (gw->playerEntity != ENTITY_NONE && World_GetStats(&((GameWorld*)gw)->ecs, gw->playerEntity)->alive) {
+        CPosition* pp = World_GetPosition(&((GameWorld*)gw)->ecs, gw->playerEntity);
+        CHitFlash* phf = World_GetHitFlash(&((GameWorld*)gw)->ecs, gw->playerEntity);
+        CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, gw->playerEntity);
 
         float px, py;
         if (playerT >= 0.0f && playerT <= 1.0f) {
@@ -222,6 +228,7 @@ void RenderSystem_HUD(const GameWorld* gw) {
     int barH = (int)(16 * scale);
     int textY = 0;
 
+    if (gw->playerEntity == ENTITY_NONE) return;
     CStats* ps = World_GetStats(&((GameWorld*)gw)->ecs, gw->playerEntity);
 
     char levelText[64];

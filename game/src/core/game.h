@@ -24,9 +24,7 @@ float GetGuiScale(void);
 
 typedef struct Game {
     MapData* map;
-    Texture2D tilesetTextures[MAX_TILESETS];
-
-    Player player;
+    // tilesetTextures moved to GameWorld
 
     int turnCount;
     GameState state;
@@ -38,32 +36,7 @@ typedef struct Game {
 
     CombatLog combatLog;
 
-    int selectedPotionTileX;
-    int selectedPotionTileY;
-    bool selectedPotionTileActive;
-
-    Texture2D potionTextures[3];
-    Texture2D texLoot;
-    Texture2D texUiFrame;
-    Texture2D texUiSlot;
-    Texture2D texUiMarker;
-    Texture2D magicAttacksTexture;
-
-    InventorySlot inventory[MAX_INVENTORY_SLOTS];
-    int inventorySlotCount;
-    int inventorySelection;
-    int invScrollOffset;
-    int statsScrollCol1;
-    int statsScrollCol2;
-    int statsActiveCol;
-    int statsSelection;
-    InventorySubState invSubState;
-    int invActionSelection;
-    InventoryTab inventoryTab;
-
-    EquipType equipped[EQUIP_SLOT_COUNT];
-    EquipType equipInventory[MAX_INVENTORY_SLOTS];
-    int equipInventoryCount;
+    // Legacy inventory and UI state moved to InventoryUIState and GameWorld
 
     int currentFloor;
     int maxFloors;
@@ -73,7 +46,7 @@ typedef struct Game {
     bool escapeSpawned;
 
     int timeWaited;
-    EntityId selectedMonsterEntity;
+    // selectedEntity moved to GameWorld
 
     int escapeX;
     int escapeY;
