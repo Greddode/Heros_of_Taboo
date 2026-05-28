@@ -100,6 +100,41 @@ void RenderSystem_World(const GameWorld* gw) {
         }
     }
 
+    // Pickup rendering (ECS entities with COMP_POSITION | COMP_PICKUP)
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+
+        CPosition* pp2 = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (pk->quantity <= 0) continue;
+
+        if (pp2->y < 0 || pp2->y >= gw->map->height || pp2->x < 0 || pp2->x >= gw->map->width) continue;
+        if (gw->visibility[pp2->y][pp2->x] != 1) continue;
+
+        int pixelX2 = pp2->x * tw;
+        int pixelY2 = pp2->y * th;
+
+        if (pk->isEquip) {
+            Texture2D eqTex = GetEquipSprite(pk->equipType);
+            if (eqTex.id > 0) {
+                Rectangle src = { 0, 0, (float)eqTex.width, (float)eqTex.height };
+                Rectangle dest = { (float)pixelX2, (float)pixelY2, (float)tw, (float)th };
+                DrawTexturePro(eqTex, src, dest, (Vector2){ 0 }, 0, WHITE);
+            } else {
+                DrawRectangle(pixelX2 + 2, pixelY2 + 2, tw - 4, th - 4, (Color){ 200, 150, 50, 255 });
+            }
+        } else {
+            DrawRectangle(pixelX2 + 2, pixelY2 + 2, tw - 4, th - 4, (Color){ 50, 200, 100, 255 });
+        }
+
+        if (pk->quantity > 1) {
+            char qty[8];
+            snprintf(qty, sizeof(qty), "x%d", pk->quantity);
+            DrawText(qty, pixelX2 + 2, pixelY2 + 2, 10, YELLOW);
+        }
+    }
+
     // Player rendering
     if (World_IsAlive(&gw->ecs, gw->playerEntity)) {
         CPosition* pp = World_GetPosition(&gw->ecs, gw->playerEntity);
