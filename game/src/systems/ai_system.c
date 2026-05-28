@@ -1,5 +1,4 @@
 #include "ai_system.h"
-#include "core/game.h"
 #include "core/audio.h"
 #include "ui/combat_log.h"
 #include "entity/monster.h"

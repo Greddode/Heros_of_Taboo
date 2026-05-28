@@ -7,7 +7,6 @@
 
 #define MOVE_ANIM_DURATION 0.15f
 #define FOG_RADIUS 7
-#define PROJECTILE_ANIM_DURATION 0.25f
 
 #include "tmx/tmx.h"
 #include "entity/entity.h"
