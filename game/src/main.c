@@ -47,6 +47,14 @@ int main(void)
             {
                 MenuAction action = Menu_Update();
                 if (action == MENU_PLAY) {
+                    BeginDrawing();
+                    ClearBackground(BLACK);
+                    const char* loadText = "LOADING...";
+                    int fontSize = 40;
+                    int tw = MeasureText(loadText, fontSize);
+                    DrawText(loadText, GetScreenWidth() / 2 - tw / 2, GetScreenHeight() / 2 - fontSize / 2, fontSize, WHITE);
+                    EndDrawing();
+
                     const char* mapFiles[] = {
                         "resources/map.tmx", "resources/map.TMX",
                         "../resources/map.tmx", "./map.tmx", "map.tmx"
@@ -195,6 +203,14 @@ int main(void)
 
                 // Now handle deferred scene transitions (after EndDrawing)
                 if (restartGame) {
+                    BeginDrawing();
+                    ClearBackground(BLACK);
+                    const char* loadText = "LOADING...";
+                    int fontSize = 40;
+                    int tw = MeasureText(loadText, fontSize);
+                    DrawText(loadText, GetScreenWidth() / 2 - tw / 2, GetScreenHeight() / 2 - fontSize / 2, fontSize, WHITE);
+                    EndDrawing();
+
                     CleanupGame(&game);
                     const char* mapFile = "resources/map.tmx";
                     if (!FileExists(mapFile)) mapFile = "../resources/map.tmx";
