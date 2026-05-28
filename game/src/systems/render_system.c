@@ -75,12 +75,17 @@ void RenderSystem_World(const GameWorld* gw) {
         if (World_HasComponents(&gw->ecs, e, COMP_AI)) {
             CAI* ai = World_GetAI(&gw->ecs, e);
             const MonsterTemplate* tpl = Monster_GetTemplate(ai->type);
+            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
 
-            // Try sprite rendering — monster textures are still in the old static array
-            // This will be fixed when textures move to the resource manager / CSpriteAnim
             bool drewSprite = false;
-            if (tpl && tpl->frameCount > 0 && tpl->spritePath) {
-                // Sprite rendering will be wired up when monster textures are ported
+            if (spr && spr->tex && spr->tex->id > 0 && tpl && tpl->frameCount > 0) {
+                float frameW = (float)spr->tex->width / (float)tpl->frameCount;
+                float frameH = (float)spr->tex->height;
+                Rectangle src = { (float)spr->frame * frameW, 0, frameW, frameH };
+                Rectangle dest = { (float)pixelX, (float)pixelY, frameW, frameH };
+                Color tint = (hf && hf->timer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;
+                DrawTexturePro(*spr->tex, src, dest, (Vector2){ 0, 0 }, 0, tint);
+                drewSprite = true;
             }
 
             if (!drewSprite && tpl) {

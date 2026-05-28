@@ -1,6 +1,7 @@
 #include "player_system.h"
 #include "core/audio.h"
 #include "ui/combat_log.h"
+#include "resources.h"
 #include <stdio.h>
 
 static int ExpForLevelLocal(int level) {
@@ -40,10 +41,10 @@ void PlayerSystem_Spawn(GameWorld* gw) {
 
     World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
     CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-    spr->tex = NULL;
-    spr->row = 6;
+    spr->tex = Resources_LoadTexture("resources/sprites/player.png");
+    spr->row = 0;
     spr->frame = 0;
-    spr->frameCount = 0;
+    spr->frameCount = 4;
     spr->animTimer = 0;
     spr->animSpeed = 0.15f;
 

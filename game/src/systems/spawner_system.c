@@ -1,5 +1,6 @@
 #include "spawner_system.h"
 #include "entity/monster.h"
+#include "resources.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -58,8 +59,9 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
             for (EntityId check = 1; check < (EntityId)gw->ecs.count; check++) {
                 if (!gw->ecs.alive[check]) continue;
                 if (!World_HasComponents(&gw->ecs, check, COMP_POSITION | COMP_STATS)) continue;
-                if (World_GetAI(&gw->ecs, check)->type == 0 && !World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
                 if (World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
+                if (!World_HasComponents(&gw->ecs, check, COMP_AI)) continue;
+                if (World_GetAI(&gw->ecs, check)->type == 0) continue;
                 CPosition* cp = World_GetPosition(&gw->ecs, check);
                 if (cp->x == mx && cp->y == my) { occupied = true; break; }
             }
@@ -127,7 +129,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 
             World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
             CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-            spr->tex = NULL;
+            spr->tex = (tpl->spritePath && tpl->frameCount > 0) ? Resources_LoadTexture(tpl->spritePath) : NULL;
             spr->row = 0;
             spr->frame = 0;
             spr->frameCount = tpl->frameCount;

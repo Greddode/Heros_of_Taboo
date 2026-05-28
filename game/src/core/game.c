@@ -882,7 +882,7 @@ void DescendFloor(Game* game) {
     game->currentFloor = floor;
     game->maxFloors = 10;
     {
-        Texture2D* t = Resources_LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+        Texture2D* t = Resources_LoadTexture("resources/sprites/player.png");
         if (t) game->player.ent.spriteSheet = *t;
     }
     if (game->player.ent.spriteSheet.id == 0) {
@@ -1093,7 +1093,7 @@ bool InitGame(Game* game, const char* tmxFile) {
     game->player.ent.spriteRow = 6;
 
     {
-        Texture2D* t = Resources_LoadTexture("resources/sprites/roguelikeChar_transparent.png");
+        Texture2D* t = Resources_LoadTexture("resources/sprites/player.png");
         if (t) game->player.ent.spriteSheet = *t;
     }
     if (game->player.ent.spriteSheet.id == 0) {
