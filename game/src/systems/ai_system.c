@@ -107,7 +107,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;
-                CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", gw->ecs.names[monster].name);
+                CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                 return;
             }
 
@@ -162,8 +162,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             if (ai->attackType == ATTACK_MAGIC) PlayMagicAttackSound();
             else PlayRangedAttackSound();
             TraceLog(LOG_INFO, "%s %s you for %d damage (HP: %d)!",
-                     gw->ecs.names[monster].name, verb, dmg, playerStats->hp);
-            CombatLog_Add(&gw->combatLog, BLACK, "%s %s you for %d!", gw->ecs.names[monster].name, verb, dmg);
+                     World_GetName(&gw->ecs, monster)->name, verb, dmg, playerStats->hp);
+            CombatLog_Add(&gw->combatLog, BLACK, "%s %s you for %d!", World_GetName(&gw->ecs, monster)->name, verb, dmg);
             return;
         }
 
@@ -176,7 +176,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                     CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                     hf->timer = 0.15f;
-                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", gw->ecs.names[monster].name);
+                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                     return;
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
@@ -194,8 +194,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
                 phf->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
-                         gw->ecs.names[monster].name, dmg, playerStats->hp);
-                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", gw->ecs.names[monster].name, dmg);
+                         World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
+                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", World_GetName(&gw->ecs, monster)->name, dmg);
                 return;
             }
         }
@@ -215,7 +215,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                     CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                     hf->timer = 0.15f;
-                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", gw->ecs.names[monster].name);
+                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                     return;
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
@@ -233,8 +233,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
                 phf->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
-                         gw->ecs.names[monster].name, dmg, playerStats->hp);
-                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", gw->ecs.names[monster].name, dmg);
+                         World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
+                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", World_GetName(&gw->ecs, monster)->name, dmg);
                 return;
             }
         }

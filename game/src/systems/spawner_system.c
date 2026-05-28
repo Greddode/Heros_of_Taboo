@@ -58,7 +58,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
             for (EntityId check = 1; check < (EntityId)gw->ecs.count; check++) {
                 if (!gw->ecs.alive[check]) continue;
                 if (!World_HasComponents(&gw->ecs, check, COMP_POSITION | COMP_STATS)) continue;
-                if (gw->ecs.ais[check].type == 0 && !World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
+                if (World_GetAI(&gw->ecs, check)->type == 0 && !World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
                 if (World_HasComponents(&gw->ecs, check, COMP_PLAYER_TAG)) continue;
                 CPosition* cp = World_GetPosition(&gw->ecs, check);
                 if (cp->x == mx && cp->y == my) { occupied = true; break; }
