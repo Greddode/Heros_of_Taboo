@@ -1,5 +1,117 @@
 # Changelog
 
+## ALPHA-0.0.8 — Equipment & Stat System
+
+---
+
+### For Players
+
+- **Equipment system** — 17 equipment types across 3 categories (Armor, Weapon, Accessory) with 5 equip slots (Head, Chest, Weapon, Off-hand, Accessory). Each item provides stat bonuses (ATK, DEF, STR, DEX, INT, CON, LCK). Two-handed weapons (War Hammer) block the off-hand slot.
+- **Inventory UI tabs** — inventory screen now has 3 tabs (Inventory / Equipment / Stats) switchable with Q/E. Inventory tab shows potions and unequipped gear; Equipment tab shows equipped items with Unequip/Drop/Back actions; Stats tab displays base stats, derived stats, and unspent stat points.
+- **Stat point allocation** — gain +3 stat points per level. Allocate to STR (damage), DEX (dodge), INT (potion healing), CON (max HP), or LCK (crit chance, loot rarity). Max HP is now derived from CON (30 + CON x 5).
+- **Loot system overhaul** — unified loot table with 4 rarity tiers: Common (Tier 1), Uncommon (Tier 2), Rare (Tier 3, floor 4+), Legendary (Tier 4, floor 6+). Luck and floor depth boost higher tier drops. Equipment drops from monsters on death (20% base + LCK x 2, max 50%).
+- **Equipment on the ground** — equipment items now spawn on dungeon floors with their own sprites. Stacked items show a loot pile icon with quantity badge. Click to inspect.
+- **Monster equipment drops** — defeating a monster has a chance to drop a random accessory (filtered by floor availability).
+- **Level-up notification** — gold "LEVEL UP!" overlay with "+3 Stat Points!" subtitle, fades out over 3 seconds. Level-up sound effect added.
+- **Potion heal scales with INT** — potion healing is now `base% x (1 + INT x 0.02)`, making Intelligence stat meaningful for sustain.
+- **Potion rarity on ground** — floor-placed potions now roll randomly (50% small, 30% medium, 20% large) instead of being floor-locked.
+- **GUI Scale setting** — adjustable UI scale (1.0x to 4.0x) in the Settings menu. All UI elements scale proportionally.
+- **Updated controls screen** — documents Q/E tab switching, sprint controls, mouse click inspect, and equipment management.
+- **Scrollable menus** — main menu, story, credits, and controls screens now scroll when content exceeds the viewport.
+- **Starting equipment** — player now starts with a Survival Knife (+2 ATK) instead of bare fists.
+
+### For Developers
+
+#### Equipment System (`game/src/core/inventory.c`, `inventory.h`)
+
+- `EquipType` enum: 17 equipment types — 3 head armors, 3 chest armors, 5 weapons, 3 shields, 7 accessories.
+- `EquipSlot` enum: `HEAD`, `CHEST`, `WEAPON`, `OFF_HAND`, `ACCESSORY`.
+- `EquipData` struct: name, description, sprite path, category, slot, stat bonuses (ATK/DEF/STR/DEX/INT/CON/LCK), `twoHanded` flag.
+- `EquipItem()` / `EquipItemSilent()` — equip with stat bonus application, CON-derived max HP recalculation.
+- `UnequipSlot()` — reverts stat bonuses, moves item to `equipInventory[]` (preserved across floors).
+- `AddEquipToInventory()` / `RemoveEquipFromInventory()` — manage unequipped gear storage.
+- Equipment sprite loading: `LoadPotionTextures()` now also loads all equipment sprites from `resources/sprites/items/equipment/`.
+
+#### Inventory Tab UI (`game/src/core/inventory.c`)
+
+- `InventoryTab` enum: `INV_TAB_INVENTORY`, `INV_TAB_EQUIPMENT`, `INV_TAB_STATS`.
+- Tab bar rendering with `Draw9Slice` marker texture, yellow underline for active tab.
+- Inventory tab: combined potion + equipment list with `[Slot] Name` format for gear.
+- Equipment tab: 5 slot rows with equipped item name, sprite, and action menu (Unequip/Drop/Back).
+- Stats tab: two-column layout — left column shows base stats (STR/DEX/INT/CON/LCK), HP, ATK, DEF, EXP; right column shows stat point allocation with Enter/Space to allocate.
+- `Inspector_Render()` unified for both monster and item inspection, showing equipment sprites, descriptions, and stat bonuses.
+
+#### Stat System (`game/src/entity/entity.h`, `player.c`)
+
+- `Entity` struct: added `str`, `dex`, `intel`, `con`, `lck` core stats and `statPoints` counter.
+- `AllocateStatPoint()` — increments one stat, decrements `statPoints`, recalculates max HP from CON.
+- `GainExperience()` — triggers level-ups, awards +3 stat points per level.
+- `ExpForLevel()` — base formula: `20 + level * 10`.
+- Combat formula updated: player damage = `attack + STR * 2 - monster.defense`. Crit chance = LCK%. Monster dodge = DEX * 2% (max 60%).
+
+#### Loot System (`game/src/entity/spawner.c`)
+
+- Unified `LootEntry` struct: `LootCategory` (POTION/EQUIP), `typeId`, `tier` (1–4), `baseWeight`.
+- `LOOT_TABLE[]` — 23 entries across 4 rarity tiers with minimum floor requirements (Tier 3: floor 4+, Tier 4: floor 6+).
+- Tier selection: effective weight = `baseWeight + LCK * 2 * tier + floor * 3 * tier`.
+- Item selection within tier uses base weights for variety.
+- Equipment placed on map tiles with stacking support and loot pile sprite for multiples.
+
+#### Shadow Scaling Rework (`game/src/core/map_helpers.c`)
+
+- Shadow monster now scales stats via exponential formula: `scale = 1.12^(level-1)`.
+- Stats derived from scaled core attributes: `HP = 10 + CON * 5`, `ATK = 4 + STR * 2`, `DEF = 1 + CON/2`, `EXP = 10 + LCK * 3`.
+
+#### FOW Optimization (`game/src/core/map_helpers.c`)
+
+- Bresenham ray-casting for line-of-sight within fog radius.
+- Wall adjacency: cardinal neighbors always checked; diagonal 8-dir check only on corner tiles (tiles with an adjacent wall) to peek around corners.
+
+#### GUI Scale (`game/src/core/game.c`, `game/src/ui/menu.c`)
+
+- `GetUIScale()` / `SetGuiScale()` / `GetGuiScale()` — global UI scale multiplier (1.0–4.0).
+- All menu screens, HUD elements, inventory, and inspector panels scale proportionally.
+- Settings menu: new "GUI Scale" slider with 0.25x increments.
+
+#### Audio (`game/src/core/audio.c`, `audio.h`)
+
+- `PlayLevelUpSound()` — loads and plays random `.wav` from `resources/audio/sounds/levelup/`.
+
+#### Controls Update (`game/src/ui/text_data.c`)
+
+- Controls screen text re-encoded (XOR key `0xAB`, 886 bytes) with Q/E tab switching, sprint, inventory, and mouse click documentation.
+
+#### New/Modified Files
+
+| File | Change |
+|------|--------|
+| `game/src/core/inventory.c` | Equipment system, tab UI, stat allocation, loot table |
+| `game/src/core/inventory.h` | `EquipType`, `EquipData`, `EquipSlot`, `EquipCategory`, tab enums |
+| `game/src/core/game.c` | Stats tab input, equipment action menu, level-up timer, GUI scale |
+| `game/src/core/game.h` | Added `equipInventory[]`, `equipMapCount/Types/Tiles/Collected/Quantities`, `levelUpTimer`, `inventoryTab`, `statsSelection/ActiveCol/ScrollCol1/2` |
+| `game/src/core/renderer.c` | Equipment sprite rendering on map, loot pile rendering, level-up overlay |
+| `game/src/core/map_helpers.c` | Bresenham FOW, corner diagonal adjacency, shadow stat scaling, potion rarity roll |
+| `game/src/core/audio.c` | Level-up sound loading and playback |
+| `game/src/core/audio.h` | `PlayLevelUpSound()` |
+| `game/src/entity/entity.h` | `str/dex/intel/con/lck` stats, `statPoints` field |
+| `game/src/entity/entity.c` | STR-based damage, LCK crits, DEX dodge, equipment drops on kill |
+| `game/src/entity/player.c` | `AllocateStatPoint()`, `ExpForLevel()`, stat point awards on level-up |
+| `game/src/entity/monster.h` | `str/dex/intel/con/lck` core stats in template and instance |
+| `game/src/entity/monster.c` | Core stat initialization and floor scaling |
+| `game/src/entity/spawner.c` | Unified loot table, tier-based drop system, equipment spawning |
+| `game/src/ui/inspector.c` | **New** — unified monster/item inspector with equipment display |
+| `game/src/ui/inspector.h` | **New** — `InspectorType`, `Inspector_Render()` |
+| `game/src/ui/menu.c` | GUI scale setting, scrollable menus, story selection cursor |
+| `game/src/ui/text_data.c` | Updated controls text (886 bytes), `RenderTextScreen` scroll parameter |
+| `game/src/ui/text_data.h` | Updated `s_controls_data` size, `RenderTextScreen` signature |
+| `game/src/ui/monster_info.c` | **Removed** — replaced by `inspector.c` |
+| `game/src/ui/monster_info.h` | **Removed** — replaced by `inspector.h` |
+| `resources/sprites/items/equipment/` | **New** — 22 equipment sprites (armors, weapons, accessories) |
+| `resources/sprites/items/loot.png` | **New** — loot pile sprite for stacked equipment |
+| `resources/sprites/items/health_potions/medium_health_potion.png` | **New** — medium potion sprite |
+| `resources/sprites/ui/UI_Flat_FrameMarker01a.png` | **New** — tab bar marker texture |
+| `resources/audio/sounds/levelup/Jump9.wav` | **New** — level-up sound effect |
+
 ## ALPHA-0.0.7 — Ranged Combat & AI Rebalance
 
 ---

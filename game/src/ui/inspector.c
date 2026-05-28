@@ -4,19 +4,56 @@
 #include <stdio.h>
 #include <string.h>
 
-static void DrawDesc(const char* desc, int x, int y, int maxWidth, int fontSize, Color color) {
+static int DrawWrappedLine(const char* text, int x, int y, int maxWidth, int fontSize, Color color) {
+    char lineBuf[256] = "";
+    const char* word = text;
+    while (*word) {
+        while (*word == ' ') word++;
+        if (!*word) break;
+        const char* wordEnd = word;
+        while (*wordEnd && *wordEnd != ' ') wordEnd++;
+        int wordLen = (int)(wordEnd - word);
+        int curLen = (int)strlen(lineBuf);
+        int sep = (curLen > 0) ? 1 : 0;
+        char testBuf[256];
+        memcpy(testBuf, lineBuf, curLen);
+        if (sep) testBuf[curLen] = ' ';
+        memcpy(testBuf + curLen + sep, word, wordLen);
+        testBuf[curLen + sep + wordLen] = '\0';
+        if (MeasureText(testBuf, fontSize) > maxWidth && curLen > 0) {
+            DrawText(lineBuf, x, y, fontSize, color);
+            y += fontSize + 4;
+            memcpy(lineBuf, word, wordLen);
+            lineBuf[wordLen] = '\0';
+        } else {
+            if (sep) lineBuf[curLen] = ' ';
+            memcpy(lineBuf + curLen + sep, word, wordLen);
+            lineBuf[curLen + sep + wordLen] = '\0';
+        }
+        word = wordEnd;
+    }
+    if (lineBuf[0]) {
+        DrawText(lineBuf, x, y, fontSize, color);
+        y += fontSize + 4;
+    }
+    return y;
+}
+
+static int DrawDesc(const char* desc, int x, int y, int maxWidth, int fontSize, Color color) {
     char buf[512];
     strncpy(buf, desc, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
-    char* line = buf;
+    int startY = y;
+    char* para = buf;
     char* nl;
-    while ((nl = strchr(line, '\n')) != NULL) {
+    while ((nl = strchr(para, '\n')) != NULL) {
         *nl = '\0';
-        DrawText(line, x, y, fontSize, color);
-        y += fontSize + 4;
-        line = nl + 1;
+        y = DrawWrappedLine(para, x, y, maxWidth, fontSize, color);
+        para = nl + 1;
     }
-    if (*line) DrawText(line, x, y, fontSize, color);
+    if (*para)
+        y = DrawWrappedLine(para, x, y, maxWidth, fontSize, color);
+    return y - startY;
 }
 
 void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w, int h) {
@@ -98,10 +135,8 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
 
             int descSize = (int)(14 * scale);
             const char* desc = d->description;
-            DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
-            int descLines = 1;
-            for (const char* p = desc; *p; p++) if (*p == '\n') descLines++;
-            ly += descLines * (descSize + 4) + (int)(4 * scale);
+            int descH = DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
+            ly += descH + (int)(4 * scale);
 
             ly += (int)(40 * scale);
 
@@ -127,7 +162,7 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusInt != 0) {
-                snprintf(buf, sizeof(buf), "INT%+d", d->bonusInt);
+                snprintf(buf, sizeof(buf), "MGC%+d", d->bonusInt);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusCon != 0) {
@@ -159,10 +194,8 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
 
             const char* desc = GetItemDescription(selType);
             int descSize = (int)(14 * scale);
-            DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
-            int descLines = 1;
-            for (const char* p = desc; *p; p++) if (*p == '\n') descLines++;
-            ly += descLines * (descSize + 4) + (int)(4 * scale);
+            int descH = DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
+            ly += descH + (int)(4 * scale);
 
             snprintf(buf, sizeof(buf), "Qty: %d", game->inventory[game->inventorySelection].quantity);
             DrawText(buf, lx, ly, (int)(14 * scale), BLACK);

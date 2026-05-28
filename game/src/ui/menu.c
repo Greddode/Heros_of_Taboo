@@ -597,16 +597,18 @@ void Menu_SettingsRender(void) {
     int titleSize = (int)(50 * scale);
     const char* title = "Settings";
     int titleW = MeasureText(title, titleSize);
-    DrawText(title, (sw - titleW) / 2, sh / 5, titleSize, (Color){ 200, 180, 50, 255 });
+    int titleY = (int)(sh * 0.1f);
+    DrawText(title, (sw - titleW) / 2, titleY, titleSize, (Color){ 200, 180, 50, 255 });
 
     int cx = sw / 2;
-    int cy = sh / 2 - (int)(30 * scale);
     int itemSpacing = (int)(70 * scale);
     int itemSize = (int)(22 * scale);
     int barW = (int)(260 * scale);
+    int labelHeight = itemSize + 8;
+    int cy = titleY + titleSize + (int)(40 * scale);
 
-    int viewY = cy;
-    int viewH = sh - cy - (int)(40 * scale);
+    int viewY = cy - labelHeight;
+    int viewH = sh - viewY - (int)(40 * scale);
     int maxVisible = viewH / itemSpacing;
     if (maxVisible < 1) maxVisible = 1;
 

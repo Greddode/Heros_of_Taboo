@@ -62,10 +62,10 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
 
     // Accessories
     { EQUIP_RING_OF_STRENGTH,  "Ring of Strength",   "A ring pulsing with power.\n+3 STR",           "resources/sprites/items/equipment/accessories/ring_of_strength.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 3,0,0,0,0, false },
-    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  "An enchanted amulet.\n+2 INT, +2 CON",           "resources/sprites/items/equipment/accessories/amulet_of_warding.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,2,2,0, false },
+    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  "An enchanted amulet.\n+2 MGC, +2 CON",           "resources/sprites/items/equipment/accessories/amulet_of_warding.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,2,2,0, false },
     { EQUIP_BOOTS_OF_SWIFTNESS,"Boots of Swiftness","Light boots that aid movement.\n+3 DEX, +1 CON", "resources/sprites/items/equipment/accessories/boots_of_swiftness.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,3,0,1,0, false },
     { EQUIP_RING_OF_THE_HAWK,  "Ring of the Hawk",   "A hawk's eye in a ring.\n+4 DEX",               "resources/sprites/items/equipment/accessories/ring_of_hawk.png",     EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,4,0,0,0, false },
-    { EQUIP_SAGES_PENDANT,     "Sage's Pendant",     "The wisdom of ages.\n+4 INT",                    "resources/sprites/items/equipment/accessories/sage_pendant.png",     EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,4,0,0, false },
+    { EQUIP_SAGES_PENDANT,     "Sage's Pendant",     "The wisdom of ages.\n+4 MGC",                    "resources/sprites/items/equipment/accessories/sage_pendant.png",     EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,4,0,0, false },
     { EQUIP_LUCKY_CHARM,       "Lucky Charm",        "A charm of fortune.\n+6 LCK",                    "resources/sprites/items/equipment/accessories/lucky_charm.png",      EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,0,0,6, false },
     { EQUIP_BERSERKER_BAND,    "Berserker Band",     "Strength at a cost.\n+5 STR, -2 DEF",            "resources/sprites/items/equipment/accessories/fallback_ring.png",    EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, -2, 0, 5,0,0,0,0, false },
 };
@@ -114,14 +114,14 @@ bool InventoryUse(Game* game, int slot) {
 
     int healPercent = GetItemHealAmount(s->type);
     if (healPercent > 0) {
-        // Base heal percentage scaled by INT: base% * (1 + INT * 0.02)
+        // Base heal percentage scaled by MGC: base% * (1 + MGC * 0.02)
         float intMult = 1.0f + (float)game->player.ent.intel * 0.02f;
         int heal = (game->player.ent.maxHp * healPercent * (int)(intMult * 100)) / 10000;
         if (heal < 1) heal = 1;
         game->player.ent.hp += heal;
         if (game->player.ent.hp > game->player.ent.maxHp)
             game->player.ent.hp = game->player.ent.maxHp;
-        CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, INTx%.0f%%)!",
+        CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, MGCx%.0f%%)!",
                       GetItemName(s->type), healPercent, heal, intMult * 100);
     }
 
@@ -540,7 +540,7 @@ static void DrawEquipmentTab(const Game* game, int ix, int iy, int iw, int ih) {
                     strncat(bonusStr, tmp, sizeof(bonusStr) - strlen(bonusStr) - 1);
                 }
                 if (data->bonusInt != 0) {
-                    char tmp[16]; snprintf(tmp, sizeof(tmp), "INT%+d ", data->bonusInt);
+                    char tmp[16]; snprintf(tmp, sizeof(tmp), "MGC%+d ", data->bonusInt);
                     strncat(bonusStr, tmp, sizeof(bonusStr) - strlen(bonusStr) - 1);
                 }
                 if (data->bonusCon != 0) {
@@ -631,7 +631,7 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
         if (IS_SEL) DrawText(">", (XX) - (int)(18 * scale), (YY), textSize, YELLOW); \
     } while(0)
 
-    static const Color cBlack = BLACK;
+    static const Color cBlack = {0, 0, 0, 255};
     int lineIdx = 0;
 
     snprintf(buf, sizeof(buf), "Name:     %s", p->name);
@@ -661,7 +661,7 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
     snprintf(buf, sizeof(buf), "DEX:      %d (base %d)", p->dex, baseDex);
     STAT_SLOT(c1y, col1x, isCol1 && lineIdx == game->statsSelection); DrawText(buf, col1x + (int)(2 * scale), c1y, textSize, cBlack); c1y += gap; lineIdx++;
 
-    snprintf(buf, sizeof(buf), "INT:      %d (base %d)", p->intel, baseInt);
+    snprintf(buf, sizeof(buf), "MGC:      %d (base %d)", p->intel, baseInt);
     STAT_SLOT(c1y, col1x, isCol1 && lineIdx == game->statsSelection); DrawText(buf, col1x + (int)(2 * scale), c1y, textSize, cBlack); c1y += gap; lineIdx++;
 
     snprintf(buf, sizeof(buf), "CON:      %d (base %d)", p->con, baseCon);
@@ -687,7 +687,7 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
     snprintf(buf, sizeof(buf), "Crit:       %d%%", critPct);
     STAT_SLOT(c1y, col1x, isCol1 && lineIdx == game->statsSelection); DrawText(buf, col1x + (int)(2 * scale), c1y, derivedSize, cBlack); c1y += gap; lineIdx++;
 
-    snprintf(buf, sizeof(buf), "Magic RES:  %d", magicRes);
+    snprintf(buf, sizeof(buf), "Magic DEF:  %d", magicRes);
     STAT_SLOT(c1y, col1x, isCol1 && lineIdx == game->statsSelection); DrawText(buf, col1x + (int)(2 * scale), c1y, derivedSize, cBlack); c1y += gap; lineIdx++;
 
     c1y += (int)(8 * scale);
@@ -711,7 +711,7 @@ static void DrawStatsTab(const Game* game, int ix, int iy, int iw, int ih) {
         int allocSize = (int)(15 * scale);
         STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("STR (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
         STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("DEX (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
-        STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("INT (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
+        STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("MGC (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
         STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("CON (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
         STAT_SLOT(c2y, col2x, isCol2 && lineIdx2 == game->statsSelection); DrawText("LCK (+1)", col2x + (int)(2 * scale), c2y, allocSize, cBlack); c2y += gap; lineIdx2++;
     } else {

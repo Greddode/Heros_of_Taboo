@@ -85,7 +85,7 @@ typedef struct {
 } EquipData;
 
 typedef struct {
-    EquipType type;
+    ItemType type;
     int quantity;
 } InventorySlot;
 

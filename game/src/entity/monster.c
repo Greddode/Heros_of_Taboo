@@ -579,7 +579,7 @@ static void ProcessMonsterAI(Monster* m, Game* game) {
                 dmg = m->attack + (int)(m->dex * 1.5f) - game->player.ent.defense;
             } else { // ATTACK_MAGIC
                 dmg = m->attack + m->intel - game->player.ent.defense;
-                // Apply magic resistance (INT × 3) for magic attacks
+                // Apply magic resistance (MGC × 3) for magic attacks
                 int magicRes = game->player.ent.intel * 3;
                 dmg -= magicRes;
             }
