@@ -1,4 +1,5 @@
 #include "spawner_system.h"
+#include "core/game.h"
 #include "entity/monster.h"
 #include "resources.h"
 #include <stdlib.h>
@@ -165,10 +166,54 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
     #undef ROOM_MAX_FLOORS
 }
 
-void SpawnerSystem_SpawnPickups(GameWorld* gw) {
-    // Bridge: read from old Game pickup arrays, create ECS entities
-    // This is called after Spawner_Populate populates the old arrays
-    // Once callers are migrated (Step 10), this function will be the sole spawner
+void SpawnerSystem_SpawnPickups(GameWorld* gw, Game* game) {
+    if (!gw || !game) return;
+
+    // Spawn potion entities from old arrays
+    for (int i = 0; i < game->potionCount; i++) {
+        if (game->potionCollected[i]) continue;
+        if (game->potionQuantities[i] <= 0) continue;
+
+        int px = game->potionTiles[i][0];
+        int py = game->potionTiles[i][1];
+
+        EntityId e = World_CreateEntity(&gw->ecs);
+        if (e == ENTITY_NONE) continue;
+
+        World_AddComponent(&gw->ecs, e, COMP_POSITION);
+        CPosition* pos = World_GetPosition(&gw->ecs, e);
+        pos->x = px; pos->y = py;
+        pos->prevX = px; pos->prevY = py;
+
+        World_AddComponent(&gw->ecs, e, COMP_PICKUP);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        pk->isEquip = false;
+        pk->itemType = game->potionTypes[i];
+        pk->quantity = game->potionQuantities[i];
+    }
+
+    // Spawn equipment entities from old arrays
+    for (int i = 0; i < game->equipMapCount; i++) {
+        if (game->equipMapCollected[i]) continue;
+        if (game->equipMapQuantities[i] <= 0) continue;
+
+        int px = game->equipMapTiles[i][0];
+        int py = game->equipMapTiles[i][1];
+
+        EntityId e = World_CreateEntity(&gw->ecs);
+        if (e == ENTITY_NONE) continue;
+
+        World_AddComponent(&gw->ecs, e, COMP_POSITION);
+        CPosition* pos = World_GetPosition(&gw->ecs, e);
+        pos->x = px; pos->y = py;
+        pos->prevX = px; pos->prevY = py;
+
+        World_AddComponent(&gw->ecs, e, COMP_PICKUP);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        pk->isEquip = true;
+        pk->equipType = game->equipMapTypes[i];
+        pk->quantity = game->equipMapQuantities[i];
+    }
 }
 
 EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y) {

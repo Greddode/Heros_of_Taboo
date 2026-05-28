@@ -1,6 +1,7 @@
 #include "game.h"
 #include "entity/entity.h"
 #include "entity/player.h"
+#include "systems/spawner_system.h"
 #include "entity/monster.h"
 #include "entity/spawner.h"
 #include "ui/combat_log.h"
@@ -981,6 +982,8 @@ void DescendFloor(Game* game) {
         Spawner_Populate(game, spawnRooms, spawnRoomCount);
     }
 
+    if (game->ecsWorld) SpawnerSystem_SpawnPickups(game->ecsWorld, game);
+
     Monster_LoadSprites();
 
     game->stairX = GetStairX();
@@ -1139,6 +1142,8 @@ bool InitGame(Game* game, const char* tmxFile) {
     if (spawnRoomCount > 0) {
         Spawner_Populate(game, spawnRooms, spawnRoomCount);
     }
+
+    if (game->ecsWorld) SpawnerSystem_SpawnPickups(game->ecsWorld, game);
 
     Monster_LoadSprites();
 

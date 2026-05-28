@@ -101,6 +101,9 @@ typedef struct Game {
     float projectileDuration;
 
     float levelUpTimer;
+
+    // Transition shim: pointer to ECS world (set by caller, used by bridge functions)
+    struct GameWorld* ecsWorld;
 } Game;
 
 bool InitGame(Game* game, const char* tmxFile);

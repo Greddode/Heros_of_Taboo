@@ -4,11 +4,14 @@
 #include "world.h"
 #include "core/procedural.h"
 
+typedef struct Game Game;
+
 // Convert monster pool into ECS entities. Called once after map load.
 void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int roomCount);
 
 // Convert potions and equip pickups on map into ECS entities.
-void SpawnerSystem_SpawnPickups(GameWorld* gw);
+// Reads from old Game arrays, creates ECS entities with CPosition + CPickup.
+void SpawnerSystem_SpawnPickups(GameWorld* gw, Game* game);
 
 // Find a pickup entity at (x, y). Returns ENTITY_NONE if none.
 EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y);
