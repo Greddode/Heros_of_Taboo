@@ -115,12 +115,13 @@ void RenderSystem_World(const GameWorld* gw) {
             py = (float)(pp->y * th);
         }
 
-        if (spr && spr->tex && spr->tex->id > 0) {
-            int cellStride = 17;
+        if (spr && spr->tex && spr->tex->id > 0 && spr->frameCount > 0) {
+            float frameW = (float)spr->tex->width / (float)spr->frameCount;
+            float frameH = (float)spr->tex->height;
             Rectangle src = {
-                (float)(spr->frame * cellStride),
-                (float)(spr->row * cellStride),
-                16.0f, 16.0f
+                (float)spr->frame * frameW,
+                (float)spr->row * frameH,
+                frameW, frameH
             };
             Rectangle dest = { px, py, (float)tw, (float)th };
             Color tint = (phf && phf->timer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;

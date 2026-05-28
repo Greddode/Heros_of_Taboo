@@ -8,7 +8,7 @@
             "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/Debug/${workspaceFolderBasename}.exe",
+            "program": "${workspaceFolder}/bin/Debug/Heros_of_Taboo.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -43,10 +43,10 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "program": "${workspaceFolder}/bin/Release/${workspaceFolderBasename}.exe",
+            "program": "${workspaceFolder}/bin/Release/Heros_of_Taboo.exe",
             "MIMode": "gdb",
             "windows": {
-              "program": "${workspaceFolder}/bin/Release/${workspaceFolderBasename}.exe",
+              "program": "${workspaceFolder}/bin/Release/Heros_of_Taboo.exe",
               "miDebuggerPath": "gdb.exe"
             },
             "osx": {

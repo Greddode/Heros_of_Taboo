@@ -788,6 +788,16 @@ void UpdateGame(Game* game) {
         if (game->player.ent.hitFlashTimer < 0.0f) game->player.ent.hitFlashTimer = 0.0f;
     }
 
+    // Player sprite animation
+    if (game->player.ent.alive && game->player.ent.spriteSheet.id > 0) {
+        static float s_playerAnimTimer = 0.0f;
+        s_playerAnimTimer += GetFrameTime();
+        if (s_playerAnimTimer >= 0.5f) {
+            s_playerAnimTimer -= 0.5f;
+            game->player.ent.animFrame = (game->player.ent.animFrame + 1) % 4;
+        }
+    }
+
     if (game->levelUpTimer > 0.0f) {
         game->levelUpTimer -= GetFrameTime();
         if (game->levelUpTimer < 0.0f) game->levelUpTimer = 0.0f;

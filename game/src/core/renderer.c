@@ -139,11 +139,13 @@ void RenderGame(const Game* game) {
         float py = (float)(game->player.ent.prevY * th) * (1.0f - playerT) + (float)(game->player.ent.y * th) * playerT;
 
         if (game->player.ent.spriteSheet.id > 0) {
-            int cellStride = 17;
+            int frameCount = 4;
+            float frameW = (float)game->player.ent.spriteSheet.width / (float)frameCount;
+            float frameH = (float)game->player.ent.spriteSheet.height;
             Rectangle src = {
-                (float)(game->player.ent.animFrame * cellStride),
-                (float)(game->player.ent.spriteRow * cellStride),
-                16.0f, 16.0f
+                (float)(game->player.ent.animFrame * frameW),
+                0,
+                frameW, frameH
             };
             Rectangle dest = { px, py, (float)tw, (float)th };
             Color tint = (game->player.ent.hitFlashTimer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;
