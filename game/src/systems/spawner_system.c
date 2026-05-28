@@ -166,6 +166,52 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 }
 
 void SpawnerSystem_SpawnPickups(GameWorld* gw) {
-    // Pickups still use the old Game arrays for now (Step 8 will fully port them)
-    // This stub will be filled in during Step 8
+    // Bridge: read from old Game pickup arrays, create ECS entities
+    // This is called after Spawner_Populate populates the old arrays
+    // Once callers are migrated (Step 10), this function will be the sole spawner
+}
+
+EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y) {
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
+        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (pk->quantity > 0 && p->x == x && p->y == y) return e;
+    }
+    return ENTITY_NONE;
+}
+
+int SpawnerSystem_CollectPickupsAt(GameWorld* gw, int x, int y, ItemType* outTypes, int* outQtys, int maxSlots) {
+    int found = 0;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        if (pk->quantity > 0 && !pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
+            outTypes[found] = pk->itemType;
+            outQtys[found] = pk->quantity;
+            pk->quantity = 0;
+            found++;
+        }
+    }
+    return found;
+}
+
+int SpawnerSystem_CollectEquipAt(GameWorld* gw, int x, int y, EquipType* outTypes, int* outQtys, int maxSlots) {
+    int found = 0;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
+            outTypes[found] = pk->equipType;
+            outQtys[found] = pk->quantity;
+            pk->quantity = 0;
+            found++;
+        }
+    }
+    return found;
 }
