@@ -28,6 +28,7 @@ typedef struct {
 
 // Forward declaration so entity functions can accept Game* without circular includes
 typedef struct Game Game;
+typedef struct GameWorld GameWorld;
 
 // Convert tile coordinates to pixel position (top-left corner)
 Vector2 TileToScreen(int x, int y, int tileWidth, int tileHeight);
@@ -47,5 +48,6 @@ Direction GetFacingDirection(const Entity* entity);
 
 // Draw a single tile from the tileset at layer layerIndex at (x, y)
 void DrawTile(const Game* game, int x, int y, int layerIndex);
+void DrawTileWorld(const GameWorld* gw, int x, int y, int layerIndex);
 
 #endif
