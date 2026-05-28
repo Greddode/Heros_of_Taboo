@@ -49,7 +49,7 @@ int main(void)
                 if (action == MENU_PLAY) {
                     BeginDrawing();
                     ClearBackground(BLACK);
-                    const char* loadText = "LOADING...";
+                    const char* loadText = "DROPPING...";
                     int fontSize = 40;
                     int tw = MeasureText(loadText, fontSize);
                     DrawText(loadText, GetScreenWidth() / 2 - tw / 2, GetScreenHeight() / 2 - fontSize / 2, fontSize, WHITE);
