@@ -1,5 +1,5 @@
 #include "ai_system.h"
-#include "core/audio.h"
+#include "audio.h"
 #include "ui/combat_log.h"
 #include "data/monster_data.h"
 #include "world_monster.h"

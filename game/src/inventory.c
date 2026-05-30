@@ -1,0 +1,293 @@
+#include "game.h"
+#include "ui/combat_log.h"
+#include "ui/inspector.h"
+#include "resources.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+// ---- Potion data -----------------------------------------------------------
+static const char* ITEM_NAMES[ITEM_COUNT] = {
+    "",
+    "Small HP Potion",
+    "Medium HP Potion",
+    "Large HP Potion"
+};
+static const int ITEM_HEALS[ITEM_COUNT] = {
+    0,
+    25,
+    50,
+    75
+};
+static const char* ITEM_DESCS[ITEM_COUNT] = {
+    "",
+    "A small vial of red liquid.\nRestores 25% Max HP.",
+    "A hearty draught.\nRestores 50% Max HP.",
+    "A potent elixir.\nRestores 75% Max HP."
+};
+static const char* ITEM_SPRITES[ITEM_COUNT] = {
+    "",
+    "resources/sprites/items/health_potions/small_health_potion.png",
+    "resources/sprites/items/health_potions/medium_health_potion.png",
+    "resources/sprites/items/health_potions/large_health_potion.png"
+};
+
+// ---- Equipment data table --------------------------------------------------
+static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
+    // NONE
+    { EQUIP_NONE,           "", "", NULL,                            EQUIP_CAT_ARMOR,    EQUIP_SLOT_HEAD,     0, 0, 0, 0,0,0,0,0, false },
+
+    // Armor - Head
+    { EQUIP_LEATHER_CAP,    "Leather Cap",     "A simple leather cap.\n+1 DEF, +1 CON",       "resources/sprites/items/equipment/armors/leather_cap.png",    EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 1, 0, 0,0,0,1,0, false },
+    { EQUIP_IRON_HELM,      "Iron Helm",       "An iron helmet forged for battle.\n+2 DEF, +2 CON", "resources/sprites/items/equipment/armors/iron_helm.png",      EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 2, 0, 0,0,0,2,0, false },
+    { EQUIP_STEEL_HELM,     "Steel Helm",      "A sturdy steel helm.\n+3 DEF, +3 CON",         "resources/sprites/items/equipment/armors/steel_helm.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 3, 0, 0,0,0,3,0, false },
+
+    // Armor - Chest
+    { EQUIP_LEATHER_VEST,   "Leather Vest",    "A flexible leather vest.\n+2 DEF, +2 CON",     "resources/sprites/items/equipment/armors/leather_vest.png",   EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 2, 0, 0,0,0,2,0, false },
+    { EQUIP_CHAIN_MAIL,     "Chain Mail",      "Interlocking rings of steel.\n+4 DEF, +4 CON", "resources/sprites/items/equipment/armors/chain_mail.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 4, 0, 0,0,0,4,0, false },
+    { EQUIP_PLATE_MAIL,     "Plate Mail",      "Full plate armour.\n+6 DEF, +6 CON",          "resources/sprites/items/equipment/armors/plate_mail.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 6, 0, 0,0,0,6,0, false },
+
+    // Weapons
+    { EQUIP_SURVIVAL_KNIFE,"Survival Knife",   "A trusty blade for the dungeon.\n+2 ATK",     "resources/sprites/items/equipment/weapons/survival_knife.png", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 2, 0, 0, 0,0,0,0,0, false },
+    { EQUIP_DAGGER,         "Dagger",          "A swift dagger.\n+3 ATK, +1 DEX",              "resources/sprites/items/equipment/weapons/dagger.png",         EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 3, 0, 0, 0,1,0,0,0, false },
+    { EQUIP_IRON_SWORD,     "Iron Sword",      "A well-balanced iron blade.\n+5 ATK",        "resources/sprites/items/equipment/weapons/iron_sword.png",    EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 5, 0, 0, 0,0,0,0,0, false },
+    { EQUIP_STEEL_SWORD,    "Steel Sword",     "A razor-sharp steel longsword.\n+8 ATK",     "resources/sprites/items/equipment/weapons/steel_sword.png",   EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 8, 0, 0, 0,0,0,0,0, false },
+    { EQUIP_WAR_HAMMER,     "War Hammer",      "A massive two-handed hammer.\n+10 ATK, +1 DEF, blocks off-hand", "resources/sprites/items/equipment/weapons/warhammer.png", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 10, 1, 0, 0,0,0,0,0, true },
+
+    // Off-hand
+    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",   "A light wooden shield.\n+2 DEF",             "resources/sprites/items/equipment/armors/wooden_shield.png",  EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 2, 0, 0,0,0,0,0, false },
+    { EQUIP_IRON_SHIELD,    "Iron Shield",     "A sturdy iron shield.\n+4 DEF",               "resources/sprites/items/equipment/armors/iron_shield.png",    EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 4, 0, 0,0,0,0,0, false },
+    { EQUIP_STEEL_SHIELD,   "Steel Shield",    "A heavy steel tower shield.\n+6 DEF",        "resources/sprites/items/equipment/armors/steel_shield.png",   EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 6, 0, 0,0,0,0,0, false },
+
+    // Accessories
+    { EQUIP_RING_OF_STRENGTH,  "Ring of Strength",   "A ring pulsing with power.\n+3 STR",           "resources/sprites/items/equipment/accessories/ring_of_strength.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 3,0,0,0,0, false },
+    { EQUIP_AMULET_OF_WARDING, "Amulet of Warding",  "An enchanted amulet.\n+2 MGC, +2 CON",           "resources/sprites/items/equipment/accessories/amulet_of_warding.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,2,2,0, false },
+    { EQUIP_BOOTS_OF_SWIFTNESS,"Boots of Swiftness","Light boots that aid movement.\n+3 DEX, +1 CON", "resources/sprites/items/equipment/accessories/boots_of_swiftness.png", EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,3,0,1,0, false },
+    { EQUIP_RING_OF_THE_HAWK,  "Ring of the Hawk",   "A hawk's eye in a ring.\n+4 DEX",               "resources/sprites/items/equipment/accessories/ring_of_hawk.png",     EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,4,0,0,0, false },
+    { EQUIP_SAGES_PENDANT,     "Sage's Pendant",     "The wisdom of ages.\n+4 MGC",                    "resources/sprites/items/equipment/accessories/sage_pendant.png",     EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,4,0,0, false },
+    { EQUIP_LUCKY_CHARM,       "Lucky Charm",        "A charm of fortune.\n+6 LCK",                    "resources/sprites/items/equipment/accessories/lucky_charm.png",      EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, 0, 0, 0,0,0,0,6, false },
+    { EQUIP_BERSERKER_BAND,    "Berserker Band",     "Strength at a cost.\n+5 STR, -2 DEF",            "resources/sprites/items/equipment/accessories/fallback_ring.png",    EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, -2, 0, 5,0,0,0,0, false },
+};
+
+// ---- Helpers ---------------------------------------------------------------
+const EquipData* GetEquipData(EquipType type) {
+    if (type < 0 || type >= EQUIP_COUNT) return NULL;
+    return &EQUIP_TABLE[type];
+}
+
+const char* GetItemName(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return "";
+    return ITEM_NAMES[type];
+}
+
+int GetItemHealAmount(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return 0;
+    return ITEM_HEALS[type];
+}
+
+const char* GetItemDescription(ItemType type) {
+    if (type < 0 || type >= ITEM_COUNT) return "";
+    return ITEM_DESCS[type];
+}
+
+// ---- Inventory (potions) ---------------------------------------------------
+bool InventoryAdd(GameWorld* game, ItemType type) {
+    if (type == ITEM_NONE) return false;
+    for (int i = 0; i < game->inventorySlotCount; i++) {
+        if (game->inventory[i].type == type) {
+            game->inventory[i].quantity++;
+            return true;
+        }
+    }
+    if (game->inventorySlotCount >= MAX_INVENTORY_SLOTS) return false;
+    game->inventory[game->inventorySlotCount].type = type;
+    game->inventory[game->inventorySlotCount].quantity = 1;
+    game->inventorySlotCount++;
+    return true;
+}
+
+bool InventoryUse(GameWorld* game, int slot) {
+        if (slot < 0 || slot >= game->inventorySlotCount) return false;
+    InventorySlot* s = &game->inventory[slot];
+    if (s->type == ITEM_NONE || s->quantity <= 0) return false;
+
+    int healPercent = GetItemHealAmount(s->type);
+    if (healPercent > 0) {
+        CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+        float intMult = 1.0f + (float)ps->intel * 0.02f;
+        int heal = (ps->maxHp * healPercent * (int)(intMult * 100)) / 10000;
+        if (heal < 1) heal = 1;
+        ps->hp += heal;
+        if (ps->hp > ps->maxHp)
+            ps->hp = ps->maxHp;
+        CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, MGCx%.0f%%)!",
+                      GetItemName(s->type), healPercent, heal, intMult * 100);
+    }
+
+    s->quantity--;
+    if (s->quantity <= 0) {
+        for (int i = slot; i < game->inventorySlotCount - 1; i++)
+            game->inventory[i] = game->inventory[i + 1];
+        game->inventorySlotCount--;
+    }
+    return true;
+}
+
+Texture2D* Inventory_LoadEquipTexture(EquipType type) {
+    const EquipData* d = GetEquipData(type);
+    if (!d || !d->spritePath || d->spritePath[0] == '\0') return NULL;
+    return Resources_LoadTexture(d->spritePath);
+}
+
+Texture2D* Inventory_LoadPotionTexture(ItemType type) {
+    if (type <= ITEM_NONE || type >= ITEM_COUNT) return NULL;
+    if (!ITEM_SPRITES[type][0]) return NULL;
+    return Resources_LoadTexture(ITEM_SPRITES[type]);
+}
+
+void LoadPotionTextures(GameWorld* game) {
+    (void)game;
+    for (int i = 1; i < ITEM_COUNT; i++) {
+        if (ITEM_SPRITES[i][0]) {
+            Resources_LoadTexture(ITEM_SPRITES[i]);
+        }
+    }
+    Resources_LoadTexture("resources/sprites/ui/UI_Flat_Frame01a.png");
+    Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
+    Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameMarker01a.png");
+    Resources_LoadTexture("resources/sprites/items/loot.png");
+}
+
+
+
+// ---- Equipment management --------------------------------------------------
+bool EquipItem(GameWorld* game, EquipType type) {
+    if (type == EQUIP_NONE) return false;
+    const EquipData* data = GetEquipData(type);
+    if (!data) return false;
+
+        int slotIdx = (int)data->slot;
+    CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+
+    if (data->slot == EQUIP_SLOT_OFF_HAND && IsTwoHandedEquipped(game)) {
+        CombatLog_Add(&game->combatLog, BLACK, "Cannot equip off-hand with a two-handed weapon!");
+        return false;
+    }
+
+    if (game->equipped[slotIdx] != EQUIP_NONE) {
+        UnequipSlot(game, data->slot);
+    }
+
+    if (data->twoHanded && game->equipped[EQUIP_SLOT_OFF_HAND] != EQUIP_NONE) {
+        UnequipSlot(game, EQUIP_SLOT_OFF_HAND);
+    }
+
+    ps->attack   += data->bonusAttack;
+    ps->defense  += data->bonusDefense;
+    ps->str      += data->bonusStr;
+    ps->dex      += data->bonusDex;
+    ps->intel    += data->bonusInt;
+    ps->con      += data->bonusCon;
+    ps->lck      += data->bonusLck;
+    int oldMaxHp = ps->maxHp;
+    ps->maxHp    = 30 + ps->con * 5;
+    ps->hp      += (ps->maxHp - oldMaxHp);
+
+    game->equipped[slotIdx] = type;
+
+    CombatLog_Add(&game->combatLog, BLACK, "Equipped %s", data->name);
+    return true;
+}
+
+void EquipItemSilent(GameWorld* game, EquipType type) {
+    if (type == EQUIP_NONE) return;
+    const EquipData* data = GetEquipData(type);
+    if (!data) return;
+
+        int slotIdx = (int)data->slot;
+
+    if (game->equipped[slotIdx] != EQUIP_NONE) {
+        const EquipData* old = GetEquipData(game->equipped[slotIdx]);
+        if (old) {
+            CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+            ps->attack   -= old->bonusAttack;
+            ps->defense  -= old->bonusDefense;
+            ps->str      -= old->bonusStr;
+            ps->dex      -= old->bonusDex;
+            ps->intel    -= old->bonusInt;
+            ps->con      -= old->bonusCon;
+            ps->lck      -= old->bonusLck;
+        }
+        game->equipped[slotIdx] = EQUIP_NONE;
+    }
+
+    CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+    ps->attack   += data->bonusAttack;
+    ps->defense  += data->bonusDefense;
+    ps->str      += data->bonusStr;
+    ps->dex      += data->bonusDex;
+    ps->intel    += data->bonusInt;
+    ps->con      += data->bonusCon;
+    ps->lck      += data->bonusLck;
+
+    ps->maxHp    = 30 + ps->con * 5;
+    if (ps->hp > ps->maxHp)
+        ps->hp = ps->maxHp;
+
+    game->equipped[slotIdx] = type;
+}
+
+void UnequipSlot(GameWorld* game, EquipSlot slot) {
+        int slotIdx = (int)slot;
+    EquipType oldType = game->equipped[slotIdx];
+    if (oldType == EQUIP_NONE) return;
+
+    const EquipData* data = GetEquipData(oldType);
+    if (!data) return;
+
+    CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+
+    ps->attack   -= data->bonusAttack;
+    ps->defense  -= data->bonusDefense;
+    ps->str      -= data->bonusStr;
+    ps->dex      -= data->bonusDex;
+    ps->intel    -= data->bonusInt;
+    ps->con      -= data->bonusCon;
+    ps->lck      -= data->bonusLck;
+
+    ps->maxHp    = 30 + ps->con * 5;
+    if (ps->hp > ps->maxHp)
+        ps->hp = ps->maxHp;
+
+    game->equipped[slotIdx] = EQUIP_NONE;
+
+    AddEquipToInventory(game, oldType);
+
+    CombatLog_Add(&game->combatLog, BLACK, "Unequipped %s", data->name);
+}
+
+bool IsEquipSlotOccupied(const GameWorld* game, EquipSlot slot) {
+    return game->ecsWorld.equipped[(int)slot] != EQUIP_NONE;
+}
+
+bool IsTwoHandedEquipped(const GameWorld* game) {
+    EquipType weapon = game->ecsWorld.equipped[EQUIP_SLOT_WEAPON];
+    if (weapon == EQUIP_NONE) return false;
+    const EquipData* data = GetEquipData(weapon);
+    return data && data->twoHanded;
+}
+
+bool AddEquipToInventory(GameWorld* game, EquipType type) {
+    if (type == EQUIP_NONE) return false;
+        if (game->equipInventoryCount >= MAX_INVENTORY_SLOTS) return false;
+    game->equipInventory[game->equipInventoryCount++] = type;
+    return true;
+}
+
+bool RemoveEquipFromInventory(GameWorld* game, int slot) {
+        if (slot < 0 || slot >= game->equipInventoryCount) return false;
+    for (int i = slot; i < game->equipInventoryCount - 1; i++)
+        game->equipInventory[i] = game->equipInventory[i + 1];
+    game->equipInventoryCount--;
+    return true;
+}

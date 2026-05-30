@@ -1,15 +1,12 @@
 #include "render_system.h"
-#include "core/inventory.h"
-#include "core/map_helpers.h"
-#include "core/renderer.h"
-#include "entity/entity.h"
+#include "map/map_helpers.h"
+#include "systems/renderer.h"
 #include "data/monster_data.h"
 #include "ui/combat_log.h"
-#include "ui/inspector.h"
+
 #include <stdio.h>
 #include <math.h>
 
-float GetUIScale(void); // Declared in game.h, required for HUD scaling
 
 void RenderSystem_DrawMap(const GameWorld* gw) {
     if (!gw || !gw->map) return;
@@ -43,7 +40,7 @@ void RenderSystem_DrawMap(const GameWorld* gw) {
     }
 }
 
-void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
+void RenderSystem_DrawMonsters(GameWorld* gw, float monsterT) {
     if (!gw || !gw->map) return;
 
     int tw = gw->map->tileWidth;
@@ -54,8 +51,8 @@ void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
         if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
         if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS)) continue;
 
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CStats* s = World_GetStats(&((GameWorld*)gw)->ecs, e);
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CStats* s = World_GetStats(&gw->ecs, e);
         if (!s->alive) continue;
 
         if (p->y < 0 || p->y >= gw->map->height || p->x < 0 || p->x >= gw->map->width) continue;
@@ -70,12 +67,12 @@ void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
             pixelY = p->y * th;
         }
 
-        CHitFlash* hf = World_GetHitFlash(&((GameWorld*)gw)->ecs, e);
+        CHitFlash* hf = World_GetHitFlash(&gw->ecs, e);
 
         if (World_HasComponents(&gw->ecs, e, COMP_AI)) {
-            CAI* ai = World_GetAI(&((GameWorld*)gw)->ecs, e);
+            CAI* ai = World_GetAI(&gw->ecs, e);
             const MonsterTemplate* tpl = Monster_GetTemplate(ai->type);
-            CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, e);
+            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
 
             bool drewSprite = false;
             if (spr && spr->tex && spr->tex->id > 0 && tpl && tpl->frameCount > 0) {
@@ -101,7 +98,7 @@ void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT) {
     }
 }
 
-void RenderSystem_World(const GameWorld* gw) {
+void RenderSystem_World(GameWorld* gw) {
     if (!gw || !gw->map) return;
 
     int tw = gw->map->tileWidth;
@@ -121,11 +118,11 @@ void RenderSystem_World(const GameWorld* gw) {
     // Pickup rendering (ECS entities with COMP_POSITION | COMP_PICKUP)
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP | COMP_SPRITE_ANIM)) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP | COMP_SPRITE_ANIM)) continue;
 
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
-        CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, e);
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
+        CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
 
         if (pk->quantity <= 0) continue;
 
@@ -151,10 +148,10 @@ void RenderSystem_World(const GameWorld* gw) {
     }
 
     // Player rendering
-    if (gw->playerEntity != ENTITY_NONE && World_GetStats(&((GameWorld*)gw)->ecs, gw->playerEntity)->alive) {
-        CPosition* pp = World_GetPosition(&((GameWorld*)gw)->ecs, gw->playerEntity);
-        CHitFlash* phf = World_GetHitFlash(&((GameWorld*)gw)->ecs, gw->playerEntity);
-        CSpriteAnim* spr = World_GetSprite(&((GameWorld*)gw)->ecs, gw->playerEntity);
+    if (gw->playerEntity != ENTITY_NONE && World_GetStats(&gw->ecs, gw->playerEntity)->alive) {
+        CPosition* pp = World_GetPosition(&gw->ecs, gw->playerEntity);
+        CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
+        CSpriteAnim* spr = World_GetSprite(&gw->ecs, gw->playerEntity);
 
         float px, py;
         if (playerT >= 0.0f && playerT <= 1.0f) {
@@ -218,7 +215,7 @@ void RenderSystem_World(const GameWorld* gw) {
     EndMode2D();
 }
 
-void RenderSystem_HUD(const GameWorld* gw) {
+void RenderSystem_HUD(GameWorld* gw) {
     if (!gw) return;
 
     float scale = GetUIScale();
@@ -229,7 +226,7 @@ void RenderSystem_HUD(const GameWorld* gw) {
     int textY = 0;
 
     if (gw->playerEntity == ENTITY_NONE) return;
-    CStats* ps = World_GetStats(&((GameWorld*)gw)->ecs, gw->playerEntity);
+    CStats* ps = World_GetStats(&gw->ecs, gw->playerEntity);
 
     char levelText[64];
     snprintf(levelText, sizeof(levelText), "Lv %d", ps->level);
@@ -278,8 +275,8 @@ void RenderSystem_HUD(const GameWorld* gw) {
     }
 
     // Level-up overlay
-    if (((GameWorld*)gw)->levelUpTimer > 0.0f) {
-        float alpha = ((GameWorld*)gw)->levelUpTimer / 3.0f;
+    if (gw->levelUpTimer > 0.0f) {
+        float alpha = gw->levelUpTimer / 3.0f;
         float textScale = 1.0f + (1.0f - alpha) * 0.3f;
         int fontSize = (int)(48 * scale * textScale);
         int subSize = (int)(24 * scale * textScale);

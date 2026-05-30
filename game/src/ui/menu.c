@@ -1,7 +1,7 @@
 #include "menu.h"
 #include "text_data.h"
-#include "core/audio.h"
-#include "../core/game.h"
+#include "audio.h"
+#include "game.h"
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>

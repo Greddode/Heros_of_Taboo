@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "game_types.h"
 
-typedef struct Game Game;
+typedef struct GameWorld GameWorld;
 
 #define MAX_POTIONS 32
 #define MAX_EQUIP_ON_MAP 64
@@ -55,23 +55,23 @@ const EquipData* GetEquipData(EquipType type);
 const char* GetItemName(ItemType type);
 int GetItemHealAmount(ItemType type);
 const char* GetItemDescription(ItemType type);
-bool InventoryAdd(Game* game, ItemType type);
-bool InventoryUse(Game* game, int slot);
+bool InventoryAdd(GameWorld* game, ItemType type);
+bool InventoryUse(GameWorld* game, int slot);
 
 // Equipment management
-bool EquipItem(Game* game, EquipType type);
-void EquipItemSilent(Game* game, EquipType type);
-void UnequipSlot(Game* game, EquipSlot slot);
-bool IsEquipSlotOccupied(const Game* game, EquipSlot slot);
-bool IsTwoHandedEquipped(const Game* game);
-bool AddEquipToInventory(Game* game, EquipType type);
-bool RemoveEquipFromInventory(Game* game, int slot);
+bool EquipItem(GameWorld* game, EquipType type);
+void EquipItemSilent(GameWorld* game, EquipType type);
+void UnequipSlot(GameWorld* game, EquipSlot slot);
+bool IsEquipSlotOccupied(const GameWorld* game, EquipSlot slot);
+bool IsTwoHandedEquipped(const GameWorld* game);
+bool AddEquipToInventory(GameWorld* game, EquipType type);
+bool RemoveEquipFromInventory(GameWorld* game, int slot);
 
-// Inventory rendering
-void Inventory_Render(const Game* game);
-void LoadPotionTextures(Game* game);
-void UnloadPotionTextures(Game* game);
+// Pre-load potion/UI textures into the ResourceManager cache.
+void LoadPotionTextures(GameWorld* game);
 // Cached equip icon from the resource manager (NULL if none / load failed).
 Texture2D* Inventory_LoadEquipTexture(EquipType type);
+// Cached potion icon from the resource manager (NULL if none / load failed).
+Texture2D* Inventory_LoadPotionTexture(ItemType type);
 
 #endif

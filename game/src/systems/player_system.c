@@ -1,5 +1,5 @@
 #include "player_system.h"
-#include "core/audio.h"
+#include "audio.h"
 #include "ui/combat_log.h"
 #include "resources.h"
 #include <stdio.h>

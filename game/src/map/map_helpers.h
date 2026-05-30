@@ -3,16 +3,16 @@
 
 #include "raylib.h"
 #include <stdbool.h>
-#include "tmx/tmx.h"
+#include "map/tmx/tmx.h"
 
-typedef struct Game Game;
+typedef struct GameWorld GameWorld;
 
 bool IsInRoom(int x, int y);
-void RevealFOW(Game* game);
-void SpawnEscapeTile(Game* game);
-void SpawnShadow(Game* game);
-void BuildBlockingMap(Game* game);
-void SpawnEntitiesFromObjects(Game* game);
+void RevealFOW(GameWorld* game);
+void SpawnEscapeTile(GameWorld* game);
+void SpawnShadow(GameWorld* game);
+void BuildBlockingMap(GameWorld* game);
+void SpawnEntitiesFromObjects(GameWorld* game);
 
 // TMX and Coordinate helper functions
 int FindTilesetForGID(const MapData* map, int gid);

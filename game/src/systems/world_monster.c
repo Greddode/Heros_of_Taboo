@@ -1,33 +1,33 @@
 #include "world_monster.h"
 #include <stddef.h>
 
-EntityId World_FindMonsterAt(const GameWorld* gw, int x, int y, EntityId exclude) {
+EntityId World_FindMonsterAt(GameWorld* gw, int x, int y, EntityId exclude) {
     if (!gw) return ENTITY_NONE;
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
         if (e == exclude) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_STATS | COMP_AI)) continue;
-        if (World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_PLAYER_TAG)) continue;
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CStats* s = World_GetStats(&((GameWorld*)gw)->ecs, e);
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS | COMP_AI)) continue;
+        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CStats* s = World_GetStats(&gw->ecs, e);
         if (s->alive && p->x == x && p->y == y) return e;
     }
     return ENTITY_NONE;
 }
 
-int World_CountAliveMonsters(const GameWorld* gw) {
+int World_CountAliveMonsters(GameWorld* gw) {
     if (!gw) return 0;
     int count = 0;
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_STATS | COMP_AI)) continue;
-        if (World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_PLAYER_TAG)) continue;
-        if (World_GetStats(&((GameWorld*)gw)->ecs, e)->alive) count++;
+        if (!World_HasComponents(&gw->ecs, e, COMP_STATS | COMP_AI)) continue;
+        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
+        if (World_GetStats(&gw->ecs, e)->alive) count++;
     }
     return count;
 }
 
-bool World_AreAllMonstersDead(const GameWorld* gw) {
+bool World_AreAllMonstersDead(GameWorld* gw) {
     return World_CountAliveMonsters(gw) == 0;
 }
 

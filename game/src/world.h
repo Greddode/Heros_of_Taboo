@@ -3,10 +3,10 @@
 
 #include "raylib.h"
 #include "ecs.h"
-#include "tmx/tmx.h"
+#include "map/tmx/tmx.h"
 #include "ui/combat_log.h"
 #include "game_types.h"
-#include "core/inventory.h"
+#include "inventory.h"
 
 typedef struct GameWorld {
     // ECS
@@ -55,7 +55,12 @@ typedef struct GameWorld {
     float levelUpTimer;
 
     // Inspector (ECS entity id, ENTITY_NONE if none)
-    EntityId selectedEntity; // Rename to be more generic for ECS
+    EntityId selectedMonsterEntity;
+
+    // Tile inspector (selected tile for potion/equipment info panel)
+    int selectedPotionTileX;
+    int selectedPotionTileY;
+    bool selectedPotionTileActive;
 
     // Inventory data (UI state will be extracted later)
     InventorySlot inventory[MAX_INVENTORY_SLOTS];

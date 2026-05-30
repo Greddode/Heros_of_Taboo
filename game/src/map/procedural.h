@@ -1,7 +1,7 @@
 #ifndef PROCEDURAL_H
 #define PROCEDURAL_H
 
-#include "tmx/tmx.h"
+#include "map/tmx/tmx.h"
 
 // Tile GID constants — VelmoraRealms tileset (448×400, 28 cols, 700 tiles).
 #define TILE_WALL_CORNER_NW   14

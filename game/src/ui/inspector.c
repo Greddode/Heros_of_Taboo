@@ -1,6 +1,7 @@
 #include "inspector.h"
 #include "systems/world_monster.h"
-#include "core/inventory.h"
+#include "inventory.h"
+#include "resources.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -56,13 +57,13 @@ static int DrawDesc(const char* desc, int x, int y, int maxWidth, int fontSize, 
     return y - startY;
 }
 
-void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w, int h) {
+void Inspector_Render(const GameWorld* game, InspectorType type, int x, int y, int w, int h, int selectedSlot) {
     // Early-out: don't draw anything if there's nothing to inspect
     if (type == INSPECTOR_MONSTER) {
         if (game->selectedMonsterEntity == ENTITY_NONE) return;
-        if (!game->ecsWorld.ecs.alive[game->selectedMonsterEntity]) return;
-        if (!World_HasComponents(&game->ecsWorld.ecs, game->selectedMonsterEntity, COMP_STATS)) return;
-        if (!World_GetStats(&game->ecsWorld.ecs, game->selectedMonsterEntity)->alive) return;
+        if (!game->ecs.alive[game->selectedMonsterEntity]) return;
+        if (!World_HasComponents(&game->ecs, game->selectedMonsterEntity, COMP_STATS)) return;
+        if (!World_GetStats(&game->ecs, game->selectedMonsterEntity)->alive) return;
     } else if (type == INSPECTOR_ITEM) {
         if (game->state != STATE_INVENTORY) return;
     }
@@ -75,8 +76,9 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
     int cx = x + w / 2;
     char buf[128];
 
-    if (game->texUiSlot.id > 0)
-        Draw9Slice(game->texUiSlot, (Rectangle){ (float)x, (float)y, (float)w, (float)h }, 8, 8, 8, 8);
+    Texture2D* uiSlot = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
+    if (uiSlot && uiSlot->id > 0)
+        Draw9Slice(*uiSlot, (Rectangle){ (float)x, (float)y, (float)w, (float)h }, 8, 8, 8, 8);
     else {
         DrawRectangle(x, y, w, h, (Color){ 0, 0, 0, 200 });
         DrawRectangleLines(x, y, w, h, LIGHTGRAY);
@@ -84,9 +86,9 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
 
     if (type == INSPECTOR_MONSTER) {
         EntityId m = game->selectedMonsterEntity;
-        CStats* s = World_GetStats(&game->ecsWorld.ecs, m);
-        CName* n = World_HasComponents(&game->ecsWorld.ecs, m, COMP_NAME)
-            ? World_GetName(&game->ecsWorld.ecs, m) : NULL;
+        CStats* s = World_GetStats(&game->ecs, m);
+        CName* n = World_HasComponents(&game->ecs, m, COMP_NAME)
+            ? World_GetName(&game->ecs, m) : NULL;
         const char* name = n ? n->name : "Monster";
 
         snprintf(buf, sizeof(buf), "%s", name);
@@ -108,10 +110,10 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
         DrawText(buf, lx, ly, fs, BLACK);
 
     } else if (type == INSPECTOR_ITEM) {
-        bool isEquip = game->inventorySelection >= game->inventorySlotCount;
+        bool isEquip = selectedSlot >= game->inventorySlotCount;
 
         if (isEquip) {
-            EquipType eType = game->equipInventory[game->inventorySelection - game->inventorySlotCount];
+            EquipType eType = game->equipInventory[selectedSlot - game->inventorySlotCount];
             const EquipData* d = GetEquipData(eType);
             if (!d) return;
 
@@ -175,7 +177,7 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
         } else {
-            ItemType selType = game->inventory[game->inventorySelection].type;
+            ItemType selType = game->inventory[selectedSlot].type;
 
             const char* iname = GetItemName(selType);
             int titleSize = (int)(16 * scale);
@@ -183,13 +185,12 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
             DrawText(iname, cx - tw / 2, ly, titleSize, BLACK);
             ly += (int)(24 * scale);
 
-            int texIdx = selType - 1;
-            if (texIdx >= 0 && texIdx < 3 && game->potionTextures[texIdx].id > 0) {
-                Texture2D tex = game->potionTextures[texIdx];
+            Texture2D* pTex = Inventory_LoadPotionTexture(selType);
+            if (pTex && pTex->id > 0) {
                 float spriteSize = (int)(48 * scale);
-                Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+                Rectangle src = { 0, 0, (float)pTex->width, (float)pTex->height };
                 Rectangle dest = { cx - spriteSize / 2, (float)ly, spriteSize, spriteSize };
-                DrawTexturePro(tex, src, dest, (Vector2){ 0 }, 0, WHITE);
+                DrawTexturePro(*pTex, src, dest, (Vector2){ 0 }, 0, WHITE);
                 ly += (int)(spriteSize + 8 * scale);
             }
 
@@ -198,7 +199,7 @@ void Inspector_Render(const Game* game, InspectorType type, int x, int y, int w,
             int descH = DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
             ly += descH + (int)(4 * scale);
 
-            snprintf(buf, sizeof(buf), "Qty: %d", game->inventory[game->inventorySelection].quantity);
+            snprintf(buf, sizeof(buf), "Qty: %d", game->inventory[selectedSlot].quantity);
             DrawText(buf, lx, ly, (int)(14 * scale), BLACK);
             ly += (int)(22 * scale);
 

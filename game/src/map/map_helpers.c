@@ -16,9 +16,13 @@ bool IsInRoom(int x, int y) {
     return false;
 }
 
-void RevealFOW(Game* game) {
-    int px = game->player.ent.x;
-    int py = game->player.ent.y;
+void RevealFOW(GameWorld* game) {
+    int px = (game->playerEntity != ENTITY_NONE)
+        ? World_GetPosition(&game->ecs, game->playerEntity)->x
+        : 0;
+    int py = (game->playerEntity != ENTITY_NONE)
+        ? World_GetPosition(&game->ecs, game->playerEntity)->y
+        : 0;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
@@ -106,13 +110,17 @@ void RevealFOW(Game* game) {
                         c2y >= 0 && c2y < game->map->height &&
                         game->blocking[cy][cx] && game->blocking[c2y][c2x])
                         game->visibility[wy][wx] = 1;
-                }
             }
         }
     }
 }
 
-void SpawnEscapeTile(Game* game) {
+Vector2 TileToScreen(int x, int y, int tw, int th) {
+    return (Vector2){ (float)(x * tw), (float)(y * th) };
+}
+}
+
+void SpawnEscapeTile(GameWorld* game) {
     int w = game->map->width;
     int h = game->map->height;
     int* data = game->map->layers[0].data;
@@ -131,11 +139,18 @@ void SpawnEscapeTile(Game* game) {
     TraceLog(LOG_WARNING, "Escape tile: could not find valid position");
 }
 
-void SpawnShadow(Game* game) {
-    int px = game->player.ent.x;
-    int py = game->player.ent.y;
+void SpawnShadow(GameWorld* game) {
+    int px = (game->playerEntity != ENTITY_NONE)
+        ? World_GetPosition(&game->ecs, game->playerEntity)->x
+        : 0;
+    int py = (game->playerEntity != ENTITY_NONE)
+        ? World_GetPosition(&game->ecs, game->playerEntity)->y
+        : 0;
     int w = game->map->width;
     int h = game->map->height;
+    int playerLevel = (game->playerEntity != ENTITY_NONE)
+        ? World_GetStats(&game->ecs, game->playerEntity)->level
+        : 1;
 
     for (int attempt = 0; attempt < 100; attempt++) {
         int tx = GetRandomValue(3, w - 4);
@@ -143,9 +158,9 @@ void SpawnShadow(Game* game) {
         int dx = tx - px;
         int dy = ty - py;
         if (dx * dx + dy * dy >= 25 && !game->blocking[ty][tx] && IsFloorGID(GetTileGID(game->map, 0, tx, ty))) {
-    EntityId shadow = SpawnerSystem_SpawnMonster(&game->ecsWorld, MONSTER_SHADOW, tx, ty, 1);
+    EntityId shadow = SpawnerSystem_SpawnMonster(game, MONSTER_SHADOW, tx, ty, 1);
     if (shadow != ENTITY_NONE) {
-        SpawnerSystem_ConfigureShadow(&game->ecsWorld, shadow, game->player.ent.level);
+        SpawnerSystem_ConfigureShadow(game, shadow, playerLevel);
         TraceLog(LOG_INFO, "Shadow spawned at (%d,%d)", tx, ty);
     }
             return;
@@ -153,8 +168,13 @@ void SpawnShadow(Game* game) {
     }
     TraceLog(LOG_WARNING, "Shadow: could not find valid spawn position");
 }
+            return;
+        }
+    }
+    TraceLog(LOG_WARNING, "Shadow: could not find valid spawn position");
+}
 
-void BuildBlockingMap(Game* game) {
+void BuildBlockingMap(GameWorld* game) {
     if (!game || !game->map) return;
 
     int w = game->map->width;
@@ -182,7 +202,7 @@ void BuildBlockingMap(Game* game) {
     }
 }
 
-void SpawnEntitiesFromObjects(Game* game) {
+void SpawnEntitiesFromObjects(GameWorld* game) {
     if (!game || !game->map) return;
 
     for (int i = 0; i < game->map->objectCount; i++) {
@@ -193,10 +213,13 @@ void SpawnEntitiesFromObjects(Game* game) {
         // Player spawn
         if (strcmp(obj->type, "player") == 0 || strcmp(obj->name, "player") == 0 ||
             strcmp(obj->type, "Player") == 0) {
-            game->player.ent.x = tileX;
-            game->player.ent.y = tileY;
-            game->player.ent.prevX = tileX;
-            game->player.ent.prevY = tileY;
+            if (game->playerEntity != ENTITY_NONE) {
+                CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+                pp->x = tileX;
+                pp->y = tileY;
+                pp->prevX = tileX;
+                pp->prevY = tileY;
+            }
             TraceLog(LOG_INFO, "Player spawned at (%d, %d)", tileX, tileY);
         }
             // Health potion
@@ -204,14 +227,14 @@ void SpawnEntitiesFromObjects(Game* game) {
                   strcmp(obj->type, "health") == 0 || strcmp(obj->type, "Health") == 0 ||
                   strcmp(obj->type, "health_potion") == 0 ||
                   strcmp(obj->name, "health_potion") == 0 || strcmp(obj->name, "HealthPotion") == 0) {
-            SpawnerSystem_SpawnHealingPotionAt(&game->ecsWorld, tileX, tileY);
+            SpawnerSystem_SpawnHealingPotionAt(game, tileX, tileY);
             TraceLog(LOG_INFO, "Health potion at (%d, %d)", tileX, tileY);
         }
         // Monsters
         else {
-            EntityId mon = SpawnerSystem_SpawnByTypeName(&game->ecsWorld, obj->type, tileX, tileY, game->currentFloor);
+            EntityId mon = SpawnerSystem_SpawnByTypeName(game, obj->type, tileX, tileY, game->currentFloor);
             if (mon != ENTITY_NONE) {
-                CName* n = World_GetName(&game->ecsWorld.ecs, mon);
+                CName* n = World_GetName(&game->ecs, mon);
                 TraceLog(LOG_INFO, "%s spawned at (%d, %d)", n ? n->name : "monster", tileX, tileY);
             }
         }

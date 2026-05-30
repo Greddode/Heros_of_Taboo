@@ -1,7 +1,8 @@
 #include "raylib.h"
-#include "core/game.h"
-#include "core/audio.h"
+#include "game.h"
+#include "audio.h"
 #include "ui/menu.h"
+#include "systems/input_system.h"
 #include <string.h>
 #include <time.h>
 
@@ -31,7 +32,9 @@ int main(void)
     InitAudioSystem();
 
     Scene scene = SCENE_MENU;
-    Game game;
+    GameWorld game;
+    InventoryUIState invUI;
+    InventoryUI_Init(&invUI);
     bool gameMenuOpen = false;
     bool settingsMenuOpen = false;
     bool prevEscDown = false;
@@ -149,7 +152,6 @@ int main(void)
                     } else if (gameMenuOpen) {
                         gameMenuOpen = false;
                     } else if (game.state == STATE_INVENTORY) {
-                        // inventory handles ESC internally
                     } else if (game.state == STATE_GAME_OVER || game.state == STATE_WIN) {
                         nextScene = SCENE_MENU;
                     } else {
@@ -171,29 +173,31 @@ int main(void)
                     }
 
                     if (!restartGame) {
-                        HandleInput(&game);
-                        UpdateGame(&game);
+                    InputSystem_Inventory(&game, &invUI);
+                    InputSystem_PlayerTurn(&game, &invUI);
+                    UpdateGame(&game);
 
                         float d = (game.animDuration > 0.0f) ? game.animDuration : MOVE_ANIM_DURATION;
                         float t = (game.animTimer <= 0.0f) ? 1.0f : 1.0f - (game.animTimer / d);
-                        float prevCX = (float)(game.player.ent.prevX * game.map->tileWidth);
-                        float curCX  = (float)(game.player.ent.x * game.map->tileWidth);
-                        float prevCY = (float)(game.player.ent.prevY * game.map->tileHeight);
-                        float curCY  = (float)(game.player.ent.y * game.map->tileHeight);
-                        game.camera.target = (Vector2){
-                            prevCX * (1.0f - t) + curCX * t + game.map->tileWidth / 2,
-                            prevCY * (1.0f - t) + curCY * t + game.map->tileHeight / 2
-                        };
+                        CPosition* pp = World_GetPosition(&game.ecs, game.playerEntity);
+                        if (pp) {
+                            float prevCX = (float)(pp->prevX * game.map->tileWidth);
+                            float curCX  = (float)(pp->x * game.map->tileWidth);
+                            float prevCY = (float)(pp->prevY * game.map->tileHeight);
+                            float curCY  = (float)(pp->y * game.map->tileHeight);
+                            game.camera.target = (Vector2){
+                                prevCX * (1.0f - t) + curCX * t + game.map->tileWidth / 2,
+                                prevCY * (1.0f - t) + curCY * t + game.map->tileHeight / 2
+                            };
+                        }
                     }
                 }
 
-                // Update camera offset every frame for window resize support
                 game.camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
 
-                // Always draw the frame before handling scene transitions
                 BeginDrawing();
                 ClearBackground(BLACK);
-                RenderGame(&game);
+                RenderGame(&game, &invUI);
                 if (settingsMenuOpen) {
                     Menu_SettingsRenderGame();
                 } else if (gameMenuOpen) {
@@ -201,7 +205,6 @@ int main(void)
                 }
                 EndDrawing();
 
-                // Now handle deferred scene transitions (after EndDrawing)
                 if (restartGame) {
                     BeginDrawing();
                     ClearBackground(BLACK);

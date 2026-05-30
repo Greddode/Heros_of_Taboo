@@ -6,6 +6,7 @@
 #define MAP_WIDTH 100
 #define MAP_HEIGHT 100
 #define PROJECTILE_ANIM_DURATION 0.25f
+#define MOVE_ANIM_DURATION 0.15f
 
 // -- Attack type identifiers -------------------------------------------------
 typedef enum {

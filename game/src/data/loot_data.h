@@ -1,7 +1,7 @@
 #ifndef LOOT_DATA_H
 #define LOOT_DATA_H
 
-#include "core/inventory.h"
+#include "inventory.h"
 
 typedef enum {
     LOOT_TYPE_POTION,

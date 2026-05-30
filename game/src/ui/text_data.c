@@ -2,7 +2,7 @@
 #include "raylib.h"
 #include <stdlib.h>
 #include <string.h>
-#include "../core/game.h"
+#include "game.h"
 
 #define XOR_KEY 0xAB
 

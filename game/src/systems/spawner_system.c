@@ -197,8 +197,8 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 void SpawnerSystem_SpawnPickups(GameWorld* gw) {
     if (!gw || !gw->map) return;
 
-    int roomCount = 0;
-    const ProceduralRoom* rooms = GetGeneratedRooms(&roomCount);
+    ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+    int roomCount = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
     if (roomCount == 0) return;
 
     int playerX = 0, playerY = 0;
@@ -319,12 +319,12 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw) {
     #undef ROOM_MAX_FLOORS
 }
 
-EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y) {
+EntityId SpawnerSystem_FindPickupAt(GameWorld* gw, int x, int y) {
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
         if (pk->quantity > 0 && p->x == x && p->y == y) return e;
     }
     return ENTITY_NONE;
@@ -358,8 +358,7 @@ int SpawnerSystem_CollectEquipAt(GameWorld* gw, int x, int y, EquipType* outType
         if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->equipType;
             outQtys[found] = pk->quantity;
-            // Note: Caller must call World_DestroyEntity if add is successful
-            // or we can destroy here if the caller guarantees space.
+            World_DestroyEntity(&gw->ecs, e);
             found++;
         }
     }
@@ -456,14 +455,14 @@ void SpawnerSystem_SpawnHealingPotionAt(GameWorld* gw, int x, int y) {
     SpawnerSystem_AddPotionAt(gw, x, y, type, 1);
 }
 
-int SpawnerSystem_ListPotionsAt(const GameWorld* gw, int x, int y,
+int SpawnerSystem_ListPotionsAt(GameWorld* gw, int x, int y,
                                 ItemType* outTypes, int* outQtys, int maxSlots) {
     int found = 0;
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
         if (pk->quantity > 0 && !pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->itemType;
             outQtys[found] = pk->quantity;
@@ -473,19 +472,17 @@ int SpawnerSystem_ListPotionsAt(const GameWorld* gw, int x, int y,
     return found;
 }
 
-int SpawnerSystem_ListEquipAt(const GameWorld* gw, int x, int y,
+int SpawnerSystem_ListEquipAt(GameWorld* gw, int x, int y,
                               EquipType* outTypes, int* outQtys, int maxSlots) {
     int found = 0;
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&((GameWorld*)gw)->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
-        CPosition* p = World_GetPosition(&((GameWorld*)gw)->ecs, e);
-        CPickup* pk = World_GetPickup(&((GameWorld*)gw)->ecs, e);
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CPickup* pk = World_GetPickup(&gw->ecs, e);
         if (pk->quantity > 0 && pk->isEquip && p->x == x && p->y == y && found < maxSlots) {
             outTypes[found] = pk->equipType;
             outQtys[found] = pk->quantity;
-            // Note: Caller must call World_DestroyEntity if add is successful
-            // or we can destroy here if the caller guarantees space.
             found++;
         }
     }

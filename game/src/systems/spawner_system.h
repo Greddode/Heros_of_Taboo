@@ -2,7 +2,7 @@
 #define SPAWNER_SYSTEM_H
 
 #include "world.h"
-#include "core/procedural.h"
+#include "map/procedural.h"
 #include "game_types.h"
 
 // Spawn one monster entity from template data.
@@ -18,7 +18,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 void SpawnerSystem_SpawnPickups(GameWorld* gw);
 
 // Find a pickup entity at (x, y). Returns ENTITY_NONE if none.
-EntityId SpawnerSystem_FindPickupAt(const GameWorld* gw, int x, int y);
+EntityId SpawnerSystem_FindPickupAt(GameWorld* gw, int x, int y);
 
 // Collect all potion pickups at (x, y). Returns count collected.
 int SpawnerSystem_CollectPickupsAt(GameWorld* gw, int x, int y, ItemType* outTypes, int* outQtys, int maxSlots);
@@ -37,9 +37,9 @@ void SpawnerSystem_AddEquipAt(GameWorld* gw, int x, int y, EquipType type, int q
 void SpawnerSystem_SpawnHealingPotionAt(GameWorld* gw, int x, int y);
 
 // Inspector: list pickups at a tile without collecting.
-int SpawnerSystem_ListPotionsAt(const GameWorld* gw, int x, int y,
+int SpawnerSystem_ListPotionsAt(GameWorld* gw, int x, int y,
                                 ItemType* outTypes, int* outQtys, int maxSlots);
-int SpawnerSystem_ListEquipAt(const GameWorld* gw, int x, int y,
+int SpawnerSystem_ListEquipAt(GameWorld* gw, int x, int y,
                               EquipType* outTypes, int* outQtys, int maxSlots);
 
 #endif

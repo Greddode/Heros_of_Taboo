@@ -7,12 +7,12 @@
 void RenderSystem_DrawMap(const GameWorld* gw);
 
 // ECS monsters with movement interpolation. Call inside an active BeginMode2D.
-void RenderSystem_DrawMonsters(const GameWorld* gw, float monsterT);
+void RenderSystem_DrawMonsters(GameWorld* gw, float monsterT);
 
 // Map + entities + projectile
-void RenderSystem_World(const GameWorld* gw);
+void RenderSystem_World(GameWorld* gw);
 
 // Health bar, floor label, combat log
-void RenderSystem_HUD(const GameWorld* gw);
+void RenderSystem_HUD(GameWorld* gw);
 
 #endif
