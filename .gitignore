@@ -11,6 +11,7 @@ obj
 *.user
 /*.sln
 *.slnx
-.continue
 /ignore
-.aider*
+*.exe
+*.obj
+game/-

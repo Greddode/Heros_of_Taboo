@@ -1,5 +1,5 @@
 #include "combat_log.h"
-#include "core/game.h"
+#include "game.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>

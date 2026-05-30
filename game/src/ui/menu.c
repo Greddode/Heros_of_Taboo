@@ -1,7 +1,7 @@
 #include "menu.h"
 #include "text_data.h"
-#include "core/audio.h"
-#include "../core/game.h"
+#include "audio.h"
+#include "game.h"
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,7 +113,10 @@ void Menu_Render(void) {
     int hintSize = (int)(14 * scale);
     const char* hint = "Use Arrow Keys / WASD to navigate, Enter to select";
     int hintW = MeasureText(hint, hintSize);
-    DrawText(hint, (sw - hintW) / 2, sh - (int)(30 * scale), hintSize, (Color){ 80, 80, 100, 255 });
+    int hintY = sh - (int)(30 * scale);
+    BeginScissorMode(0, hintY, sw, (int)(30 * scale));
+    DrawText(hint, (sw - hintW) / 2, hintY, hintSize, (Color){ 80, 80, 100, 255 });
+    EndScissorMode();
 }
 
 MenuAction Menu_CreditsUpdate(void) {
@@ -429,8 +432,11 @@ void Menu_StoryRender(void) {
                     ? "At end - ESC - Back"
                     : "UP/DOWN - Scroll     ESC - Back";
             int hintSize = (int)(16 * scale);
+            int hintY = sh - (int)(40 * scale);
+            BeginScissorMode(0, hintY, sw, (int)(40 * scale));
             int hintW = MeasureText(scrollHint, hintSize);
-            DrawText(scrollHint, (sw - hintW) / 2, sh - (int)(40 * scale), hintSize, (Color){ 100, 100, 130, 255 });
+            DrawText(scrollHint, (sw - hintW) / 2, hintY, hintSize, (Color){ 100, 100, 130, 255 });
+            EndScissorMode();
         }
     } else {
         const char* err = "Could not load story.txt";
@@ -439,8 +445,11 @@ void Menu_StoryRender(void) {
         DrawText(err, (sw - errW) / 2, sh / 2, errSize, RED);
         const char* hint = "ESC - Back";
         int hintSize = (int)(16 * scale);
+        int hintY = sh - (int)(40 * scale);
+        BeginScissorMode(0, hintY, sw, (int)(40 * scale));
         int hintW = MeasureText(hint, hintSize);
-        DrawText(hint, (sw - hintW) / 2, sh - (int)(40 * scale), hintSize, (Color){ 100, 100, 130, 255 });
+        DrawText(hint, (sw - hintW) / 2, hintY, hintSize, (Color){ 100, 100, 130, 255 });
+        EndScissorMode();
     }
 }
 
@@ -597,16 +606,18 @@ void Menu_SettingsRender(void) {
     int titleSize = (int)(50 * scale);
     const char* title = "Settings";
     int titleW = MeasureText(title, titleSize);
-    DrawText(title, (sw - titleW) / 2, sh / 5, titleSize, (Color){ 200, 180, 50, 255 });
+    int titleY = (int)(sh * 0.1f);
+    DrawText(title, (sw - titleW) / 2, titleY, titleSize, (Color){ 200, 180, 50, 255 });
 
     int cx = sw / 2;
-    int cy = sh / 2 - (int)(30 * scale);
     int itemSpacing = (int)(70 * scale);
     int itemSize = (int)(22 * scale);
     int barW = (int)(260 * scale);
+    int labelHeight = itemSize + 8;
+    int cy = titleY + titleSize + (int)(40 * scale);
 
-    int viewY = cy;
-    int viewH = sh - cy - (int)(40 * scale);
+    int viewY = cy - labelHeight;
+    int viewH = sh - viewY - (int)(40 * scale);
     int maxVisible = viewH / itemSpacing;
     if (maxVisible < 1) maxVisible = 1;
 
@@ -629,7 +640,10 @@ void Menu_SettingsRender(void) {
     int hintSize = (int)(14 * scale);
     const char* hint = "UP / DOWN - select     LEFT / RIGHT or A / D - adjust     ESC - Back";
     int hintW = MeasureText(hint, hintSize);
-    DrawText(hint, (sw - hintW) / 2, sh - (int)(30 * scale), hintSize, (Color){ 80, 80, 100, 255 });
+    int hintY = sh - (int)(30 * scale);
+    BeginScissorMode(0, hintY, sw, (int)(30 * scale));
+    DrawText(hint, (sw - hintW) / 2, hintY, hintSize, (Color){ 80, 80, 100, 255 });
+    EndScissorMode();
 }
 
 void Menu_SettingsUpdateGame(void) {
