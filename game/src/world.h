@@ -32,6 +32,8 @@ typedef struct GameWorld {
     int escapeX, escapeY;
     bool floorClearedNotified;
     bool escapeSpawned;
+    bool monstersEverSpawned;
+    bool shadowSpawned;
 
     // Animation
     float animTimer, animDuration;
@@ -61,9 +63,9 @@ typedef struct GameWorld {
     EntityId selectedMonsterEntity;
 
     // Tile inspector (selected tile for potion/equipment info panel)
-    int selectedPotionTileX;
-    int selectedPotionTileY;
-    bool selectedPotionTileActive;
+    int inspectedTileX;
+    int inspectedTileY;
+    bool inspectedTileActive;
 
     // Inventory data (UI state will be extracted later)
     InventorySlot inventory[MAX_INVENTORY_SLOTS];
@@ -71,6 +73,9 @@ typedef struct GameWorld {
     EquipType equipped[EQUIP_SLOT_COUNT];
     EquipType equipInventory[MAX_INVENTORY_SLOTS];
     int equipInventoryCount;
+
+    // Minimap
+    bool mapOpen;
 } GameWorld;
 
 void GameWorld_Init(GameWorld* gw);

@@ -9,6 +9,43 @@
 
 #define MIN_PLAYER_DIST 5
 
+typedef struct {
+    MonsterType type;
+    const char* altName;
+    int chance;
+} MonsterNameVariant;
+
+static const MonsterNameVariant s_nameVariants[] = {
+    { MONSTER_BAT,           "Ozzy's Pet",         10 },
+    { MONSTER_BAT,           "Definitely a Bird",   8 },
+    { MONSTER_GOBLIN,        "Shrekt",              10 },
+    { MONSTER_GOBLIN,        "Mike Wazowski",       8 },
+    { MONSTER_SKELETON,      "Mr. Bones",          12 },
+    { MONSTER_SKELETON,      "Sans",                5 },
+    { MONSTER_FLOATING_EYE,  "Big Brother",        10 },
+    { MONSTER_FLOATING_EYE,  "Google",              8 },
+    { MONSTER_OGRE,          "Shrek",              15 },
+    { MONSTER_OGRE,          "Donkey",              8 },
+    { MONSTER_DRAGON,        "Puff",               10 },
+    { MONSTER_DRAGON,        "Smaug (Bootleg)",     8 },
+    { MONSTER_RANGER_GOBLIN, "Hawkeye (Knockoff)", 10 },
+    { MONSTER_WARP_SKULL,    "Skeletor",           12 },
+    { MONSTER_DEMON_EYE,     "The Algorithm",      10 },
+};
+static const int s_nameVariantCount = sizeof(s_nameVariants) / sizeof(s_nameVariants[0]);
+
+static void MaybeAssignMemeName(GameWorld* gw, EntityId e, MonsterType type) {
+    CName* n = World_GetName(&gw->ecs, e);
+    for (int i = 0; i < s_nameVariantCount; i++) {
+        if (s_nameVariants[i].type != type) continue;
+        if (GetRandomValue(1, 100) <= s_nameVariants[i].chance) {
+            strncpy(n->name, s_nameVariants[i].altName, sizeof(n->name) - 1);
+            n->name[sizeof(n->name) - 1] = '\0';
+            return;
+        }
+    }
+}
+
 static int DistSq(int ax, int ay, int bx, int by) {
     int dx = ax - bx;
     int dy = ay - by;
@@ -30,7 +67,13 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
     pos->prevY = y;
     pos->facingDir = DIR_DOWN;
 
-    float scale = powf(1.12f, (float)floor);
+    int effectiveFloor = floor;
+    if (tpl->maxLevel != -1) {
+        int maxScaleFloor = tpl->maxLevel - tpl->level;
+        if (maxScaleFloor < 1) maxScaleFloor = 1;
+        if (effectiveFloor > maxScaleFloor) effectiveFloor = maxScaleFloor;
+    }
+    float scale = powf(1.12f, (float)effectiveFloor);
     int str = (int)(tpl->str * scale);
     int con = (int)(tpl->con * scale);
     int lck = (int)(tpl->lck * scale);
@@ -48,6 +91,7 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
     s->defense = (int)(tpl->defense * scale) + con / 2;
     s->level = tpl->level + floor * GetRandomValue(1, 3);
     if (s->level < 1) s->level = 1;
+    if (tpl->maxLevel != -1 && s->level > tpl->maxLevel) s->level = tpl->maxLevel;
     s->expValue = (int)(tpl->expValue * scale) + lck * 3;
     s->alive = true;
     s->statPoints = 0;
@@ -78,6 +122,7 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
     CName* n = World_GetName(&gw->ecs, e);
     strncpy(n->name, tpl->name, sizeof(n->name) - 1);
     n->name[sizeof(n->name) - 1] = '\0';
+    MaybeAssignMemeName(gw, e, type);
 
     World_AddComponent(&gw->ecs, e, COMP_FALLBACK_COLOR);
     World_GetColor(&gw->ecs, e)->color = tpl->color;
@@ -167,7 +212,8 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 
             for (int t = 0; t < MONSTER_TYPE_COUNT; t++) {
                 const MonsterTemplate* tpl = Monster_GetTemplate((MonsterType)t);
-                if (!tpl || tpl->spawnWeight <= 0 || floor < tpl->minFloor) {
+                if (!tpl || tpl->spawnWeight <= 0 || floor < tpl->minFloor ||
+                    (tpl->maxFloor != -1 && floor > tpl->maxFloor)) {
                     monsterWeights[t] = 0;
                     continue;
                 }
@@ -185,7 +231,8 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
                 }
             }
 
-            SpawnerSystem_SpawnMonster(gw, type, mx, my, floor);
+            EntityId spawned = SpawnerSystem_SpawnMonster(gw, type, mx, my, floor);
+            if (spawned != ENTITY_NONE) gw->monstersEverSpawned = true;
         }
     }
 
@@ -240,7 +287,7 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw) {
             int ly = floorTiles[fi] / w;
             if (DistSq(lx, ly, playerX, playerY) < minDist) continue;
 
-            int tierMinFloor[4] = { 1, 1, 4, 6 };
+            int tierMinFloor[4] = { 1, 3, 5, 7 };
             float tierWeights[4] = { 0, 0, 0, 0 };
             for (int te = 0; te < (int)LOOT_TABLE_COUNT; te++) {
                 const LootEntry* entry = &LOOT_TABLE[te];
@@ -304,15 +351,6 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw) {
             if (pk->isEquip) pk->equipType = (EquipType)chosen->typeId;
             else pk->itemType = (ItemType)chosen->typeId;
             pk->quantity = 1;
-
-            // FIX: Add Sprite component so RenderSystem can see the pickup
-            World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
-            CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-            // Assuming you have a central sheet for items or specific paths
-            spr->tex = Resources_LoadTexture("resources/tilesets/items.png"); 
-            spr->frameCount = 0; // Static
-            spr->row = pk->isEquip ? 1 : 0;
-            spr->frame = chosen->typeId;
         }
     }
 
@@ -414,14 +452,6 @@ static EntityId CreatePickupEntity(GameWorld* gw, int x, int y, bool isEquip, in
     if (isEquip) pk->equipType = (EquipType)typeId;
     else pk->itemType = (ItemType)typeId;
     pk->quantity = qty;
-
-    // Add visuals for manual additions
-    World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
-    CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-    spr->tex = Resources_LoadTexture("resources/tilesets/items.png");
-    spr->frameCount = 0;
-    spr->row = isEquip ? 1 : 0;
-    spr->frame = typeId;
 
     return e;
 }

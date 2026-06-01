@@ -1,5 +1,5 @@
 #include "ai_system.h"
-#include "audio.h"
+#include "game_audio.h"
 #include "ui/combat_log.h"
 #include "data/monster_data.h"
 #include "world_monster.h"
@@ -47,6 +47,63 @@ static Direction MoveToward(GameWorld* gw, EntityId mover, int targetX, int targ
             int nd = abs(targetX - tx) + abs(targetY - ty);
             if (nd < bestDist) { bestDist = nd; bestDir = dirs[d]; }
         }
+    }
+    return bestDir;
+}
+
+static Direction MoveAwayFrom(GameWorld* gw, EntityId mover, int targetX, int targetY) {
+    CPosition* mp = World_GetPosition(&gw->ecs, mover);
+    int mapWidth  = gw->map->width;
+    int mapHeight = gw->map->height;
+
+    Direction bestDir = DIR_NONE;
+    int bestDist = abs(targetX - mp->x) + abs(targetY - mp->y);
+    Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
+    for (int d = 0; d < 4; d++) {
+        int tx = mp->x, ty = mp->y;
+        switch (dirs[d]) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
+            !gw->blocking[ty][tx] &&
+            World_FindMonsterAt(gw, tx, ty, mover) == ENTITY_NONE) {
+            int nd = abs(targetX - tx) + abs(targetY - ty);
+            if (nd > bestDist) { bestDist = nd; bestDir = dirs[d]; }
+        }
+    }
+    return bestDir;
+}
+
+static Direction MoveFlank(GameWorld* gw, EntityId mover, int targetX, int targetY) {
+    CPosition* mp = World_GetPosition(&gw->ecs, mover);
+    int mapWidth  = gw->map->width;
+    int mapHeight = gw->map->height;
+
+    Direction bestDir = DIR_NONE;
+    int bestScore = 9999;
+    Direction dirs[] = { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
+    for (int d = 0; d < 4; d++) {
+        int tx = mp->x, ty = mp->y;
+        switch (dirs[d]) {
+            case DIR_UP:    ty--; break;
+            case DIR_DOWN:  ty++; break;
+            case DIR_LEFT:  tx--; break;
+            case DIR_RIGHT: tx++; break;
+            default: break;
+        }
+        if (tx < 0 || tx >= mapWidth || ty < 0 || ty >= mapHeight) continue;
+        if (gw->blocking[ty][tx]) continue;
+        EntityId occupant = World_FindMonsterAt(gw, tx, ty, mover);
+        if (occupant != ENTITY_NONE && !World_HasComponents(&gw->ecs, occupant, COMP_PLAYER_TAG)) continue;
+
+        int distToTarget = abs(targetX - tx) + abs(targetY - ty);
+        int score = distToTarget;
+        if (tx == mp->x || ty == mp->y) score += 1;
+        if (score < bestScore) { bestScore = score; bestDir = dirs[d]; }
     }
     return bestDir;
 }
@@ -102,7 +159,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             if (ai->attackType == ATTACK_RANGED) {
                 dmg = ms->attack + (int)(ms->dex * 1.5f) - playerStats->defense;
             } else {
-                dmg = ms->attack + ms->intel - playerStats->defense;
+                dmg = ms->attack + ms->intel;
                 int magicRes = playerStats->intel * 3;
                 dmg -= magicRes;
             }
@@ -133,21 +190,32 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             gw->projectile.tileEX = playerX;
             gw->projectile.tileEY = playerY;
             gw->projectile.attackType = ai->attackType;
-            gw->projectile.color = (ai->attackType == ATTACK_MAGIC) ? (Color){ 80, 80, 255, 255 } : (Color){ 139, 69, 19, 255 };
             if (ai->attackType == ATTACK_MAGIC) {
-                gw->projectile.startFrame = 30;
+                int row = 1;
+                Color magicColor;
+                switch (ai->type) {
+                    case MONSTER_WARP_SKULL:   row = 3; magicColor = (Color){ 180,  60, 220, 255 }; break;
+                    case MONSTER_FLOATING_EYE: row = 2; magicColor = (Color){  60, 200, 220, 255 }; break;
+                    case MONSTER_DEMON_EYE:    row = 7; magicColor = (Color){ 220,  40,  40, 255 }; break;
+                    default:                   row = 1; magicColor = (Color){  80,  80, 255, 255 }; break;
+                }
+                gw->projectile.startRow    = row;
+                gw->projectile.startFrame  = row * 10;
                 gw->projectile.animFrameCount = 9;
+                gw->projectile.color       = magicColor;
             } else {
-                gw->projectile.startFrame = 0;
+                gw->projectile.startRow    = 0;
+                gw->projectile.startFrame  = 0;
                 gw->projectile.animFrameCount = 0;
+                gw->projectile.color       = (Color){ 139, 69, 19, 255 };
             }
             gw->projectileTimer = PROJECTILE_ANIM_DURATION;
             gw->projectileDuration = PROJECTILE_ANIM_DURATION;
 
-            PlayHitSound();
+            GameAudio_PlayHitSound();
             const char* verb = (ai->attackType == ATTACK_MAGIC) ? "blasts" : "shoots";
-            if (ai->attackType == ATTACK_MAGIC) PlayMagicAttackSound();
-            else PlayRangedAttackSound();
+            if (ai->attackType == ATTACK_MAGIC) GameAudio_PlayMagicAttackSound();
+            else GameAudio_PlayRangedAttackSound();
             TraceLog(LOG_INFO, "%s %s you for %d damage (HP: %d)!",
                      World_GetName(&gw->ecs, monster)->name, verb, dmg, playerStats->hp);
             CombatLog_Add(&gw->combatLog, BLACK, "%s %s you for %d!", World_GetName(&gw->ecs, monster)->name, verb, dmg);
@@ -175,7 +243,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
-                PlayHitSound();
+                GameAudio_PlayHitSound();
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;
                 CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
@@ -187,8 +255,16 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             }
         }
 
-        Direction bestDir = MoveToward(gw, monster, playerX, playerY);
-        if (bestDir != DIR_NONE) ApplyMove(gw, monster, bestDir);
+        if (ai->attackType == ATTACK_MELEE) {
+            Direction flankDir = MoveFlank(gw, monster, playerX, playerY);
+            if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, playerX, playerY);
+            if (flankDir != DIR_NONE) ApplyMove(gw, monster, flankDir);
+        } else {
+            Direction kiteDir = MoveAwayFrom(gw, monster, playerX, playerY);
+            if (kiteDir == DIR_NONE) kiteDir = MoveToward(gw, monster, playerX, playerY);
+            if (kiteDir != DIR_NONE) ApplyMove(gw, monster, kiteDir);
+        }
+        if (ai->attackType != ATTACK_MELEE) return;
     }
     else if (ai->huntTurns > 0 && ai->lastSeenX >= 0) {
         ai->huntTurns--;
@@ -214,7 +290,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
-                PlayHitSound();
+                GameAudio_PlayHitSound();
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;
                 CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
@@ -226,8 +302,9 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             }
         }
 
-        Direction bestDir = MoveToward(gw, monster, ai->lastSeenX, ai->lastSeenY);
-        if (bestDir != DIR_NONE) ApplyMove(gw, monster, bestDir);
+        Direction huntDir = MoveFlank(gw, monster, ai->lastSeenX, ai->lastSeenY);
+        if (huntDir == DIR_NONE) huntDir = MoveToward(gw, monster, ai->lastSeenX, ai->lastSeenY);
+        if (huntDir != DIR_NONE) ApplyMove(gw, monster, huntDir);
     }
     else if (dist <= tpl->detectionRange + 8) {
         for (int attempt = 0; attempt < 4; attempt++) {

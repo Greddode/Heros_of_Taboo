@@ -9,6 +9,7 @@ const LootEntry LOOT_TABLE[] = {
     { LOOT_TYPE_EQUIP,  (int)EQUIP_DAGGER,          1, 10 },
     { LOOT_TYPE_EQUIP,  (int)EQUIP_RING_OF_STRENGTH,1, 10 },
     { LOOT_TYPE_EQUIP,  (int)EQUIP_BOOTS_OF_SWIFTNESS,1, 10 },
+    { LOOT_TYPE_EQUIP,  (int)EQUIP_SIMPLE_BOW,      1, 8 },
 
     // Tier 2 (Uncommon) — base weight 10
     { LOOT_TYPE_POTION, (int)ITEM_MEDIUM_HP_POTION, 2, 12 },
@@ -27,10 +28,14 @@ const LootEntry LOOT_TABLE[] = {
     { LOOT_TYPE_EQUIP,  (int)EQUIP_STEEL_SHIELD,    3, 6 },
     { LOOT_TYPE_EQUIP,  (int)EQUIP_SAGES_PENDANT,   3, 6 },
     { LOOT_TYPE_EQUIP,  (int)EQUIP_LUCKY_CHARM,     3, 5 },
+    { LOOT_TYPE_EQUIP,  (int)EQUIP_DWARVEN_BOW,     3, 4 },
+    { LOOT_TYPE_EQUIP,  (int)EQUIP_CROSSBOW,        3, 5 },
 
     // Tier 4 (Legendary) — base weight 3
     { LOOT_TYPE_EQUIP,  (int)EQUIP_WAR_HAMMER,      4, 4 },
     { LOOT_TYPE_EQUIP,  (int)EQUIP_BERSERKER_BAND,  4, 3 },
+    { LOOT_TYPE_EQUIP,  (int)EQUIP_ELVEN_BOW,       4, 3 },
+    { LOOT_TYPE_EQUIP,  (int)EQUIP_GREATBOW,        4, 2 },
 };
 
 const int LOOT_TABLE_COUNT = (int)(sizeof(LOOT_TABLE) / sizeof(LOOT_TABLE[0]));

@@ -1,7 +1,9 @@
 #include "raylib.h"
 #include "game.h"
 #include "audio.h"
+#include "game_audio.h"
 #include "ui/menu.h"
+#include "ui/map_ui.h"
 #include "systems/input_system.h"
 #include <string.h>
 #include <time.h>
@@ -30,6 +32,7 @@ int main(void)
     SetRandomSeed((unsigned int)time(NULL));
 
     InitAudioSystem();
+    GameAudio_Init();
 
     Scene scene = SCENE_MENU;
     GameWorld game;
@@ -41,7 +44,8 @@ int main(void)
 
     while (!WindowShouldClose() && scene != SCENE_EXIT)
     {
-        UpdateMusicSystem(scene == SCENE_GAME);
+        GameAudio_SetContext(scene == SCENE_GAME);
+        UpdateMusicSystem();
 
         switch (scene)
         {
@@ -154,7 +158,9 @@ int main(void)
                     } else if (game.state == STATE_INVENTORY) {
                     } else if (game.state == STATE_GAME_OVER || game.state == STATE_WIN) {
                         nextScene = SCENE_MENU;
-                    } else {
+                } else if (game.state == STATE_MAP) {
+                    MapUI_Update(&game);
+                } else {
                         gameMenuOpen = true;
                     }
                 }
@@ -198,6 +204,7 @@ int main(void)
                 BeginDrawing();
                 ClearBackground(BLACK);
                 RenderGame(&game, &invUI);
+                if (game.state == STATE_MAP) MapUI_Render(&game);
                 if (settingsMenuOpen) {
                     Menu_SettingsRenderGame();
                 } else if (gameMenuOpen) {

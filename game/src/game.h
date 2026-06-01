@@ -19,7 +19,6 @@ float GetGuiScale(void);
 
 bool InitGame(GameWorld* game, const char* tmxFile);
 void CleanupGame(GameWorld* game);
-void HandleInput(GameWorld* game);
 void UpdateGame(GameWorld* game);
 void DescendFloor(GameWorld* game);
 

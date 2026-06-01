@@ -1,6 +1,6 @@
 #include "systems/input_system.h"
 #include "game.h"
-#include "audio.h"
+#include "game_audio.h"
 #include "map/map_helpers.h"
 #include "inventory.h"
 #include "ui/combat_log.h"
@@ -9,6 +9,7 @@
 #include "systems/combat_system.h"
 #include "systems/world_monster.h"
 #include "systems/player.h"
+#include "systems/movement_system.h"
 #include "data/monster_data.h"
 #include <stdio.h>
 #include <string.h>
@@ -22,10 +23,10 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
     CPosition* ppos = (pe != ENTITY_NONE) ? World_GetPosition(w, pe) : NULL;
     CStats* ps = (pe != ENTITY_NONE) ? World_GetStats(w, pe) : NULL;
 
-    if (IsKeyPressed(KEY_I)) { game->state = STATE_PLAYER_TURN; return; }
+    if (IsKeyPressed(KEY_I)) { InventoryUI_Init(ui); game->state = STATE_PLAYER_TURN; return; }
     if (IsKeyPressed(KEY_ESCAPE)) {
         if (ui->subState == INV_ACTION_MENU) ui->subState = INV_BROWSE;
-        else game->state = STATE_PLAYER_TURN;
+        else { InventoryUI_Init(ui); game->state = STATE_PLAYER_TURN; }
         return;
     }
 
@@ -154,7 +155,7 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
         int slotH = (int)(44 * iscale);
         int contentH = (int)((400 - 24 - 40 - 60) * iscale);
         int topPad = (int)(40 * iscale);
-        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { if (ui->selection > 0) { ui->selection--; int t = topPad - ui->scrollOffset + ui->selection * slotH; if (t < 0) ui->scrollOffset += t; } }
+        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { if (ui->selection > 0) { ui->selection--; int t = topPad - ui->scrollOffset + ui->selection * slotH; if (t < 0) { ui->scrollOffset += t; if (ui->scrollOffset < 0) ui->scrollOffset = 0; } } }
         if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) { if (ui->selection < EQUIP_SLOT_COUNT - 1) { ui->selection++; int b = topPad - ui->scrollOffset + (ui->selection + 1) * slotH; if (b > contentH) ui->scrollOffset += (b - contentH); } }
         if ((IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) && game->equipped[ui->selection] != EQUIP_NONE) { ui->subState = INV_ACTION_MENU; ui->actionSelection = 0; }
         return;
@@ -189,7 +190,7 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
             int itemH = (int)(22 * iscale);
             int contentH = (int)((400 - 24 - 40 - 60) * iscale);
             int topPad = (int)(42 * iscale);
-            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { if (ui->selection > 0) { ui->selection--; int t = topPad - ui->scrollOffset + ui->selection * itemH; if (t < 0) ui->scrollOffset += t; } }
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { if (ui->selection > 0) { ui->selection--; int t = topPad - ui->scrollOffset + ui->selection * itemH; if (t < 0) { ui->scrollOffset += t; if (ui->scrollOffset < 0) ui->scrollOffset = 0; } } }
             if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) { if (ui->selection < totalInv - 1) { ui->selection++; int b = topPad - ui->scrollOffset + (ui->selection + 1) * itemH; if (b > contentH) ui->scrollOffset += (b - contentH); } }
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) { ui->subState = INV_ACTION_MENU; ui->actionSelection = 0; }
         } else if (ui->subState == INV_ACTION_MENU && ui->tab == INV_TAB_INVENTORY) {
@@ -245,6 +246,10 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
 
 void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
     (void)ui;
+    if ((game->state == STATE_PLAYER_TURN || game->state == STATE_ENEMY_TURN) && (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_Z))) {
+        game->state = STATE_MAP;
+        return;
+    }
     if (game->state != STATE_PLAYER_TURN) return;
     if (game->animTimer > 0.0f) return;
 
@@ -299,8 +304,8 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
                     bool alive = AISystem_ProcessAll(game, game->timeWaited);
                     if (!alive) { game->state = STATE_GAME_OVER; return; }
                     if (ps && ps->hp < hpBefore) break;
-                    { ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS]; int pCount = SpawnerSystem_CollectPickupsAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, pTypes, pQtys, MAX_POTIONS); for (int i = 0; i < pCount; i++) { int picked = 0; for (int q = 0; q < pQtys[i]; q++) { if (InventoryAdd(game, pTypes[i])) picked++; else break; } if (picked > 0) { CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i])); PlayPickupSound(); } } }
-                    { EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP]; int eCount = SpawnerSystem_CollectEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes, eQtys, MAX_EQUIP_ON_MAP); for (int i = 0; i < eCount; i++) { int picked = 0; for (int q = 0; q < eQtys[i]; q++) { if (AddEquipToInventory(game, eTypes[i])) picked++; else break; } if (picked > 0) { const EquipData* d = GetEquipData(eTypes[i]); CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment"); PlayPickupSound(); SpawnerSystem_ReduceEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes[i], picked); } } }
+                    { ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS]; int pCount = SpawnerSystem_CollectPickupsAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, pTypes, pQtys, MAX_POTIONS); for (int i = 0; i < pCount; i++) { int picked = 0; for (int q = 0; q < pQtys[i]; q++) { if (InventoryAdd(game, pTypes[i])) picked++; else break; } if (picked > 0) { CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i])); GameAudio_PlayPickupSound(); } } }
+                    { EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP]; int eCount = SpawnerSystem_CollectEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes, eQtys, MAX_EQUIP_ON_MAP); for (int i = 0; i < eCount; i++) { int picked = 0; for (int q = 0; q < eQtys[i]; q++) { if (AddEquipToInventory(game, eTypes[i])) picked++; else break; } if (picked > 0) { const EquipData* d = GetEquipData(eTypes[i]); CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment"); GameAudio_PlayPickupSound(); SpawnerSystem_ReduceEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes[i], picked); } } }
                 }
                 if (!stoppedAtRoom) game->sprintBypassRoom = false;
                 for (int i = 0; i < snapCount; i++) { CPosition* mp = World_GetPosition(&game->ecs, monSnap[i].id); mp->prevX = monSnap[i].prevX; mp->prevY = monSnap[i].prevY; if (World_HasComponents(&game->ecs, monSnap[i].id, COMP_HIT_FLASH)) World_GetHitFlash(&game->ecs, monSnap[i].id)->timer = monSnap[i].hitFlash; }
@@ -327,85 +332,43 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
         if (ctrlHeld) { game->selectedMonsterEntity = ENTITY_NONE; }
         else {
             game->sprintBypassRoom = false;
-            int oldX = ppos ? ppos->x : 0, oldY = ppos ? ppos->y : 0;
-            bool moved = false;
-            if (ppos) {
-                int nx = ppos->x, ny = ppos->y;
-                switch (dir) {
-                    case DIR_UP: ny--; break;
-                    case DIR_DOWN: ny++; break;
-                    case DIR_LEFT: nx--; break;
-                    case DIR_RIGHT: nx++; break;
-                    default: break;
-                }
-                bool inBounds = (nx >= 0 && nx < game->map->width && ny >= 0 && ny < game->map->height);
-                bool canMove = inBounds && !game->blocking[ny][nx]
-                    && World_FindMonsterAt(game, nx, ny, ENTITY_NONE) == ENTITY_NONE;
-                if (canMove) {
-                    ppos->prevX = ppos->x; ppos->prevY = ppos->y;
-                    ppos->x = nx; ppos->y = ny;
-                    moved = true;
-                } else if (inBounds && World_FindMonsterAt(game, nx, ny, ENTITY_NONE) != ENTITY_NONE) {
-                    // Attack monster on bump
-                    if (CombatSystem_PlayerMeleeAttack(game, pe, nx, ny)) {
-                        game->turnCount++; game->enemyTurnCooldown = 0.15f; game->state = STATE_ENEMY_TURN;
-                        game->sprintBypassRoom = false; game->selectedMonsterEntity = ENTITY_NONE;
-                    }
-                    return;
-                }
-            }
-            if (moved) {
-                // Collect pickups at new position
-                {
-                    ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS];
-                    int pCount = SpawnerSystem_CollectPickupsAt(game, ppos->x, ppos->y, pTypes, pQtys, MAX_POTIONS);
-                    for (int i = 0; i < pCount; i++) {
-                        int picked = 0;
-                        for (int q = 0; q < pQtys[i]; q++) {
-                            if (InventoryAdd(game, pTypes[i])) picked++;
-                            else break;
-                        }
-                        if (picked > 0) {
-                            CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i]));
-                            PlayPickupSound();
-                        }
-                    }
-                }
-                {
-                    EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP];
-                    int eCount = SpawnerSystem_CollectEquipAt(game, ppos->x, ppos->y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
-                    for (int i = 0; i < eCount; i++) {
-                        int picked = 0;
-                        for (int q = 0; q < eQtys[i]; q++) {
-                            if (AddEquipToInventory(game, eTypes[i])) picked++;
-                            else break;
-                        }
-                        if (picked > 0) {
-                            const EquipData* d = GetEquipData(eTypes[i]);
-                            CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
-                            PlayPickupSound();
-                            SpawnerSystem_ReduceEquipAt(game, ppos->x, ppos->y, eTypes[i], picked);
-                        }
-                    }
-                }
-                game->selectedMonsterEntity = ENTITY_NONE; game->turnCount++; game->enemyTurnCooldown = 0.15f;
-                if (ppos && (ppos->x != oldX || ppos->y != oldY)) { game->animTimer = MOVE_ANIM_DURATION; game->animDuration = MOVE_ANIM_DURATION; RevealFOW(game); }
-                game->state = STATE_ENEMY_TURN;
-            }
+            MovementSystem_PlayerMove(game, dir);
         }
     } else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
         game->sprintBypassRoom = false; game->turnCount++; game->timeWaited++;
-        if (game->timeWaited == 15 && game->currentFloor < game->maxFloors) { SpawnShadow(game); CombatLog_Add(&game->combatLog, RED, "You feel a presence come to this floor"); }
+        if (game->timeWaited >= 15 && !game->shadowSpawned && game->currentFloor < game->maxFloors) { SpawnShadow(game); game->shadowSpawned = true; CombatLog_Add(&game->combatLog, RED, "You feel a presence come to this floor"); CombatLog_Add(&game->combatLog, RED, "What a horrible night to have a curse..."); }
         if (ps && ps->hp < ps->maxHp) { int waitHeal = 1 + (ps->intel / 2); ps->hp += waitHeal; if (ps->hp > ps->maxHp) ps->hp = ps->maxHp; CombatLog_Add(&game->combatLog, BLACK, "Wait heals %d HP", waitHeal); }
         game->enemyTurnCooldown = 0.08f; game->state = STATE_ENEMY_TURN; return;
     }
 
     if ((IsKeyPressed(KEY_F) || IsKeyPressed(KEY_ENTER)) && game->state == STATE_PLAYER_TURN) {
-        Direction fdir = ppos ? ppos->facingDir : DIR_NONE;
-        int tx = ppos ? ppos->x : 0, ty = ppos ? ppos->y : 0;
-        switch (fdir) { case DIR_UP: ty--; break; case DIR_DOWN: ty++; break; case DIR_LEFT: tx--; break; case DIR_RIGHT: tx++; break; default: break; }
-        if (CombatSystem_PlayerMeleeAttack(game, pe, tx, ty)) { game->turnCount++; game->enemyTurnCooldown = 0.15f; game->state = STATE_ENEMY_TURN; game->sprintBypassRoom = false; game->selectedMonsterEntity = ENTITY_NONE; }
-        else CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to attack there");
+        EquipType weapon = game->equipped[EQUIP_SLOT_WEAPON];
+        const EquipData* wdata = GetEquipData(weapon);
+        if (wdata && wdata->isRanged) {
+            if (CombatSystem_PlayerRangedAttack(game, pe)) {
+                game->turnCount++;
+                game->enemyTurnCooldown = 0.15f;
+                game->state = STATE_ENEMY_TURN;
+                game->sprintBypassRoom = false;
+                game->selectedMonsterEntity = ENTITY_NONE;
+            }
+        } else {
+            Direction fdir = ppos ? ppos->facingDir : DIR_NONE;
+            int tx = ppos ? ppos->x : 0, ty = ppos ? ppos->y : 0;
+            switch (fdir) { case DIR_UP: ty--; break; case DIR_DOWN: ty++; break; case DIR_LEFT: tx--; break; case DIR_RIGHT: tx++; break; default: break; }
+            if (CombatSystem_PlayerMeleeAttack(game, pe, tx, ty)) { game->turnCount++; game->enemyTurnCooldown = 0.15f; game->state = STATE_ENEMY_TURN; game->sprintBypassRoom = false; game->selectedMonsterEntity = ENTITY_NONE; }
+            else CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to attack there");
+        }
+    }
+
+    if (IsKeyPressed(KEY_T) && game->state == STATE_PLAYER_TURN) {
+        if (CombatSystem_PlayerThrowWeapon(game, pe)) {
+            game->turnCount++;
+            game->enemyTurnCooldown = 0.15f;
+            game->state = STATE_ENEMY_TURN;
+            game->sprintBypassRoom = false;
+            game->selectedMonsterEntity = ENTITY_NONE;
+        }
     }
 
     if (IsKeyPressed(KEY_Q)) {
@@ -413,14 +376,11 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
         int tx = ppos ? ppos->x : 0, ty = ppos ? ppos->y : 0;
         switch (fdir) { case DIR_UP: ty--; break; case DIR_DOWN: ty++; break; case DIR_LEFT: tx--; break; case DIR_RIGHT: tx++; break; default: break; }
         if (tx >= 0 && tx < game->map->width && ty >= 0 && ty < game->map->height && game->visibility[ty][tx] == 1) {
-            game->selectedPotionTileX = tx; game->selectedPotionTileY = ty; game->selectedPotionTileActive = true;
+            game->inspectedTileX = tx; game->inspectedTileY = ty; game->inspectedTileActive = true;
             EntityId mon = World_FindMonsterAt(game, tx, ty, ENTITY_NONE);
             game->selectedMonsterEntity = (mon != ENTITY_NONE && World_GetStats(&game->ecs, mon)->alive) ? mon : ENTITY_NONE;
         }
     }
 
     if (IsKeyPressed(KEY_I) || IsKeyPressed(KEY_TAB)) { game->state = STATE_INVENTORY; ui->subState = INV_BROWSE; if (ui->selection < 0 || ui->selection >= game->inventorySlotCount) ui->selection = 0; return; }
-
-    if (ppos && ppos->x == game->stairX && ppos->y == game->stairY && game->stairX >= 0 && game->stairY >= 0) DescendFloor(game);
-    if (game->escapeSpawned && ppos && ppos->x == game->escapeX && ppos->y == game->escapeY) game->state = STATE_WIN;
 }

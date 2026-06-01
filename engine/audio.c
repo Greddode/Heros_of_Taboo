@@ -2,51 +2,41 @@
 #include "raylib.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
-#define MAX_MENU_TRACKS    8
-#define MAX_GAME_TRACKS   16
-#define MAX_HIT_SOUNDS     16
-#define MAX_PICKUP_SOUNDS  16
-#define MAX_RANGED_SOUNDS  16
-#define MAX_MAGIC_SOUNDS   16
-#define MAX_LEVELUP_SOUNDS  16
+#define MAX_MUSIC_CONTEXTS   16
+#define MAX_SOUND_CATEGORIES 32
+#define MAX_TRACKS_PER_CTX   16
+#define MAX_SOUNDS_PER_CAT   16
 
-#define MENU_MUSIC_DIR  "resources/audio/music/main_menu"
-#define GAME_MUSIC_DIR  "resources/audio/music/game"
+typedef struct {
+    char   name[64];
+    char   dirPath[256];
+    Music  tracks[MAX_TRACKS_PER_CTX];
+    int    trackCount;
+    int    currentTrack;
+    float  lastTimePlayed;
+    bool   loaded;
+} MusicContext;
 
-typedef enum {
-    TRACK_NONE,
-    TRACK_MENU,
-    TRACK_GAME
-} ActiveTrack;
+typedef struct {
+    char  name[64];
+    char  dirPath[256];
+    Sound sounds[MAX_SOUNDS_PER_CAT];
+    int   soundCount;
+    bool  loaded;
+} SoundCategory;
 
-static Music s_menuTracks[MAX_MENU_TRACKS];
-static int s_menuTrackCount = 0;
+static MusicContext   s_musicContexts[MAX_MUSIC_CONTEXTS];
+static int            s_musicContextCount = 0;
 
-static Music s_gameTracks[MAX_GAME_TRACKS];
-static int s_gameTrackCount = 0;
-static int s_currentGameTrack = -1;
-static float s_lastGameTimePlayed = 0.0f;
+static SoundCategory  s_soundCategories[MAX_SOUND_CATEGORIES];
+static int            s_soundCategoryCount = 0;
 
-static ActiveTrack s_activeTrack = TRACK_NONE;
-static bool s_audioReady = false;
-static float s_musicVolume = 0.5f;
-static float s_sfxVolume = 0.5f;
-
-static Sound s_hitSounds[MAX_HIT_SOUNDS];
-static int s_hitSoundCount = 0;
-
-static Sound s_pickupSounds[MAX_PICKUP_SOUNDS];
-static int s_pickupSoundCount = 0;
-
-static Sound s_rangedSounds[MAX_RANGED_SOUNDS];
-static int s_rangedSoundCount = 0;
-
-static Sound s_magicSounds[MAX_MAGIC_SOUNDS];
-static int s_magicSoundCount = 0;
-
-static Sound s_levelUpSounds[MAX_LEVELUP_SOUNDS];
-static int s_levelUpSoundCount = 0;
+static AudioMusicContext s_activeContext = AUDIO_INVALID;
+static bool              s_audioReady   = false;
+static float             s_musicVolume  = 0.5f;
+static float             s_sfxVolume    = 0.5f;
 
 static void LoadSoundsFromDir(const char *dirPath, Sound *sounds, int *count, int maxCount) {
     FilePathList files = LoadDirectoryFiles(dirPath);
@@ -75,194 +65,163 @@ static void LoadMusicFromDir(const char *dirPath, Music *tracks, int *count, int
     UnloadDirectoryFiles(files);
 }
 
-static void LoadHitSounds(void) {
-    LoadSoundsFromDir("resources/audio/sounds/hit", s_hitSounds, &s_hitSoundCount, MAX_HIT_SOUNDS);
-}
-
-static void LoadPickupSounds(void) {
-    LoadSoundsFromDir("resources/audio/sounds/pickup", s_pickupSounds, &s_pickupSoundCount, MAX_PICKUP_SOUNDS);
-}
-
-static void LoadRangedSounds(void) {
-    LoadSoundsFromDir("resources/audio/sounds/ranged_attack", s_rangedSounds, &s_rangedSoundCount, MAX_RANGED_SOUNDS);
-}
-
-static void LoadMagicSounds(void) {
-    LoadSoundsFromDir("resources/audio/sounds/magic_attack", s_magicSounds, &s_magicSoundCount, MAX_MAGIC_SOUNDS);
-}
-
-static void LoadLevelUpSounds(void) {
-    LoadSoundsFromDir("resources/audio/sounds/levelup", s_levelUpSounds, &s_levelUpSoundCount, MAX_LEVELUP_SOUNDS);
+static int PickNextTrack(MusicContext *ctx) {
+    if (ctx->trackCount <= 0) return -1;
+    if (ctx->trackCount == 1) return 0;
+    int next;
+    do {
+        next = GetRandomValue(0, ctx->trackCount - 1);
+    } while (next == ctx->currentTrack);
+    return next;
 }
 
 void InitAudioSystem(void) {
     InitAudioDevice();
     if (!IsAudioDeviceReady()) return;
-
-    LoadMusicFromDir(MENU_MUSIC_DIR, s_menuTracks, &s_menuTrackCount, MAX_MENU_TRACKS);
-    LoadMusicFromDir(GAME_MUSIC_DIR, s_gameTracks, &s_gameTrackCount, MAX_GAME_TRACKS);
-
-    LoadHitSounds();
-    LoadPickupSounds();
-    LoadRangedSounds();
-    LoadMagicSounds();
-    LoadLevelUpSounds();
-
     s_audioReady = true;
 }
 
-static int PickRandomGameTrack(void) {
-    if (s_gameTrackCount <= 0) return -1;
-    if (s_gameTrackCount == 1) return 0;
-    int next;
-    do {
-        next = GetRandomValue(0, s_gameTrackCount - 1);
-    } while (next == s_currentGameTrack);
-    return next;
+AudioMusicContext Audio_RegisterMusicContext(const char* name, const char* dirPath) {
+    if (s_musicContextCount >= MAX_MUSIC_CONTEXTS) return AUDIO_INVALID;
+    MusicContext* ctx = &s_musicContexts[s_musicContextCount];
+    strncpy(ctx->name, name, sizeof(ctx->name) - 1);
+    ctx->name[sizeof(ctx->name) - 1] = '\0';
+    strncpy(ctx->dirPath, dirPath, sizeof(ctx->dirPath) - 1);
+    ctx->dirPath[sizeof(ctx->dirPath) - 1] = '\0';
+    ctx->trackCount     = 0;
+    ctx->currentTrack   = -1;
+    ctx->lastTimePlayed = 0.0f;
+    ctx->loaded         = false;
+    return s_musicContextCount++;
 }
 
-static void PlayMenuTrack(void) {
-    if (s_menuTrackCount <= 0) return;
-    s_menuTracks[0].looping = true;
-    PlayMusicStream(s_menuTracks[0]);
-    SetMusicVolume(s_menuTracks[0], s_musicVolume);
+AudioSoundCategory Audio_RegisterSoundCategory(const char* name, const char* dirPath) {
+    if (s_soundCategoryCount >= MAX_SOUND_CATEGORIES) return AUDIO_INVALID;
+    SoundCategory* cat = &s_soundCategories[s_soundCategoryCount];
+    strncpy(cat->name, name, sizeof(cat->name) - 1);
+    cat->name[sizeof(cat->name) - 1] = '\0';
+    strncpy(cat->dirPath, dirPath, sizeof(cat->dirPath) - 1);
+    cat->dirPath[sizeof(cat->dirPath) - 1] = '\0';
+    cat->soundCount = 0;
+    cat->loaded     = false;
+    return s_soundCategoryCount++;
 }
 
-static void PlayGameTrack(int idx) {
-    if (idx < 0 || idx >= s_gameTrackCount) return;
-    StopMusicStream(s_gameTracks[idx]);
-    PlayMusicStream(s_gameTracks[idx]);
-    SetMusicVolume(s_gameTracks[idx], s_musicVolume);
-}
-
-void UpdateMusicSystem(bool inGame) {
+void Audio_SetMusicContext(AudioMusicContext handle) {
     if (!s_audioReady) return;
 
-    ActiveTrack desired = inGame ? TRACK_GAME : TRACK_MENU;
-
-    if (desired != s_activeTrack) {
-        switch (s_activeTrack) {
-            case TRACK_MENU: StopMusicStream(s_menuTracks[0]); break;
-            case TRACK_GAME:
-                if (s_currentGameTrack >= 0)
-                    StopMusicStream(s_gameTracks[s_currentGameTrack]);
-                break;
-            default: break;
-        }
-
-        switch (desired) {
-            case TRACK_MENU:
-                PlayMenuTrack();
-                break;
-            case TRACK_GAME:
-                s_currentGameTrack = PickRandomGameTrack();
-                s_lastGameTimePlayed = 0.0f;
-                PlayGameTrack(s_currentGameTrack);
-                break;
-            default: break;
-        }
-
-        s_activeTrack = desired;
+    if (s_activeContext != AUDIO_INVALID) {
+        MusicContext* cur = &s_musicContexts[s_activeContext];
+        if (cur->currentTrack >= 0)
+            StopMusicStream(cur->tracks[cur->currentTrack]);
     }
 
-    switch (s_activeTrack) {
-        case TRACK_MENU:
-            UpdateMusicStream(s_menuTracks[0]);
-            break;
-        case TRACK_GAME:
-            if (s_currentGameTrack >= 0) {
-                float played = GetMusicTimePlayed(s_gameTracks[s_currentGameTrack]);
-                float len = GetMusicTimeLength(s_gameTracks[s_currentGameTrack]);
-                if (played < s_lastGameTimePlayed && len > 0.5f) {
-                    StopMusicStream(s_gameTracks[s_currentGameTrack]);
-                    s_currentGameTrack = PickRandomGameTrack();
-                    PlayGameTrack(s_currentGameTrack);
-                } else {
-                    UpdateMusicStream(s_gameTracks[s_currentGameTrack]);
-                }
-                s_lastGameTimePlayed = played;
-            }
-            break;
-        default: break;
+    s_activeContext = handle;
+    if (handle == AUDIO_INVALID) return;
+
+    MusicContext* ctx = &s_musicContexts[handle];
+
+    if (!ctx->loaded) {
+        LoadMusicFromDir(ctx->dirPath, ctx->tracks, &ctx->trackCount, MAX_TRACKS_PER_CTX);
+        ctx->loaded = true;
     }
+
+    if (ctx->trackCount == 0) return;
+    ctx->currentTrack   = PickNextTrack(ctx);
+    ctx->lastTimePlayed = 0.0f;
+    PlayMusicStream(ctx->tracks[ctx->currentTrack]);
+    SetMusicVolume(ctx->tracks[ctx->currentTrack], s_musicVolume);
 }
 
-float GetMusicVolume(void) {
+AudioMusicContext Audio_GetMusicContext(void) {
+    return s_activeContext;
+}
+
+void UpdateMusicSystem(void) {
+    if (!s_audioReady || s_activeContext == AUDIO_INVALID) return;
+    MusicContext* ctx = &s_musicContexts[s_activeContext];
+    if (ctx->currentTrack < 0 || ctx->trackCount == 0) return;
+
+    Music* m = &ctx->tracks[ctx->currentTrack];
+    float played = GetMusicTimePlayed(*m);
+    float len    = GetMusicTimeLength(*m);
+
+    if (played < ctx->lastTimePlayed && len > 0.5f) {
+        StopMusicStream(*m);
+        ctx->currentTrack = PickNextTrack(ctx);
+        m = &ctx->tracks[ctx->currentTrack];
+        PlayMusicStream(*m);
+        SetMusicVolume(*m, s_musicVolume);
+    } else {
+        UpdateMusicStream(*m);
+    }
+    ctx->lastTimePlayed = played;
+}
+
+void Audio_PlaySound(AudioSoundCategory handle) {
+    if (!s_audioReady || handle < 0 || handle >= s_soundCategoryCount) return;
+    SoundCategory* cat = &s_soundCategories[handle];
+
+    if (!cat->loaded) {
+        LoadSoundsFromDir(cat->dirPath, cat->sounds, &cat->soundCount, MAX_SOUNDS_PER_CAT);
+        cat->loaded = true;
+    }
+    if (cat->soundCount == 0) return;
+
+    int idx = GetRandomValue(0, cat->soundCount - 1);
+    SetSoundVolume(cat->sounds[idx], s_sfxVolume);
+    PlaySound(cat->sounds[idx]);
+}
+
+float Audio_GetMusicVolume(void) {
     return s_musicVolume;
 }
 
-void SetAudioVolume(float vol) {
+void Audio_SetMusicVolume(float vol) {
     s_musicVolume = (vol < 0.0f) ? 0.0f : (vol > 1.0f) ? 1.0f : vol;
-    if (!s_audioReady) return;
-    if (s_activeTrack == TRACK_MENU && s_menuTrackCount > 0)
-        SetMusicVolume(s_menuTracks[0], s_musicVolume);
-    else if (s_activeTrack == TRACK_GAME && s_currentGameTrack >= 0)
-        SetMusicVolume(s_gameTracks[s_currentGameTrack], s_musicVolume);
+    if (!s_audioReady || s_activeContext == AUDIO_INVALID) return;
+    MusicContext* ctx = &s_musicContexts[s_activeContext];
+    if (ctx->currentTrack >= 0)
+        SetMusicVolume(ctx->tracks[ctx->currentTrack], s_musicVolume);
 }
 
-float GetSFXVolume(void) {
+float Audio_GetSFXVolume(void) {
     return s_sfxVolume;
 }
 
-void SetSFXVolume(float vol) {
+void Audio_SetSFXVolume(float vol) {
     s_sfxVolume = (vol < 0.0f) ? 0.0f : (vol > 1.0f) ? 1.0f : vol;
-}
-
-void PlayHitSound(void) {
-    if (!s_audioReady || s_hitSoundCount == 0) return;
-    int idx = GetRandomValue(0, s_hitSoundCount - 1);
-    SetSoundVolume(s_hitSounds[idx], s_sfxVolume);
-    PlaySound(s_hitSounds[idx]);
-}
-
-void PlayPickupSound(void) {
-    if (!s_audioReady || s_pickupSoundCount == 0) return;
-    int idx = GetRandomValue(0, s_pickupSoundCount - 1);
-    SetSoundVolume(s_pickupSounds[idx], s_sfxVolume);
-    PlaySound(s_pickupSounds[idx]);
-}
-
-void PlayRangedAttackSound(void) {
-    if (!s_audioReady || s_rangedSoundCount == 0) return;
-    int idx = GetRandomValue(0, s_rangedSoundCount - 1);
-    SetSoundVolume(s_rangedSounds[idx], s_sfxVolume);
-    PlaySound(s_rangedSounds[idx]);
-}
-
-void PlayMagicAttackSound(void) {
-    if (!s_audioReady || s_magicSoundCount == 0) return;
-    int idx = GetRandomValue(0, s_magicSoundCount - 1);
-    SetSoundVolume(s_magicSounds[idx], s_sfxVolume);
-    PlaySound(s_magicSounds[idx]);
-}
-
-void PlayLevelUpSound(void) {
-    if (!s_audioReady || s_levelUpSoundCount == 0) return;
-    int idx = GetRandomValue(0, s_levelUpSoundCount - 1);
-    SetSoundVolume(s_levelUpSounds[idx], s_sfxVolume);
-    PlaySound(s_levelUpSounds[idx]);
 }
 
 void ShutdownAudioSystem(void) {
     if (!s_audioReady) return;
-    for (int i = 0; i < s_menuTrackCount; i++)
-        StopMusicStream(s_menuTracks[i]);
-    for (int i = 0; i < s_gameTrackCount; i++)
-        StopMusicStream(s_gameTracks[i]);
-    for (int i = 0; i < s_hitSoundCount; i++) UnloadSound(s_hitSounds[i]);
-    s_hitSoundCount = 0;
-    for (int i = 0; i < s_pickupSoundCount; i++) UnloadSound(s_pickupSounds[i]);
-    s_pickupSoundCount = 0;
-    for (int i = 0; i < s_rangedSoundCount; i++) UnloadSound(s_rangedSounds[i]);
-    s_rangedSoundCount = 0;
-    for (int i = 0; i < s_magicSoundCount; i++) UnloadSound(s_magicSounds[i]);
-    s_magicSoundCount = 0;
-    for (int i = 0; i < s_levelUpSoundCount; i++) UnloadSound(s_levelUpSounds[i]);
-    s_levelUpSoundCount = 0;
-    for (int i = 0; i < s_menuTrackCount; i++) UnloadMusicStream(s_menuTracks[i]);
-    s_menuTrackCount = 0;
-    for (int i = 0; i < s_gameTrackCount; i++) UnloadMusicStream(s_gameTracks[i]);
-    s_gameTrackCount = 0;
+
+    for (int i = 0; i < s_musicContextCount; i++) {
+        MusicContext* ctx = &s_musicContexts[i];
+        if (!ctx->loaded) continue;
+        for (int j = 0; j < ctx->trackCount; j++)
+            StopMusicStream(ctx->tracks[j]);
+        for (int j = 0; j < ctx->trackCount; j++)
+            UnloadMusicStream(ctx->tracks[j]);
+        ctx->trackCount     = 0;
+        ctx->currentTrack   = -1;
+        ctx->lastTimePlayed = 0.0f;
+        ctx->loaded         = false;
+    }
+
+    for (int i = 0; i < s_soundCategoryCount; i++) {
+        SoundCategory* cat = &s_soundCategories[i];
+        if (!cat->loaded) continue;
+        for (int j = 0; j < cat->soundCount; j++)
+            UnloadSound(cat->sounds[j]);
+        cat->soundCount = 0;
+        cat->loaded     = false;
+    }
+
+    s_musicContextCount  = 0;
+    s_soundCategoryCount = 0;
+    s_activeContext      = AUDIO_INVALID;
+
     CloseAudioDevice();
     s_audioReady = false;
 }

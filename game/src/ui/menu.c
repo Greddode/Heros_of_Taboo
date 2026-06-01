@@ -568,15 +568,15 @@ static void Settings_UpdateSel(bool inc) {
 
 static void Settings_AdjustVol(int dir) {
     if (s_settingsSel == 0) {
-        float vol = GetMusicVolume() + 0.05f * dir;
+        float vol = Audio_GetMusicVolume() + 0.05f * dir;
         if (vol < 0.0f) vol = 0.0f;
         if (vol > 1.0f) vol = 1.0f;
-        SetAudioVolume(vol);
+        Audio_SetMusicVolume(vol);
     } else if (s_settingsSel == 1) {
-        float vol = GetSFXVolume() + 0.05f * dir;
+        float vol = Audio_GetSFXVolume() + 0.05f * dir;
         if (vol < 0.0f) vol = 0.0f;
         if (vol > 1.0f) vol = 1.0f;
-        SetSFXVolume(vol);
+        Audio_SetSFXVolume(vol);
     } else if (s_settingsSel == 2) {
         float scale = GetGuiScale() + 0.25f * dir; // Change by 0.25 increments
         if (scale < 1.0f) scale = 1.0f;
@@ -628,9 +628,9 @@ void Menu_SettingsRender(void) {
         int itemY = cy + i * itemSpacing;
         bool isSelected = (idx == s_settingsSel);
         if (idx == 0) {
-            DrawVolumeBarItem(cx, itemY, "Music Volume", GetMusicVolume(), isSelected, itemSize, barW, false);
+            DrawVolumeBarItem(cx, itemY, "Music Volume", Audio_GetMusicVolume(), isSelected, itemSize, barW, false);
         } else if (idx == 1) {
-            DrawVolumeBarItem(cx, itemY, "SFX Volume", GetSFXVolume(), isSelected, itemSize, barW, false);
+            DrawVolumeBarItem(cx, itemY, "SFX Volume", Audio_GetSFXVolume(), isSelected, itemSize, barW, false);
         } else if (idx == 2) {
             DrawVolumeBarItem(cx, itemY, "GUI Scale", GetGuiScale(), isSelected, itemSize, barW, true);
         }
@@ -678,16 +678,16 @@ void Menu_SettingsRenderGame(void) {
     int barW = (int)(170 * scale);
 
     if (s_settingsSel == 0) {
-        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), true, itemSize, barW, false);
-        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", Audio_GetMusicVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", Audio_GetSFXVolume(), false, itemSize, barW, false);
         DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
     } else if (s_settingsSel == 1) {
-        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), true, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", Audio_GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", Audio_GetSFXVolume(), true, itemSize, barW, false);
         DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), false, itemSize, barW, true);
     } else if (s_settingsSel == 2) {
-        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", GetMusicVolume(), false, itemSize, barW, false);
-        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", GetSFXVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale), "Music Volume", Audio_GetMusicVolume(), false, itemSize, barW, false);
+        DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing, "SFX Volume", Audio_GetSFXVolume(), false, itemSize, barW, false);
         DrawVolumeBarItem(cx, py + (int)(68 * scale) + itemSpacing * 2, "GUI Scale", GetGuiScale(), true, itemSize, barW, true);
     }
 

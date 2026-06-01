@@ -1,12 +1,7 @@
 #include "player_system.h"
-#include "audio.h"
-#include "ui/combat_log.h"
+#include "systems/player.h"
 #include "resources.h"
 #include <stdio.h>
-
-static int ExpForLevelLocal(int level) {
-    return 20 + level * 10;
-}
 
 void PlayerSystem_Spawn(GameWorld* gw) {
     EntityId e = World_CreateEntity(&gw->ecs);
@@ -15,10 +10,10 @@ void PlayerSystem_Spawn(GameWorld* gw) {
 
     World_AddComponent(&gw->ecs, e, COMP_POSITION);
     CPosition* pos = World_GetPosition(&gw->ecs, e);
-    pos->x = 0;
-    pos->y = 0;
-    pos->prevX = 0;
-    pos->prevY = 0;
+    pos->x = 1;
+    pos->y = 1;
+    pos->prevX = 1;
+    pos->prevY = 1;
     pos->facingDir = DIR_DOWN;
 
     World_AddComponent(&gw->ecs, e, COMP_STATS);
@@ -34,7 +29,7 @@ void PlayerSystem_Spawn(GameWorld* gw) {
     s->level = 1;
     s->alive = true;
     s->exp = 0;
-    s->expToNext = ExpForLevelLocal(1);
+    s->expToNext = ExpForLevel(1);
     s->expValue = 0;
     s->maxHp = 30 + s->con * 5;
     s->hp = s->maxHp;
@@ -42,11 +37,14 @@ void PlayerSystem_Spawn(GameWorld* gw) {
     World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
     CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
     spr->tex = Resources_LoadTexture("resources/sprites/player.png");
-    spr->row = 0;
+    spr->row = 6;
     spr->frame = 0;
     spr->frameCount = 4;
     spr->animTimer = 0;
-    spr->animSpeed = 0.15f;
+    spr->animSpeed = 0.5f;
+
+    World_AddComponent(&gw->ecs, e, COMP_FALLBACK_COLOR);
+    World_GetColor(&gw->ecs, e)->color = (Color){ 50, 200, 255, 255 };
 
     World_AddComponent(&gw->ecs, e, COMP_NAME);
     CName* n = World_GetName(&gw->ecs, e);
@@ -57,39 +55,4 @@ void PlayerSystem_Spawn(GameWorld* gw) {
     World_AddComponent(&gw->ecs, e, COMP_HIT_FLASH);
     CHitFlash* hf = World_GetHitFlash(&gw->ecs, e);
     hf->timer = 0;
-}
-
-void PlayerSystem_GainExperience(GameWorld* gw, int amount) {
-    if (gw->playerEntity == ENTITY_NONE) return;
-    CStats* s = World_GetStats(&gw->ecs, gw->playerEntity);
-    s->exp += amount;
-    TraceLog(LOG_INFO, "Gained %d exp (total: %d, next: %d)", amount, s->exp, s->expToNext);
-    while (s->exp >= s->expToNext) {
-        s->exp -= s->expToNext;
-        s->level++;
-        s->expToNext = ExpForLevelLocal(s->level);
-        s->statPoints += 2;
-        gw->levelUpTimer = 3.0f;
-        PlayLevelUpSound();
-        TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", s->level, s->statPoints);
-        CombatLog_Add(&gw->combatLog, BLACK, "Level %d! +2 stat points to allocate!", s->level);
-    }
-}
-
-bool PlayerSystem_AllocateStatPoint(GameWorld* gw, int statIdx) {
-    if (gw->playerEntity == ENTITY_NONE) return false;
-    CStats* s = World_GetStats(&gw->ecs, gw->playerEntity);
-    if (s->statPoints <= 0) return false;
-    switch (statIdx) {
-        case 0: s->str++;   break;
-        case 1: s->dex++;   break;
-        case 2: s->intel++; break;
-        case 3: s->con++;   break;
-        case 4: s->lck++;   break;
-        default: return false;
-    }
-    s->statPoints--;
-    s->maxHp = 30 + s->con * 5;
-    if (s->hp > s->maxHp) s->hp = s->maxHp;
-    return true;
 }

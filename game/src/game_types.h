@@ -12,7 +12,8 @@
 typedef enum {
     ATTACK_MELEE = 0,
     ATTACK_RANGED,
-    ATTACK_MAGIC
+    ATTACK_MAGIC,
+    ATTACK_THROW
 } AttackType;
 
 // Direction an entity can move
@@ -93,6 +94,12 @@ typedef enum {
     EQUIP_SAGES_PENDANT,
     EQUIP_LUCKY_CHARM,
     EQUIP_BERSERKER_BAND,
+    // Ranged weapons (two-handed, EQUIP_SLOT_WEAPON)
+    EQUIP_SIMPLE_BOW,
+    EQUIP_DWARVEN_BOW,
+    EQUIP_ELVEN_BOW,
+    EQUIP_GREATBOW,
+    EQUIP_CROSSBOW,
     EQUIP_COUNT
 } EquipType;
 
@@ -102,7 +109,8 @@ typedef enum {
     STATE_ENEMY_TURN,
     STATE_GAME_OVER,
     STATE_WIN,
-    STATE_INVENTORY
+    STATE_INVENTORY,
+    STATE_MAP
 } GameState;
 
 // -- Projectile --------------------------------------------------------------
@@ -115,7 +123,10 @@ typedef struct {
     int tileEX, tileEY;
     AttackType attackType;
     int startFrame;
+    int startRow;
     int animFrameCount;
+    Texture2D* throwTex;
+    float      throwRotation;
 } Projectile;
 
 #endif

@@ -23,6 +23,8 @@ typedef struct {
     float animSpeed;
     int detectionRange;
     int minFloor;
+    int maxFloor;      // inclusive; -1 means no cap
+    int maxLevel;      // stat scaling hard cap; -1 means no cap
     int spawnWeight;
     AttackType attackType;
     int attackRange;

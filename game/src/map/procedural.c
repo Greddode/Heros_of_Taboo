@@ -491,6 +491,42 @@ MapData* GenerateProceduralMap(int width, int height, int generateStairs) {
             }
         }
         if (floorTileCount > 0) {
+            // Filter out floor tiles that are at hallway entrances (adjacent to
+            // a corridor floor tile outside any room), so stairs don't appear
+            // right at a room-to-corridor junction.
+            {
+                int filtered[100];
+                int filteredCount = 0;
+                for (int f = 0; f < floorTileCount; f++) {
+                    int fx = floorTilesInRoom[f] % width;
+                    int fy = floorTilesInRoom[f] / width;
+                    bool atHallway = false;
+                    int dirs[4][2] = {{-1,0},{1,0},{0,-1},{0,1}};
+                    for (int d = 0; d < 4 && !atHallway; d++) {
+                        int nx = fx + dirs[d][0];
+                        int ny = fy + dirs[d][1];
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                        if (!IsFloorGID(layer->data[ny * width + nx])) continue;
+                        bool inAnyRoom = false;
+                        for (int ri = 0; ri < roomCount; ri++) {
+                            if (nx >= rooms[ri].x && nx < rooms[ri].x + rooms[ri].w &&
+                                ny >= rooms[ri].y && ny < rooms[ri].y + rooms[ri].h) {
+                                inAnyRoom = true;
+                                break;
+                            }
+                        }
+                        if (!inAnyRoom) atHallway = true;
+                    }
+                    if (!atHallway)
+                        filtered[filteredCount++] = floorTilesInRoom[f];
+                }
+                if (filteredCount > 0) {
+                    floorTileCount = filteredCount;
+                    for (int f = 0; f < filteredCount; f++)
+                        floorTilesInRoom[f] = filtered[f];
+                }
+            }
+
             int picked = floorTilesInRoom[GetRandomValue(0, floorTileCount - 1)];
             // Avoid placing stairs directly on the player spawn (room-0 centre)
             if (stairRoomIdx == 0 && floorTileCount > 1) {

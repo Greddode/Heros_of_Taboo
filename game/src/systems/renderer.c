@@ -232,6 +232,15 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
                 if (e2 > -bdy) { err -= bdy; x += sxDir; }
                 if (e2 < bdx)  { err += bdx; y += syDir; }
             }
+        } else if (game->projectile.attackType == ATTACK_THROW &&
+                   game->projectile.throwTex && game->projectile.throwTex->id > 0) {
+            int mapTw = game->map->tileWidth, mapTh = game->map->tileHeight;
+            Rectangle src  = { 0, 0, (float)game->projectile.throwTex->width,
+                                      (float)game->projectile.throwTex->height };
+            Rectangle dest = { cx, cy, (float)mapTw, (float)mapTh };
+            Vector2   origin = { mapTw / 2.0f, mapTh / 2.0f };
+            float rotation = pt * 720.0f;
+            DrawTexturePro(*game->projectile.throwTex, src, dest, origin, rotation, WHITE);
         } else {
             float sx = game->projectile.sx, sy = game->projectile.sy;
             float dx = cx - sx, dy = cy - sy;
@@ -329,9 +338,9 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
     Inspector_Render(game, INSPECTOR_MONSTER, GetScreenWidth() - (int)(200 * iscale), (int)(10 * iscale), (int)(190 * iscale), (int)(160 * iscale), 0);
 
     // Potion / equipment tile info (top-right, below monster info)
-    if (game->selectedPotionTileActive) {
-        int ptx = game->selectedPotionTileX;
-        int pty = game->selectedPotionTileY;
+    if (game->inspectedTileActive) {
+        int ptx = game->inspectedTileX;
+        int pty = game->inspectedTileY;
         ItemType tileTypes[MAX_POTIONS];
         int tileQtys[MAX_POTIONS];
         int tileCount = SpawnerSystem_ListPotionsAt(game, ptx, pty, tileTypes, tileQtys, MAX_POTIONS);
@@ -398,6 +407,20 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
     if (stateText[0]) {
         int textWidth = MeasureText(stateText, (int)(20 * scale));
         DrawText(stateText, (GetScreenWidth() - textWidth) / 2, GetScreenHeight() - (int)(40 * scale), (int)(20 * scale), YELLOW);
+    }
+
+    // Combat action hints
+    if (game->state == STATE_PLAYER_TURN && game->playerEntity != ENTITY_NONE) {
+        EquipType weapon = game->equipped[EQUIP_SLOT_WEAPON];
+        const EquipData* wdata = GetEquipData(weapon);
+        int hintX = panelX + panelW + (int)(10 * scale);
+        int hintY = panelY + (int)(4 * scale);
+        int hintFs = (int)(12 * scale);
+        if (hintFs < 8) hintFs = 8;
+        DrawText("[F] Attack", hintX, hintY, hintFs, DARKGRAY);
+        if (wdata && !wdata->isRanged && weapon != EQUIP_NONE) {
+            DrawText("[T] Throw Weapon", hintX, hintY + (int)(14 * scale), hintFs, DARKGRAY);
+        }
     }
 
     // Level-up notification overlay

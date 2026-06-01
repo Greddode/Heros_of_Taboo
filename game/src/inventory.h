@@ -29,6 +29,7 @@ typedef struct {
     int bonusCon;
     int bonusLck;
     bool twoHanded;
+    bool isRanged;
 } EquipData;
 
 typedef struct {
@@ -50,6 +51,7 @@ typedef enum {
 
 // Equipment data table
 const EquipData* GetEquipData(EquipType type);
+int GetEquipRangeBonus(EquipType type);
 
 // Item functions
 const char* GetItemName(ItemType type);

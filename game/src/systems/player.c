@@ -1,13 +1,13 @@
 #include "player.h"
 #include "game.h"
 #include "world.h"
-#include "audio.h"
+#include "game_audio.h"
 #include "ui/combat_log.h"
 #include <stdio.h>
 
 // Base experience needed: 20 + level * 10
 int ExpForLevel(int level) {
-    return 20 + level * 10;
+    return 50 + level * 40;
 }
 
 // Apply stat bonuses for reaching a new level
@@ -20,7 +20,7 @@ static void ApplyLevelUp(GameWorld* game) {
     ps->statPoints += 2;
     ps->expToNext = ExpForLevel(ps->level);
     game->levelUpTimer = 3.0f;
-    PlayLevelUpSound();
+    GameAudio_PlayLevelUpSound();
     TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", ps->level, ps->statPoints);
     CombatLog_Add(&game->combatLog, BLACK, "Level %d! +2 stat points to allocate!", ps->level);
 }
