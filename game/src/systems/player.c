@@ -3,11 +3,11 @@
 #include "world.h"
 #include "game_audio.h"
 #include "ui/combat_log.h"
+#include "game_balance.h"
 #include <stdio.h>
 
-// Base experience needed: 20 + level * 10
 int ExpForLevel(int level) {
-    return 50 + level * 40;
+    return calc_xp_for_level(level);
 }
 
 // Apply stat bonuses for reaching a new level
@@ -17,12 +17,12 @@ static void ApplyLevelUp(GameWorld* game) {
     if (pe == ENTITY_NONE) return;
     CStats* ps = World_GetStats(w, pe);
     ps->level++;
-    ps->statPoints += 2;
+    ps->statPoints += STAT_POINTS_PER_LEVEL;
     ps->expToNext = ExpForLevel(ps->level);
-    game->levelUpTimer = 3.0f;
+    game->levelUpTimer = LEVEL_UP_FLASH_SECONDS;
     GameAudio_PlayLevelUpSound();
     TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", ps->level, ps->statPoints);
-    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +2 stat points to allocate!", ps->level);
+    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +%d stat points to allocate!", ps->level, STAT_POINTS_PER_LEVEL);
 }
 
 // Allocate one stat point to a specific stat
@@ -37,8 +37,7 @@ bool AllocateStatPoint(CStats* s, int statIdx) {
         default: return false;
     }
     s->statPoints--;
-    // Recalculate derived max HP from CON
-    s->maxHp = 30 + s->con * 5;
+    s->maxHp = calc_max_hp(s->con);
     if (s->hp > s->maxHp) s->hp = s->maxHp;
     return true;
 }

@@ -1,6 +1,7 @@
 #include "player_system.h"
 #include "systems/player.h"
 #include "resources.h"
+#include "game_balance.h"
 #include <stdio.h>
 
 void PlayerSystem_Spawn(GameWorld* gw) {
@@ -10,28 +11,28 @@ void PlayerSystem_Spawn(GameWorld* gw) {
 
     World_AddComponent(&gw->ecs, e, COMP_POSITION);
     CPosition* pos = World_GetPosition(&gw->ecs, e);
-    pos->x = 1;
-    pos->y = 1;
-    pos->prevX = 1;
-    pos->prevY = 1;
+    pos->x = PLAYER_SPAWN_X;
+    pos->y = PLAYER_SPAWN_Y;
+    pos->prevX = PLAYER_SPAWN_X;
+    pos->prevY = PLAYER_SPAWN_Y;
     pos->facingDir = DIR_DOWN;
 
     World_AddComponent(&gw->ecs, e, COMP_STATS);
     CStats* s = World_GetStats(&gw->ecs, e);
-    s->str = 3;
-    s->dex = 3;
-    s->intel = 3;
-    s->con = 3;
-    s->lck = 2;
+    s->str = PLAYER_BASE_STR;
+    s->dex = PLAYER_BASE_DEX;
+    s->intel = PLAYER_BASE_INT;
+    s->con = PLAYER_BASE_CON;
+    s->lck = PLAYER_BASE_LCK;
     s->statPoints = 0;
-    s->attack = 5;
-    s->defense = 1;
-    s->level = 1;
+    s->attack = PLAYER_BASE_ATTACK;
+    s->defense = PLAYER_BASE_DEFENSE;
+    s->level = PLAYER_BASE_LEVEL;
     s->alive = true;
     s->exp = 0;
-    s->expToNext = ExpForLevel(1);
+    s->expToNext = ExpForLevel(PLAYER_BASE_LEVEL);
     s->expValue = 0;
-    s->maxHp = 30 + s->con * 5;
+    s->maxHp = calc_max_hp(s->con);
     s->hp = s->maxHp;
 
     World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);

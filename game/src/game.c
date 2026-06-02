@@ -10,6 +10,8 @@
 #include "ui/combat_log.h"
 #include "map/procedural.h"
 #include "resources.h"
+#include "game_balance.h"
+#include "equipment_bonus.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,18 +22,16 @@ static float s_guiScaleSetting = 1.0f;
 
 // UI scaling helper function
 float GetUIScale(void) {
-    const float baseWidth = 1024.0f;
-    const float baseHeight = 768.0f;
-    float widthScale = (float)GetScreenWidth() / baseWidth;
-    float heightScale = (float)GetScreenHeight() / baseHeight;
+    float widthScale = (float)GetScreenWidth() / UI_BASE_WIDTH;
+    float heightScale = (float)GetScreenHeight() / UI_BASE_HEIGHT;
     float scale = fminf(widthScale, heightScale);
-    scale = fmaxf(scale, 0.75f);
+    scale = fmaxf(scale, UI_MIN_AUTO_SCALE);
     return scale * s_guiScaleSetting;
 }
 
 void SetGuiScale(float scale) {
-    if (scale < 1.0f) scale = 1.0f;
-    if (scale > 4.0f) scale = 4.0f;
+    if (scale < UI_GUI_SCALE_MIN) scale = UI_GUI_SCALE_MIN;
+    if (scale > UI_GUI_SCALE_MAX) scale = UI_GUI_SCALE_MAX;
     s_guiScaleSetting = scale;
 }
 
@@ -291,21 +291,11 @@ void DescendFloor(GameWorld* game) {
         EntityId pe = game->playerEntity;
         for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
             if (game->equipped[i] != EQUIP_NONE) {
-                const EquipData* d = GetEquipData(game->equipped[i]);
-                if (d) {
-                    CStats* s = World_GetStats(w, pe);
-                    s->attack  += d->bonusAttack;
-                    s->defense += d->bonusDefense;
-                    s->str     += d->bonusStr;
-                    s->dex     += d->bonusDex;
-                    s->intel   += d->bonusInt;
-                    s->con     += d->bonusCon;
-                    s->lck     += d->bonusLck;
-                }
+                EquipmentBonus_Apply(w, pe, game->equipped[i]);
             }
         }
         CStats* ps = World_GetStats(w, pe);
-        ps->maxHp = 30 + ps->con * 5;
+        ps->maxHp = calc_max_hp(ps->con);
         if (savedStats.maxHp > 0) {
             float ratio = (float)savedStats.hp / (float)savedStats.maxHp;
             ps->hp = (int)(ratio * (float)ps->maxHp);
@@ -323,7 +313,8 @@ void DescendFloor(GameWorld* game) {
         }
     }
 
-    game->map = GenerateProceduralMap(80, 50, game->currentFloor < game->maxFloors);
+    game->map = GenerateProceduralMap(PROCEDURAL_MAP_WIDTH, PROCEDURAL_MAP_HEIGHT,
+                                      game->currentFloor < game->maxFloors);
     if (!game->map) {
         TraceLog(LOG_ERROR, "Failed to generate map for floor %d", game->currentFloor);
         return;
@@ -382,7 +373,7 @@ void DescendFloor(GameWorld* game) {
     }
     game->camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
     game->camera.rotation = 0;
-    game->camera.zoom = 4.0f;
+    game->camera.zoom = DEFAULT_CAMERA_ZOOM;
 
     char floorMsg[64];
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
@@ -398,7 +389,7 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
         TraceLog(LOG_INFO, "TMX load failed, generating procedural map...");
-        game->map = GenerateProceduralMap(80, 50, 1);
+        game->map = GenerateProceduralMap(PROCEDURAL_MAP_WIDTH, PROCEDURAL_MAP_HEIGHT, 1);
     }
     if (!game->map) {
         TraceLog(LOG_ERROR, "Failed to create any map");
@@ -424,7 +415,7 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
         }
     }
 
-    game->currentFloor = 1;
+    game->currentFloor = DEFAULT_START_FLOOR;
 
     Monster_InitTemplates();
 
@@ -447,7 +438,7 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
     game->selectedMonsterEntity = ENTITY_NONE;
     game->timeWaited = 0;
     game->escapeSpawned = false;
-    game->maxFloors = 10;
+    game->maxFloors = DEFAULT_MAX_FLOORS;
     game->stairX = GetStairX();
     game->stairY = GetStairY();
 
@@ -475,7 +466,7 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
     }
     game->camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
     game->camera.rotation = 0;
-    game->camera.zoom = 4.0f;
+    game->camera.zoom = DEFAULT_CAMERA_ZOOM;
 
     return true;
 }

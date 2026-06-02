@@ -3,6 +3,7 @@
 #include "game_audio.h"
 #include "map/map_helpers.h"
 #include "inventory.h"
+#include "equipment_bonus.h"
 #include "ui/combat_log.h"
 #include "systems/spawner_system.h"
 #include "systems/ai_system.h"
@@ -171,7 +172,7 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                 EquipType oldType = game->equipped[(int)slot];
                 if (oldType != EQUIP_NONE) {
                     const EquipData* data = GetEquipData(oldType);
-                    if (data && ps) { ps->attack -= data->bonusAttack; ps->defense -= data->bonusDefense; ps->str -= data->bonusStr; ps->dex -= data->bonusDex; ps->intel -= data->bonusInt; ps->con -= data->bonusCon; ps->lck -= data->bonusLck; ps->maxHp = 30 + ps->con * 5; if (ps->hp > ps->maxHp) ps->hp = ps->maxHp; }
+                    EquipmentBonus_Remove(w, pe, oldType);
                     game->equipped[(int)slot] = EQUIP_NONE;
                     SpawnerSystem_AddEquipAt(game, ppos->x, ppos->y, oldType, 1);
                     CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", data ? data->name : "item");

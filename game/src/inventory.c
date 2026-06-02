@@ -2,6 +2,8 @@
 #include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include "resources.h"
+#include "game_balance.h"
+#include "equipment_bonus.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -132,14 +134,13 @@ bool InventoryUse(GameWorld* game, int slot) {
     int healPercent = GetItemHealAmount(s->type);
     if (healPercent > 0) {
         CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
-        float intMult = 1.0f + (float)ps->intel * 0.02f;
-        int heal = (ps->maxHp * healPercent * (int)(intMult * 100)) / 10000;
-        if (heal < 1) heal = 1;
+        int heal = calc_potion_heal(ps->maxHp, healPercent, ps->intel);
         ps->hp += heal;
         if (ps->hp > ps->maxHp)
             ps->hp = ps->maxHp;
         CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, MGCx%.0f%%)!",
-                      GetItemName(s->type), healPercent, heal, intMult * 100);
+                      GetItemName(s->type), healPercent, heal,
+                      (1.0f + (float)ps->intel * POTION_INT_SCALE) * 100);
     }
 
     s->quantity--;
@@ -200,15 +201,7 @@ bool EquipItem(GameWorld* game, EquipType type) {
         UnequipSlot(game, EQUIP_SLOT_OFF_HAND);
     }
 
-    ps->attack   += data->bonusAttack;
-    ps->defense  += data->bonusDefense;
-    ps->str      += data->bonusStr;
-    ps->dex      += data->bonusDex;
-    ps->intel    += data->bonusInt;
-    ps->con      += data->bonusCon;
-    ps->lck      += data->bonusLck;
-    ps->maxHp    = 30 + ps->con * 5;
-    if (ps->hp > ps->maxHp) ps->hp = ps->maxHp;
+    EquipmentBonus_Apply(&game->ecs, game->playerEntity, type);
 
     game->equipped[slotIdx] = type;
 
@@ -224,32 +217,12 @@ void EquipItemSilent(GameWorld* game, EquipType type) {
         int slotIdx = (int)data->slot;
 
     if (game->equipped[slotIdx] != EQUIP_NONE) {
-        const EquipData* old = GetEquipData(game->equipped[slotIdx]);
-        if (old) {
-            CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
-            ps->attack   -= old->bonusAttack;
-            ps->defense  -= old->bonusDefense;
-            ps->str      -= old->bonusStr;
-            ps->dex      -= old->bonusDex;
-            ps->intel    -= old->bonusInt;
-            ps->con      -= old->bonusCon;
-            ps->lck      -= old->bonusLck;
-        }
+        EquipmentBonus_Remove(&game->ecs, game->playerEntity,
+                              game->equipped[slotIdx]);
         game->equipped[slotIdx] = EQUIP_NONE;
     }
 
-    CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
-    ps->attack   += data->bonusAttack;
-    ps->defense  += data->bonusDefense;
-    ps->str      += data->bonusStr;
-    ps->dex      += data->bonusDex;
-    ps->intel    += data->bonusInt;
-    ps->con      += data->bonusCon;
-    ps->lck      += data->bonusLck;
-
-    ps->maxHp    = 30 + ps->con * 5;
-    if (ps->hp > ps->maxHp)
-        ps->hp = ps->maxHp;
+    EquipmentBonus_Apply(&game->ecs, game->playerEntity, type);
 
     game->equipped[slotIdx] = type;
 }
@@ -262,19 +235,7 @@ void UnequipSlot(GameWorld* game, EquipSlot slot) {
     const EquipData* data = GetEquipData(oldType);
     if (!data) return;
 
-    CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
-
-    ps->attack   -= data->bonusAttack;
-    ps->defense  -= data->bonusDefense;
-    ps->str      -= data->bonusStr;
-    ps->dex      -= data->bonusDex;
-    ps->intel    -= data->bonusInt;
-    ps->con      -= data->bonusCon;
-    ps->lck      -= data->bonusLck;
-
-    ps->maxHp    = 30 + ps->con * 5;
-    if (ps->hp > ps->maxHp)
-        ps->hp = ps->maxHp;
+    EquipmentBonus_Remove(&game->ecs, game->playerEntity, oldType);
 
     game->equipped[slotIdx] = EQUIP_NONE;
 

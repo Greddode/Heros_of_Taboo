@@ -8,6 +8,7 @@
 #include "systems/player.h"
 #include "ui/combat_log.h"
 #include "resources.h"
+#include "game_balance.h"
 #include <string.h>
 
 static bool HasLineOfSight(int x0, int y0, int x1, int y1,
@@ -44,29 +45,26 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
         ? World_GetName(&game->ecs, mon) : NULL;
     const char* monName = name ? name->name : "monster";
 
-    int dodgePct = ms->dex * 2;
-    if (dodgePct > 60) dodgePct = 60;
+    int dodgePct = calc_dodge_chance(ms->dex);
     if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
         if (World_HasComponents(&game->ecs, attackerId, COMP_HIT_FLASH))
-            World_GetHitFlash(&game->ecs, attackerId)->timer = 0.15f;
+            World_GetHitFlash(&game->ecs, attackerId)->timer = HIT_FLASH_DURATION;
         CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", monName);
         return true;
     }
 
-    int damage = as->attack + as->str * 2 - ms->defense;
-    if (damage < 1) damage = 1;
+    int damage = calc_damage_after_defense(calc_melee_damage(as->attack, as->str), ms->defense);
     if (GetRandomValue(1, 100) <= as->lck) {
-        damage *= 2;
-        if (damage < 1) damage = 1;
+        damage *= CRIT_MULT;
         CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
     }
 
     ms->hp -= damage;
     GameAudio_PlayHitSound();
     if (World_HasComponents(&game->ecs, attackerId, COMP_HIT_FLASH))
-        World_GetHitFlash(&game->ecs, attackerId)->timer = 0.15f;
+        World_GetHitFlash(&game->ecs, attackerId)->timer = HIT_FLASH_DURATION;
     if (World_HasComponents(&game->ecs, mon, COMP_HIT_FLASH)) {
-        World_GetHitFlash(&game->ecs, mon)->timer = 0.15f;
+        World_GetHitFlash(&game->ecs, mon)->timer = HIT_FLASH_DURATION;
     }
     CombatLog_Add(&game->combatLog, BLACK, "You hit %s for %d!", monName, damage);
 
@@ -138,25 +136,22 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
         ? World_GetName(&game->ecs, target) : NULL;
     const char* monName = name ? name->name : "monster";
 
-    int dodgePct = ms->dex * 2;
-    if (dodgePct > 60) dodgePct = 60;
+    int dodgePct = calc_dodge_chance(ms->dex);
     if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
         CombatLog_Add(&game->combatLog, BLACK, "%s dodges your arrow!", monName);
         return true;
     }
 
-    int damage = (int)(as->dex * 1.5f) - ms->defense;
-    if (damage < 1) damage = 1;
+    int damage = calc_damage_after_defense(calc_ranged_damage(as->dex), ms->defense);
     if (GetRandomValue(1, 100) <= as->lck) {
-        damage *= 2;
-        if (damage < 1) damage = 1;
+        damage *= CRIT_MULT;
         CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
     }
 
     ms->hp -= damage;
     GameAudio_PlayRangedAttackSound();
     if (World_HasComponents(&game->ecs, target, COMP_HIT_FLASH))
-        World_GetHitFlash(&game->ecs, target)->timer = 0.15f;
+        World_GetHitFlash(&game->ecs, target)->timer = HIT_FLASH_DURATION;
     CombatLog_Add(&game->combatLog, BLACK, "You shoot %s for %d!", monName, damage);
 
     if (ms->hp <= 0) {
@@ -213,8 +208,7 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
 
     Texture2D* throwTex = Resources_LoadTexture(wdata->spritePath);
 
-    int throwRange = 3 + savedDex / 3;
-    if (throwRange < 3) throwRange = 3;
+    int throwRange = calc_throw_range(savedDex);
 
     UnequipSlot(game, EQUIP_SLOT_WEAPON);
     int invSlot = -1;
@@ -280,25 +274,23 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
                 ? World_GetName(&game->ecs, target) : NULL;
             const char* monName = name ? name->name : "monster";
 
-            int dodgePct = ms->dex * 2;
-            if (dodgePct > 60) dodgePct = 60;
+            int dodgePct = calc_dodge_chance(ms->dex);
             if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                 CombatLog_Add(&game->combatLog, BLACK, "%s dodges your %s!", monName, weaponName);
                 return true;
             }
 
-            int damage = (savedAttack + savedDex * 2) - ms->defense;
-            if (damage < 1) damage = 1;
+            int damage = calc_damage_after_defense(calc_throw_damage(savedAttack, savedDex), ms->defense);
             if (GetRandomValue(1, 100) <= savedLck) {
-                damage *= 2;
-                if (damage < 1) damage = 1;
+                damage *= CRIT_MULT;
+                if (damage < MIN_DAMAGE) damage = MIN_DAMAGE;
                 CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
             }
 
             ms->hp -= damage;
             GameAudio_PlayRangedAttackSound();
             if (World_HasComponents(&game->ecs, target, COMP_HIT_FLASH))
-                World_GetHitFlash(&game->ecs, target)->timer = 0.15f;
+                World_GetHitFlash(&game->ecs, target)->timer = HIT_FLASH_DURATION;
             CombatLog_Add(&game->combatLog, BLACK, "Your thrown %s hits %s for %d!", weaponName, monName, damage);
 
             if (ms->hp <= 0) {
