@@ -7,6 +7,7 @@
 #include "game_balance.h"
 #include "equipment_bonus.h"
 #include "inventory.h"
+#include "validation.h"
 #include "world.h"
 #include "ecs.h"
 #include "resources.h"
@@ -329,6 +330,82 @@ static bool test_equipment_bonus_edge_cases(void)
 }
 
 // =============================================================================
+// Validation tests
+// =============================================================================
+
+static bool test_validate_inventory_slot(void)
+{
+    CHECK(Validate_InventorySlot(0, 16),         "slot 0 in 16");
+    CHECK(Validate_InventorySlot(15, 16),         "slot 15 in 16");
+    CHECK(!Validate_InventorySlot(-1, 16),        "slot -1 rejected");
+    CHECK(!Validate_InventorySlot(16, 16),        "slot 16 rejected (out of bounds)");
+    CHECK(!Validate_InventorySlot(0, 0),          "slot 0 rejected when count=0");
+    CHECK(Validate_InventorySlot(0, 1),           "slot 0 in single-element");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_equip_type(void)
+{
+    CHECK(Validate_EquipType(EQUIP_SURVIVAL_KNIFE), "valid equip type");
+    CHECK(Validate_EquipType(EQUIP_COUNT - 1),      "last equip type");
+    CHECK(!Validate_EquipType(EQUIP_NONE),           "EQUIP_NONE rejected");
+    CHECK(!Validate_EquipType(EQUIP_COUNT),          "out of bounds rejected");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_item_type(void)
+{
+    CHECK(Validate_ItemType(ITEM_SMALL_HP_POTION), "valid item type");
+    CHECK(!Validate_ItemType(ITEM_NONE),            "ITEM_NONE rejected");
+    CHECK(!Validate_ItemType(ITEM_COUNT),           "out of bounds rejected");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_monster_type(void)
+{
+    CHECK(Validate_MonsterType(MONSTER_FLOATING_EYE), "valid monster type");
+    CHECK(Validate_MonsterType(0),                    "monster type 0");
+    CHECK(Validate_MonsterType(MONSTER_TYPE_COUNT - 1), "last monster type");
+    CHECK(!Validate_MonsterType(-1),                  "negative rejected");
+    CHECK(!Validate_MonsterType(MONSTER_TYPE_COUNT),  "out of bounds rejected");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_stat_index(void)
+{
+    CHECK(Validate_StatIndex(0),  "stat 0 (STR)");
+    CHECK(Validate_StatIndex(4),  "stat 4 (LCK)");
+    CHECK(!Validate_StatIndex(-1), "negative rejected");
+    CHECK(!Validate_StatIndex(5),  "out of bounds rejected");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_floor(void)
+{
+    CHECK(Validate_Floor(1),   "floor 1 valid");
+    CHECK(Validate_Floor(10),  "floor 10 valid");
+    CHECK(!Validate_Floor(0),  "floor 0 rejected");
+    CHECK(!Validate_Floor(-1), "negative rejected");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_clamp_int(void)
+{
+    CHECK_EQ(Clamp_Int(5, 0, 10),   5,  "clamp in range");
+    CHECK_EQ(Clamp_Int(-5, 0, 10),  0,  "clamp below min");
+    CHECK_EQ(Clamp_Int(15, 0, 10), 10,  "clamp above max");
+    CHECK_EQ(Clamp_Int(0, 0, 0),    0,  "clamp single value");
+    TEST_PASS();
+    return true;
+}
+
+// =============================================================================
 // Test runner
 // =============================================================================
 
@@ -359,6 +436,15 @@ static struct {
     {"equip_bonus_apply_remove", test_equipment_bonus_apply_remove},
     {"equip_bonus_recalculate",  test_equipment_bonus_recalculate},
     {"equip_bonus_edge_cases",   test_equipment_bonus_edge_cases},
+
+    // Validation
+    {"validate_inventory_slot",  test_validate_inventory_slot},
+    {"validate_equip_type",      test_validate_equip_type},
+    {"validate_item_type",       test_validate_item_type},
+    {"validate_monster_type",    test_validate_monster_type},
+    {"validate_stat_index",      test_validate_stat_index},
+    {"validate_floor",           test_validate_floor},
+    {"clamp_int",                test_clamp_int},
 };
 
 int main(void)
