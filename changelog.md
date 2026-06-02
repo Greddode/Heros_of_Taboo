@@ -4,10 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Latest] - 2026-06-02
 
-### Codebase Refactoring (Tasks 1â€“2)
+### Codebase Refactoring (Tasks 1â€“3)
 - **game_balance.h** â€” centralized all stat formulas, damage calculations, dodge, XP curves, UI scale, camera constants, player base stats, and game tuning parameters into a single documented header with 30 macros and 12 inline functions.
 - **equipment_bonus.c/h** â€” extracted duplicated equip/unequip stat-bonus apply/remove logic from inventory.c, game.c, and input_system.c into idempotent `EquipmentBonus_Apply`/`Remove`/`Recalculate` functions.
-- Replaced ~121 lines of literal magic numbers across 6 files with named constants and inline formula functions.
+- **floor_init.c/h** â€” extracted duplicated per-floor setup (blocking map, monster templates, spawning, stairs, state/timer reset, visibility, FOW, camera) from `InitGame` and `DescendFloor` into `Floor_InitNewFloor`. Each function shrinks by ~30 lines.
+- **Unit tests** â€” added 16 deterministic unit tests covering all game_balance formulas (XP, HP, damage, dodge, throw range, wait heal, potion heal), equipment data table validation, item data validation, and equipment bonus apply/remove/recalculate with edge cases (NULL world, missing CStats, EQUIP_NONE). Runnable via `make test` and returns 0 on pass.
+- Replaced ~160 lines of literal magic numbers and duplicated blocks across 7 files with named constants and inline formula functions.
 
 ## [Latest] - 2026-06-01
 
@@ -80,36 +82,36 @@ For earlier versions, see git history.
 ## Historical (pre-refactor, preserved for reference)
 
 
-## ALPHA-0.0.8 GÇö Equipment & Stat System
+## ALPHA-0.0.8 Gï¿½ï¿½ Equipment & Stat System
 
 ---
 
 ### For Players
 
-- **Equipment system** GÇö 17 equipment types across 3 categories (Armor, Weapon, Accessory) with 5 equip slots (Head, Chest, Weapon, Off-hand, Accessory). Each item provides stat bonuses (ATK, DEF, STR, DEX, INT, CON, LCK). Two-handed weapons (War Hammer) block the off-hand slot.
-- **Inventory UI tabs** GÇö inventory screen now has 3 tabs (Inventory / Equipment / Stats) switchable with Q/E. Inventory tab shows potions and unequipped gear; Equipment tab shows equipped items with Unequip/Drop/Back actions; Stats tab displays base stats, derived stats, and unspent stat points.
-- **Stat point allocation** GÇö gain +2 stat points per level. Allocate to STR (damage), DEX (dodge), MGC (potion healing), CON (max HP), or LCK (crit chance, loot rarity). Max HP is now derived from CON (30 + CON x 5).
-- **Loot system overhaul** GÇö unified loot table with 4 rarity tiers: Common (Tier 1), Uncommon (Tier 2), Rare (Tier 3, floor 4+), Legendary (Tier 4, floor 6+). Luck and floor depth boost higher tier drops. Equipment drops from monsters on death (20% base + LCK x 2, max 50%).
-- **Equipment on the ground** GÇö equipment items now spawn on dungeon floors with their own sprites. Stacked items show a loot pile icon with quantity badge. Click to inspect.
-- **Monster equipment drops** GÇö defeating a monster has a chance to drop a random accessory (filtered by floor availability).
-- **Level-up notification** GÇö gold "LEVEL UP!" overlay with "+3 Stat Points!" subtitle, fades out over 3 seconds. Level-up sound effect added.
-- **Potion heal scales with INT** GÇö potion healing is now `base% x (1 + INT x 0.02)`, making Intelligence stat meaningful for sustain.
-- **Potion rarity on ground** GÇö floor-placed potions now roll randomly (50% small, 30% medium, 20% large) instead of being floor-locked.
-- **GUI Scale setting** GÇö adjustable UI scale (1.0x to 4.0x) in the Settings menu. All UI elements scale proportionally.
-- **Updated controls screen** GÇö documents Q/E tab switching, sprint controls, mouse click inspect, and equipment management.
-- **Scrollable menus** GÇö main menu, story, credits, and controls screens now scroll when content exceeds the viewport.
-- **Starting equipment** GÇö player now starts with a Survival Knife (+2 ATK) instead of bare fists.
+- **Equipment system** Gï¿½ï¿½ 17 equipment types across 3 categories (Armor, Weapon, Accessory) with 5 equip slots (Head, Chest, Weapon, Off-hand, Accessory). Each item provides stat bonuses (ATK, DEF, STR, DEX, INT, CON, LCK). Two-handed weapons (War Hammer) block the off-hand slot.
+- **Inventory UI tabs** Gï¿½ï¿½ inventory screen now has 3 tabs (Inventory / Equipment / Stats) switchable with Q/E. Inventory tab shows potions and unequipped gear; Equipment tab shows equipped items with Unequip/Drop/Back actions; Stats tab displays base stats, derived stats, and unspent stat points.
+- **Stat point allocation** Gï¿½ï¿½ gain +2 stat points per level. Allocate to STR (damage), DEX (dodge), MGC (potion healing), CON (max HP), or LCK (crit chance, loot rarity). Max HP is now derived from CON (30 + CON x 5).
+- **Loot system overhaul** Gï¿½ï¿½ unified loot table with 4 rarity tiers: Common (Tier 1), Uncommon (Tier 2), Rare (Tier 3, floor 4+), Legendary (Tier 4, floor 6+). Luck and floor depth boost higher tier drops. Equipment drops from monsters on death (20% base + LCK x 2, max 50%).
+- **Equipment on the ground** Gï¿½ï¿½ equipment items now spawn on dungeon floors with their own sprites. Stacked items show a loot pile icon with quantity badge. Click to inspect.
+- **Monster equipment drops** Gï¿½ï¿½ defeating a monster has a chance to drop a random accessory (filtered by floor availability).
+- **Level-up notification** Gï¿½ï¿½ gold "LEVEL UP!" overlay with "+3 Stat Points!" subtitle, fades out over 3 seconds. Level-up sound effect added.
+- **Potion heal scales with INT** Gï¿½ï¿½ potion healing is now `base% x (1 + INT x 0.02)`, making Intelligence stat meaningful for sustain.
+- **Potion rarity on ground** Gï¿½ï¿½ floor-placed potions now roll randomly (50% small, 30% medium, 20% large) instead of being floor-locked.
+- **GUI Scale setting** Gï¿½ï¿½ adjustable UI scale (1.0x to 4.0x) in the Settings menu. All UI elements scale proportionally.
+- **Updated controls screen** Gï¿½ï¿½ documents Q/E tab switching, sprint controls, mouse click inspect, and equipment management.
+- **Scrollable menus** Gï¿½ï¿½ main menu, story, credits, and controls screens now scroll when content exceeds the viewport.
+- **Starting equipment** Gï¿½ï¿½ player now starts with a Survival Knife (+2 ATK) instead of bare fists.
 
 ### For Developers
 
 #### Equipment System (`game/src/core/inventory.c`, `inventory.h`)
 
-- `EquipType` enum: 17 equipment types GÇö 3 head armors, 3 chest armors, 5 weapons, 3 shields, 7 accessories.
+- `EquipType` enum: 17 equipment types Gï¿½ï¿½ 3 head armors, 3 chest armors, 5 weapons, 3 shields, 7 accessories.
 - `EquipSlot` enum: `HEAD`, `CHEST`, `WEAPON`, `OFF_HAND`, `ACCESSORY`.
 - `EquipData` struct: name, description, sprite path, category, slot, stat bonuses (ATK/DEF/STR/DEX/INT/CON/LCK), `twoHanded` flag.
-- `EquipItem()` / `EquipItemSilent()` GÇö equip with stat bonus application, CON-derived max HP recalculation.
-- `UnequipSlot()` GÇö reverts stat bonuses, moves item to `equipInventory[]` (preserved across floors).
-- `AddEquipToInventory()` / `RemoveEquipFromInventory()` GÇö manage unequipped gear storage.
+- `EquipItem()` / `EquipItemSilent()` Gï¿½ï¿½ equip with stat bonus application, CON-derived max HP recalculation.
+- `UnequipSlot()` Gï¿½ï¿½ reverts stat bonuses, moves item to `equipInventory[]` (preserved across floors).
+- `AddEquipToInventory()` / `RemoveEquipFromInventory()` Gï¿½ï¿½ manage unequipped gear storage.
 - Equipment sprite loading: `LoadPotionTextures()` now also loads all equipment sprites from `resources/sprites/items/equipment/`.
 
 #### Inventory Tab UI (`game/src/core/inventory.c`)
@@ -118,21 +120,21 @@ For earlier versions, see git history.
 - Tab bar rendering with `Draw9Slice` marker texture, yellow underline for active tab.
 - Inventory tab: combined potion + equipment list with `[Slot] Name` format for gear.
 - Equipment tab: 5 slot rows with equipped item name, sprite, and action menu (Unequip/Drop/Back).
-- Stats tab: two-column layout GÇö left column shows base stats (STR/DEX/INT/CON/LCK), HP, ATK, DEF, EXP; right column shows stat point allocation with Enter/Space to allocate.
+- Stats tab: two-column layout Gï¿½ï¿½ left column shows base stats (STR/DEX/INT/CON/LCK), HP, ATK, DEF, EXP; right column shows stat point allocation with Enter/Space to allocate.
 - `Inspector_Render()` unified for both monster and item inspection, showing equipment sprites, descriptions, and stat bonuses.
 
 #### Stat System (`game/src/entity/entity.h`, `player.c`)
 
 - `Entity` struct: added `str`, `dex`, `intel`, `con`, `lck` core stats and `statPoints` counter.
-- `AllocateStatPoint()` GÇö increments one stat, decrements `statPoints`, recalculates max HP from CON.
-- `GainExperience()` GÇö triggers level-ups, awards +2 stat points per level.
-- `ExpForLevel()` GÇö base formula: `20 + level * 10`.
+- `AllocateStatPoint()` Gï¿½ï¿½ increments one stat, decrements `statPoints`, recalculates max HP from CON.
+- `GainExperience()` Gï¿½ï¿½ triggers level-ups, awards +2 stat points per level.
+- `ExpForLevel()` Gï¿½ï¿½ base formula: `20 + level * 10`.
 - Combat formula updated: player damage = `attack + STR * 2 - monster.defense`. Crit chance = LCK%. Monster dodge = DEX * 2% (max 60%).
 
 #### Loot System (`game/src/entity/spawner.c`)
 
-- Unified `LootEntry` struct: `LootCategory` (POTION/EQUIP), `typeId`, `tier` (1GÇô4), `baseWeight`.
-- `LOOT_TABLE[]` GÇö 23 entries across 4 rarity tiers with minimum floor requirements (Tier 3: floor 4+, Tier 4: floor 6+).
+- Unified `LootEntry` struct: `LootCategory` (POTION/EQUIP), `typeId`, `tier` (1Gï¿½ï¿½4), `baseWeight`.
+- `LOOT_TABLE[]` Gï¿½ï¿½ 23 entries across 4 rarity tiers with minimum floor requirements (Tier 3: floor 4+, Tier 4: floor 6+).
 - Tier selection: effective weight = `baseWeight + LCK * 2 * tier + floor * 3 * tier`.
 - Item selection within tier uses base weights for variety.
 - Equipment placed on map tiles with stacking support and loot pile sprite for multiples.
@@ -149,13 +151,13 @@ For earlier versions, see git history.
 
 #### GUI Scale (`game/src/core/game.c`, `game/src/ui/menu.c`)
 
-- `GetUIScale()` / `SetGuiScale()` / `GetGuiScale()` GÇö global UI scale multiplier (1.0GÇô4.0).
+- `GetUIScale()` / `SetGuiScale()` / `GetGuiScale()` Gï¿½ï¿½ global UI scale multiplier (1.0Gï¿½ï¿½4.0).
 - All menu screens, HUD elements, inventory, and inspector panels scale proportionally.
 - Settings menu: new "GUI Scale" slider with 0.25x increments.
 
 #### Audio (`game/src/core/audio.c`, `audio.h`)
 
-- `PlayLevelUpSound()` GÇö loads and plays random `.wav` from `resources/audio/sounds/levelup/`.
+- `PlayLevelUpSound()` Gï¿½ï¿½ loads and plays random `.wav` from `resources/audio/sounds/levelup/`.
 
 #### Controls Update (`game/src/ui/text_data.c`)
 
@@ -179,30 +181,30 @@ For earlier versions, see git history.
 | `game/src/entity/monster.h` | `str/dex/intel/con/lck` core stats in template and instance |
 | `game/src/entity/monster.c` | Core stat initialization and floor scaling |
 | `game/src/entity/spawner.c` | Unified loot table, tier-based drop system, equipment spawning |
-| `game/src/ui/inspector.c` | **New** GÇö unified monster/item inspector with equipment display |
-| `game/src/ui/inspector.h` | **New** GÇö `InspectorType`, `Inspector_Render()` |
+| `game/src/ui/inspector.c` | **New** Gï¿½ï¿½ unified monster/item inspector with equipment display |
+| `game/src/ui/inspector.h` | **New** Gï¿½ï¿½ `InspectorType`, `Inspector_Render()` |
 | `game/src/ui/menu.c` | GUI scale setting, scrollable menus, story selection cursor |
 | `game/src/ui/text_data.c` | Updated controls text (886 bytes), `RenderTextScreen` scroll parameter |
 | `game/src/ui/text_data.h` | Updated `s_controls_data` size, `RenderTextScreen` signature |
-| `game/src/ui/monster_info.c` | **Removed** GÇö replaced by `inspector.c` |
-| `game/src/ui/monster_info.h` | **Removed** GÇö replaced by `inspector.h` |
-| `resources/sprites/items/equipment/` | **New** GÇö 22 equipment sprites (armors, weapons, accessories) |
-| `resources/sprites/items/loot.png` | **New** GÇö loot pile sprite for stacked equipment |
-| `resources/sprites/items/health_potions/medium_health_potion.png` | **New** GÇö medium potion sprite |
-| `resources/sprites/ui/UI_Flat_FrameMarker01a.png` | **New** GÇö tab bar marker texture |
-| `resources/audio/sounds/levelup/Jump9.wav` | **New** GÇö level-up sound effect |
+| `game/src/ui/monster_info.c` | **Removed** Gï¿½ï¿½ replaced by `inspector.c` |
+| `game/src/ui/monster_info.h` | **Removed** Gï¿½ï¿½ replaced by `inspector.h` |
+| `resources/sprites/items/equipment/` | **New** Gï¿½ï¿½ 22 equipment sprites (armors, weapons, accessories) |
+| `resources/sprites/items/loot.png` | **New** Gï¿½ï¿½ loot pile sprite for stacked equipment |
+| `resources/sprites/items/health_potions/medium_health_potion.png` | **New** Gï¿½ï¿½ medium potion sprite |
+| `resources/sprites/ui/UI_Flat_FrameMarker01a.png` | **New** Gï¿½ï¿½ tab bar marker texture |
+| `resources/audio/sounds/levelup/Jump9.wav` | **New** Gï¿½ï¿½ level-up sound effect |
 
-## ALPHA-0.0.7 GÇö Ranged Combat & AI Rebalance
+## ALPHA-0.0.7 Gï¿½ï¿½ Ranged Combat & AI Rebalance
 
 ---
 
 ### For Players
 
-- **Goblin Archer** GÇö new ranged monster (floor 2+): fires pixel-line projectiles up to 5 tiles in cardinal directions.
-- **Warp Skull magic** GÇö Warp Skull now attacks with wave-animated magic projectiles (range 3, cardinal only).
-- **Smarter monster AI** GÇö monsters remember your last seen position for 4 turns after losing line of sight, chase you around corners.
-- **Better wandering** GÇö monsters try up to 4 random directions before giving up, and patrol a wider area.
-- **Sprint picks up potions** GÇö sprinting over a potion tile now correctly collects it.
+- **Goblin Archer** Gï¿½ï¿½ new ranged monster (floor 2+): fires pixel-line projectiles up to 5 tiles in cardinal directions.
+- **Warp Skull magic** Gï¿½ï¿½ Warp Skull now attacks with wave-animated magic projectiles (range 3, cardinal only).
+- **Smarter monster AI** Gï¿½ï¿½ monsters remember your last seen position for 4 turns after losing line of sight, chase you around corners.
+- **Better wandering** Gï¿½ï¿½ monsters try up to 4 random directions before giving up, and patrol a wider area.
+- **Sprint picks up potions** Gï¿½ï¿½ sprinting over a potion tile now correctly collects it.
 
 ### For Developers
 
@@ -210,40 +212,40 @@ For earlier versions, see git history.
 - `MonsterTemplate`/`Monster` structs: new `attackType`, `attackRange` fields.
 - `Projectile` struct in `game.h`: active flag, start/end tile coords, attack type, animation frames, color.
 - Projectile timers (`projectileTimer`/`projectileDuration`) count down each frame; auto-clear on expiry (0.25s).
-- `animatingEnemyTurn` flag GÇö delays player turn transition until projectiles and monster movement animations finish.
-- `magicAttacksTexture` GÇö loaded from `resources/tilesets/magic_attacks.png`, unloaded in `CleanupGame`.
-- Ranged/magic sound effects GÇö loaded from `resources/audio/sounds/ranged_attack/` and `magic_attack/`.
+- `animatingEnemyTurn` flag Gï¿½ï¿½ delays player turn transition until projectiles and monster movement animations finish.
+- `magicAttacksTexture` Gï¿½ï¿½ loaded from `resources/tilesets/magic_attacks.png`, unloaded in `CleanupGame`.
+- Ranged/magic sound effects Gï¿½ï¿½ loaded from `resources/audio/sounds/ranged_attack/` and `magic_attack/`.
 - AI refactor: `MoveToward()` / `ApplyMove()` helper functions extracted, `Monster_ProcessAllAI` takes `Game*`.
 - Hunt memory: `lastSeenX/Y` + `huntTurns` fields, 4-turn chase after LOS lost.
 - Multi-attempt wander: up to 4 direction tries, wander range expanded to `detectionRange + 8`.
 - Bugfix: restored `alive = true`, `active = true`, `facingRight = true`, `strncpy(name, ...)`, `expValue` in `Monster_Spawn`.
 - Bugfix: added missing `attackType`/`attackRange` to Goblin template.
 
-## ALPHA-0.0.6 GÇö Rebalance & Inventory Update
+## ALPHA-0.0.6 Gï¿½ï¿½ Rebalance & Inventory Update
 
 ---
 
 ### For Players
 
-- **Sprint movement** GÇö hold SHIFT + direction to slide to the nearest obstacle. Sprint stops at room/hallway boundaries; press sprint again to bypass. All monsters process AI between each step.
-- **Health potions** GÇö pick up potions from the ground (press I to open inventory). Three tiers: Small (12 HP, floors 1GÇô2), Big (48 HP, floors 3GÇô5), Large (128 HP, floors 6+). Use, Drop, or Drop All from the action menu.
-- **Potion sprites** GÇö each potion type has its own sprite on the map. Stacked potions show a quantity badge.
-- **Click to inspect** GÇö left-click a potion tile to see its contents in the info panel.
-- **9-slice UI panels** GÇö stats, combat log, monster info, and inventory now use framed texture backgrounds instead of solid rectangles.
-- **Wait healing scales** GÇö resting (period/space) heals `1 + (level / 5) * 2` HP (1 at levels 1GÇô4, 3 at 5GÇô9, 5 at 10GÇô14, etc.).
-- **6 new monster types** GÇö Bat, Demon Eye, Dragon, Floating Eye, Fungal Myconid, Warp Skull added across 3 difficulty tiers (Early/Mid/Late).
-- **Monster rebalance** GÇö floor stat scaling reduced from `GetRandomValue(3,6)` to `GetRandomValue(1,3)`; spawn weights are flat for consistent rarity.
+- **Sprint movement** Gï¿½ï¿½ hold SHIFT + direction to slide to the nearest obstacle. Sprint stops at room/hallway boundaries; press sprint again to bypass. All monsters process AI between each step.
+- **Health potions** Gï¿½ï¿½ pick up potions from the ground (press I to open inventory). Three tiers: Small (12 HP, floors 1Gï¿½ï¿½2), Big (48 HP, floors 3Gï¿½ï¿½5), Large (128 HP, floors 6+). Use, Drop, or Drop All from the action menu.
+- **Potion sprites** Gï¿½ï¿½ each potion type has its own sprite on the map. Stacked potions show a quantity badge.
+- **Click to inspect** Gï¿½ï¿½ left-click a potion tile to see its contents in the info panel.
+- **9-slice UI panels** Gï¿½ï¿½ stats, combat log, monster info, and inventory now use framed texture backgrounds instead of solid rectangles.
+- **Wait healing scales** Gï¿½ï¿½ resting (period/space) heals `1 + (level / 5) * 2` HP (1 at levels 1Gï¿½ï¿½4, 3 at 5Gï¿½ï¿½9, 5 at 10Gï¿½ï¿½14, etc.).
+- **6 new monster types** Gï¿½ï¿½ Bat, Demon Eye, Dragon, Floating Eye, Fungal Myconid, Warp Skull added across 3 difficulty tiers (Early/Mid/Late).
+- **Monster rebalance** Gï¿½ï¿½ floor stat scaling reduced from `GetRandomValue(3,6)` to `GetRandomValue(1,3)`; spawn weights are flat for consistent rarity.
 
 ### For Developers
 
 #### Codebase Refactor (`game/src/core/`)
 
-- `game.c` (1352 GåÆ 594 lines) split into focused modules:
-  - **`renderer.c`** GÇö `Draw9Slice()`, `RenderGame()` (map, entities, HUD)
-  - **`inventory.c`** GÇö item metadata, `InventoryAdd/Use`, potion texture loading, `Inventory_Render()` overlay
-  - **`map_helpers.c`** GÇö `IsInRoom()`, `RevealFOW()`, `BuildBlockingMap()`, `SpawnEntitiesFromObjects()`, `SpawnEscapeTile()`, `SpawnShadow()`
+- `game.c` (1352 Gï¿½ï¿½ 594 lines) split into focused modules:
+  - **`renderer.c`** Gï¿½ï¿½ `Draw9Slice()`, `RenderGame()` (map, entities, HUD)
+  - **`inventory.c`** Gï¿½ï¿½ item metadata, `InventoryAdd/Use`, potion texture loading, `Inventory_Render()` overlay
+  - **`map_helpers.c`** Gï¿½ï¿½ `IsInRoom()`, `RevealFOW()`, `BuildBlockingMap()`, `SpawnEntitiesFromObjects()`, `SpawnEscapeTile()`, `SpawnShadow()`
 - `game.h` now includes `inventory.h`, `renderer.h`, `map_helpers.h` and exports only core functions (`InitGame`, `CleanupGame`, `HandleInput`, `UpdateGame`, `DescendFloor`).
-- `premake5.lua` uses wildcard `files {"**.c", "**.h"}` GÇö no manual Makefile updates needed.
+- `premake5.lua` uses wildcard `files {"**.c", "**.h"}` Gï¿½ï¿½ no manual Makefile updates needed.
 
 #### Sprint System (`game/src/core/game.c`)
 
@@ -258,23 +260,23 @@ For earlier versions, see git history.
 
 - 10 monster types total (6 new): `MONSTER_BAT`, `MONSTER_DEMON_EYE`, `MONSTER_DRAGON`, `MONSTER_FLOATING_EYE`, `MONSTER_FUNGAL_MYCONID`, `MONSTER_WARP_SKULL`.
 - `MonsterTemplate` struct: `minFloor` (1/3/6), `spawnWeight` for weighted random selection.
-- `Monster_InitTemplates()` GÇö 3-tier configuration: Early (floors 1+), Mid (floors 3+), Late (floors 6+). All base EXP doubled.
-- `Monster_Spawn()` GÇö scales level by `GetRandomValue(1,3)` per floor.
+- `Monster_InitTemplates()` Gï¿½ï¿½ 3-tier configuration: Early (floors 1+), Mid (floors 3+), Late (floors 6+). All base EXP doubled.
+- `Monster_Spawn()` Gï¿½ï¿½ scales level by `GetRandomValue(1,3)` per floor.
 - Sprite paths moved from `resources/sprite_animations/idle/` to `resources/sprites/monsters/`.
 
 #### Inventory System (`game/src/core/inventory.c`, `inventory.h`)
 
 - `ItemType` enum: `ITEM_NONE`, `ITEM_SMALL_HP_POTION`, `ITEM_BIG_HP_POTION`, `ITEM_LARGE_HP_POTION`.
 - `InventorySlot` struct with `type` and `quantity`; max 16 slots, stacking by type.
-- `InventoryAdd()` / `InventoryUse()` GÇö add stacks, consume items with HP restoration.
-- `Inventory_Render()` GÇö full overlay: item list with selection, info panel with description/quantity/heal amount, action menu popup.
-- `LoadPotionTextures()` / `UnloadPotionTextures()` GÇö load 3 potion sprites and 2 UI frame textures.
+- `InventoryAdd()` / `InventoryUse()` Gï¿½ï¿½ add stacks, consume items with HP restoration.
+- `Inventory_Render()` Gï¿½ï¿½ full overlay: item list with selection, info panel with description/quantity/heal amount, action menu popup.
+- `LoadPotionTextures()` / `UnloadPotionTextures()` Gï¿½ï¿½ load 3 potion sprites and 2 UI frame textures.
 
 #### 9-Slice UI (`game/src/core/renderer.c`)
 
-- `Draw9Slice(tex, dest, l, t, r, b)` GÇö draws a 9-sliced texture without corner distortion.
-- `UI_Flat_Frame01a.png` (96+ù64, 16px corners) for stats panel, inventory, combat log.
-- `UI_Flat_FrameSlot01b.png` (32+ù32, 8px corners) for info popups, action menus.
+- `Draw9Slice(tex, dest, l, t, r, b)` Gï¿½ï¿½ draws a 9-sliced texture without corner distortion.
+- `UI_Flat_Frame01a.png` (96+ï¿½64, 16px corners) for stats panel, inventory, combat log.
+- `UI_Flat_FrameSlot01b.png` (32+ï¿½32, 8px corners) for info popups, action menus.
 - All UI functions fall back to solid-colour rectangles when textures are missing.
 
 #### Combat Log (`game/src/ui/combat_log.c`, `combat_log.h`)
@@ -285,14 +287,14 @@ For earlier versions, see git history.
 
 | File | Change |
 |------|--------|
-| `game/src/core/game.c` | Refactored GÇö core loop only |
+| `game/src/core/game.c` | Refactored Gï¿½ï¿½ core loop only |
 | `game/src/core/game.h` | Removed item/inventory/render decls, added module includes |
-| `game/src/core/renderer.c` | **New** GÇö `Draw9Slice`, `RenderGame` |
-| `game/src/core/renderer.h` | **New** GÇö renderer API |
-| `game/src/core/inventory.c` | **New** GÇö item metadata, inventory logic, overlay rendering |
-| `game/src/core/inventory.h` | **New** GÇö `ItemType`, `InventorySlot`, inventory API |
-| `game/src/core/map_helpers.c` | **New** GÇö `IsInRoom`, `RevealFOW`, `BuildBlockingMap`, spawn helpers |
-| `game/src/core/map_helpers.h` | **New** GÇö map helper API |
+| `game/src/core/renderer.c` | **New** Gï¿½ï¿½ `Draw9Slice`, `RenderGame` |
+| `game/src/core/renderer.h` | **New** Gï¿½ï¿½ renderer API |
+| `game/src/core/inventory.c` | **New** Gï¿½ï¿½ item metadata, inventory logic, overlay rendering |
+| `game/src/core/inventory.h` | **New** Gï¿½ï¿½ `ItemType`, `InventorySlot`, inventory API |
+| `game/src/core/map_helpers.c` | **New** Gï¿½ï¿½ `IsInRoom`, `RevealFOW`, `BuildBlockingMap`, spawn helpers |
+| `game/src/core/map_helpers.h` | **New** Gï¿½ï¿½ map helper API |
 | `game/src/entity/monster.c` | 6 new monsters, `MonsterTemplate` with `minFloor`/`spawnWeight` |
 | `game/src/entity/monster.h` | 6 new `MonsterType` enums, template struct |
 | `game/src/entity/spawner.c` | Weighted random selection filtered by `minFloor` |
@@ -302,41 +304,41 @@ For earlier versions, see git history.
 | `game/src/ui/combat_log.h` | Updated `CombatLog_Render` signature |
 | `game/src/ui/monster_info.c` | 9-sliced info panel |
 | `game/src/ui/monster_info.h` | Include game.h |
-| `resources/sprites/items/health_potions/` | **New** GÇö 3 potion sprites |
-| `resources/sprites/monsters/` | **New** GÇö monster sprites |
-| `resources/sprites/ui/` | **New** GÇö `UI_Flat_Frame01a`, `UI_Flat_FrameSlot01b` |
+| `resources/sprites/items/health_potions/` | **New** Gï¿½ï¿½ 3 potion sprites |
+| `resources/sprites/monsters/` | **New** Gï¿½ï¿½ monster sprites |
+| `resources/sprites/ui/` | **New** Gï¿½ï¿½ `UI_Flat_Frame01a`, `UI_Flat_FrameSlot01b` |
 
-## ALPHA-0.0.5 GÇö Story Board & Floors Update
+## ALPHA-0.0.5 Gï¿½ï¿½ Story Board & Floors Update
 
 ---
 
 ### For Players
 
-- **Multi-floor dungeon** GÇö 10 floors to descend. All monsters start at level 1 and gain 3GÇô6 random extra levels per floor deeper (+2 HP, +1 ATK, +0.5 DEF, +5 EXP per level), making each floor progressively more dangerous.
-- **Stairs progression** GÇö floors 1GÇô9 have stairs to go deeper; floor 10 is the final floor.
-- **Escape tile** GÇö on floor 10, kill all monsters to spawn an escape tile. Step on it to win.
-- **Shadow monster** GÇö after 15 idle turns, a shadow spawns at twice your level (min level 10). It has three AI states (slowed, normal, frenzy) and a detection range of 20. Does not spawn on floor 10.
-- **Story screen** GÇö new "Story" option on the main menu displays the game's lore text with word wrapping and scrolling support.
-- **Monster info panel** GÇö click a monster to inspect its stats on the right side of the screen (clears on movement).
-- **HUD update** GÇö shows "Floor: X/10" instead of enemy count.
-- **Combat log colors** GÇö yellow for floor cleared, green for escape tile appeared, red for shadow spawn.
-- **Credits update** GÇö added "DeepDiveGameStudio - Monster Sprites".
+- **Multi-floor dungeon** Gï¿½ï¿½ 10 floors to descend. All monsters start at level 1 and gain 3Gï¿½ï¿½6 random extra levels per floor deeper (+2 HP, +1 ATK, +0.5 DEF, +5 EXP per level), making each floor progressively more dangerous.
+- **Stairs progression** Gï¿½ï¿½ floors 1Gï¿½ï¿½9 have stairs to go deeper; floor 10 is the final floor.
+- **Escape tile** Gï¿½ï¿½ on floor 10, kill all monsters to spawn an escape tile. Step on it to win.
+- **Shadow monster** Gï¿½ï¿½ after 15 idle turns, a shadow spawns at twice your level (min level 10). It has three AI states (slowed, normal, frenzy) and a detection range of 20. Does not spawn on floor 10.
+- **Story screen** Gï¿½ï¿½ new "Story" option on the main menu displays the game's lore text with word wrapping and scrolling support.
+- **Monster info panel** Gï¿½ï¿½ click a monster to inspect its stats on the right side of the screen (clears on movement).
+- **HUD update** Gï¿½ï¿½ shows "Floor: X/10" instead of enemy count.
+- **Combat log colors** Gï¿½ï¿½ yellow for floor cleared, green for escape tile appeared, red for shadow spawn.
+- **Credits update** Gï¿½ï¿½ added "DeepDiveGameStudio - Monster Sprites".
 
 ### For Developers
 
 #### Floor System (`game/src/core/game.c`, `game/src/core/game.h`)
 
 - `Game` struct: added `currentFloor`, `maxFloors` (10), `stairX/Y`, `escapeX/Y`, `timeWaited`, `floorClearedNotified`, `escapeSpawned`, `selectedMonsterIdx`.
-- `DescendFloor()` GÇö resets `timeWaited` and `escapeSpawned` via `memset`, preserves player stats across floors.
-- Floor 10: no stairs, all monster kills GåÆ `SpawnEscapeTile()` places GID 47, sets `STATE_WIN`.
-- `SpawnShadow()` GÇö spawns shadow at `timeWaited == 15` on floors 1GÇô9 only.
+- `DescendFloor()` Gï¿½ï¿½ resets `timeWaited` and `escapeSpawned` via `memset`, preserves player stats across floors.
+- Floor 10: no stairs, all monster kills Gï¿½ï¿½ `SpawnEscapeTile()` places GID 47, sets `STATE_WIN`.
+- `SpawnShadow()` Gï¿½ï¿½ spawns shadow at `timeWaited == 15` on floors 1Gï¿½ï¿½9 only.
 
 #### Monster Scaling (`game/src/entity/monster.c`)
 
 - All monster templates start at level 1 (base stats unchanged).
-- `Monster_ScaleToFloor()` GÇö adds `(floor - 1) * GetRandomValue(3, 6)` extra levels per floor.
+- `Monster_ScaleToFloor()` Gï¿½ï¿½ adds `(floor - 1) * GetRandomValue(3, 6)` extra levels per floor.
 - Stat formula per extra level: +2 HP, +1 ATK, +0.5 DEF, +5 EXP.
-- `MONSTER_SHADOW` enum with `shadowTurnCounter`; three AI states based on `timeWaited` (< 25 slowed, 25GÇô34 normal, GëÑ 35 frenzy).
+- `MONSTER_SHADOW` enum with `shadowTurnCounter`; three AI states based on `timeWaited` (< 25 slowed, 25Gï¿½ï¿½34 normal, Gï¿½ï¿½ 35 frenzy).
 
 #### Procudural Generation (`game/src/core/procedural.c`, `game/src/core/procedural.h`)
 
@@ -348,7 +350,7 @@ For earlier versions, see git history.
 - New `MENU_STORY` enum option and `SCENE_STORY` scene.
 - Story text is XOR-encrypted (key `0xAB`, 1116 bytes) and embedded in the binary via `s_story_data[]`.
 - `Story_LoadFile()` decodes into memory, splits by line.
-- `Story_BuildVisualLines()` GÇö word-wraps source lines to fit screen width; rebuilds on window resize.
+- `Story_BuildVisualLines()` Gï¿½ï¿½ word-wraps source lines to fit screen width; rebuilds on window resize.
 - Scrolling with UP/DOWN keys, clamped to visual line count.
 
 #### Combat Log (`game/src/ui/combat_log.c`, `game/src/ui/combat_log.h`)
@@ -359,7 +361,7 @@ For earlier versions, see git history.
 
 | File | Change |
 |------|--------|
-| `resources/story.txt` | Added GÇö plaintext story lore |
+| `resources/story.txt` | Added Gï¿½ï¿½ plaintext story lore |
 | `CHANGELOG.md` | This entry |
 | `game/src/ui/text_data.c` | Added `s_story_data[1116]` (XOR-encrypted) |
 | `game/src/ui/text_data.h` | Added `s_story_data` extern |
@@ -378,17 +380,17 @@ For earlier versions, see git history.
 | `game/src/core/procedural.h` | Stair/escape GID constants |
 | `game/src/main.c` | `SCENE_STORY` scene handling |
 
-## ALPHA-0.0.4 GÇö Music Update
+## ALPHA-0.0.4 Gï¿½ï¿½ Music Update
 
 ---
 
 ### For Players
 
-- **Dynamic game music** GÇö 5 `.ogg` tracks now play randomly in-game, cycling seamlessly one after another with no gap between tracks.
-- **Menu music** GÇö a dedicated track plays on the main menu (stops when the game starts).
-- **New tileset** GÇö replaced the grey placeholder tileset with the VelmoraRealms tileset for a proper dungeon look.
-- **Floor tile variation** GÇö floors now randomly mix 9 tile variants (GIDs 23, 24, 48GÇô53) alongside the base floor tile. 75% of tiles use the base floor, 25% use variants.
-- **Fixed wall rendering** GÇö walls now display correctly around all floor variants (no gaps or misplaced edges).
+- **Dynamic game music** Gï¿½ï¿½ 5 `.ogg` tracks now play randomly in-game, cycling seamlessly one after another with no gap between tracks.
+- **Menu music** Gï¿½ï¿½ a dedicated track plays on the main menu (stops when the game starts).
+- **New tileset** Gï¿½ï¿½ replaced the grey placeholder tileset with the VelmoraRealms tileset for a proper dungeon look.
+- **Floor tile variation** Gï¿½ï¿½ floors now randomly mix 9 tile variants (GIDs 23, 24, 48Gï¿½ï¿½53) alongside the base floor tile. 75% of tiles use the base floor, 25% use variants.
+- **Fixed wall rendering** Gï¿½ï¿½ walls now display correctly around all floor variants (no gaps or misplaced edges).
 
 ### For Developers
 
@@ -399,7 +401,7 @@ For earlier versions, see git history.
   - Game tracks loaded from `resources/audio/music/game/`
 - `LoadMusicFromDir()` loads all `.ogg` files from a directory into a `Music` array.
 - Game tracks set to `looping = true` for seamless internal looping.
-- Track cycling uses `GetMusicTimePlayed()` / `GetMusicTimeLength()` to detect loop boundaries and switch tracks at the exact wrap point GÇö no audible gap.
+- Track cycling uses `GetMusicTimePlayed()` / `GetMusicTimeLength()` to detect loop boundaries and switch tracks at the exact wrap point Gï¿½ï¿½ no audible gap.
 - `PickRandomGameTrack()` avoids repeating the same track twice in a row.
 - `ShutdownAudioSystem()` unloads all loaded `Music` streams.
 - Old `.mp3` files (`Abnormal Circumstances.mp3`, `Element.mp3`) no longer referenced.
@@ -410,21 +412,21 @@ For earlier versions, see git history.
 - **`procedural.c`**: `IsFloorGID()` helper checks all floor variants. `RandomFloorGID()` picks with 75/25 weighting. All wall placement, corner detection, and collision sync functions use `IsFloorGID()` instead of direct `== TILE_FLOOR` comparison.
 - **`entity/entity.c`**: `DrawTile()` uses `FindTilesetForGID()` to select the correct texture per tile.
 - **`core/game.c`**: `InitGame` loops over all map tilesets to load textures. `CleanupGame` unloads all.
-- **`core/game.h`**: `Game::tilesetTexture` GåÆ `Game::tilesetTextures[]` array.
+- **`core/game.h`**: `Game::tilesetTexture` Gï¿½ï¿½ `Game::tilesetTextures[]` array.
 - **`spawner.c`**: `Spawner_Populate` uses `IsFloorGID()` so entities spawn on any floor variant.
 
 #### Code Cleanup
 
 - Removed redundant comments across all source files (obvious bounds checks, trivially named variables, self-documenting blocks).
 - Kept architectural comments (section dividers, complex logic explanations, public API docs).
-- `credits.txt` added to `game/src/ui/` GÇö decrypted plaintext for easy editing (re-encrypt via `text_data.c` with XOR key `0xAB`).
+- `credits.txt` added to `game/src/ui/` Gï¿½ï¿½ decrypted plaintext for easy editing (re-encrypt via `text_data.c` with XOR key `0xAB`).
 
 #### New Files
 
 | File | Purpose |
 |------|---------|
-| `CHANGELOG.md` | This file GÇö release notes per version |
-| `resources/tilesets/VelmoraRealms-TileSet.png` | Primary dungeon tileset (448+ù400, 28 cols, 700 tiles) |
+| `CHANGELOG.md` | This file Gï¿½ï¿½ release notes per version |
+| `resources/tilesets/VelmoraRealms-TileSet.png` | Primary dungeon tileset (448+ï¿½400, 28 cols, 700 tiles) |
 | `resources/tilesets/VelmoraRealms-TileSet.tsx` | Tiled tileset definition |
 | `game/src/ui/credits.txt` | Decrypted credits for editing |
 
