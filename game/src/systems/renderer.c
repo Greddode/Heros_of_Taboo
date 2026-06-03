@@ -280,6 +280,18 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
         DrawText(dn->text, (int)(dn->pos.x - tw / 2), (int)dn->pos.y, fs, c);
     }
 
+    // Floating status messages (world-space)
+    for (int i = 0; i < MAX_FLOAT_MSGS; i++) {
+        if (!game->floatMsgs.entries[i].active) continue;
+        FloatMsg* fm = &game->floatMsgs.entries[i];
+        Color c = fm->color;
+        c.a = (unsigned char)(255.0f * fm->alpha);
+        int fs = (int)(16.0f * game->camera.zoom / DEFAULT_CAMERA_ZOOM);
+        if (fs < 12) fs = 12;
+        int tw = MeasureText(fm->text, fs);
+        DrawText(fm->text, (int)(fm->worldX - tw / 2), (int)fm->worldY, fs, c);
+    }
+
     EndMode2D();
 
     // HUD (screen space)

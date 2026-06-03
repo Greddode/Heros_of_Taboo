@@ -22,7 +22,10 @@ static void ApplyLevelUp(GameWorld* game) {
     game->levelUpTimer = LEVEL_UP_FLASH_SECONDS;
     GameAudio_PlayLevelUpSound();
     TraceLog(LOG_INFO, "Level up! Now level %d (%d stat points available)", ps->level, ps->statPoints);
-    CombatLog_Add(&game->combatLog, BLACK, "Level %d! +%d stat points to allocate!", ps->level, STAT_POINTS_PER_LEVEL);
+    {
+        CPosition* pp = World_GetPosition(w, pe);
+        FloatMsg_Spawn(game, pp->x, pp->y, GOLD, "Level %d!", ps->level);
+    }
 }
 
 // Allocate one stat point to a specific stat

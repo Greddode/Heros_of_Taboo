@@ -59,7 +59,10 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     if (GetRandomValue(1, 100) <= as->lck) {
         damage *= CRIT_MULT;
         dmgColor = ORANGE;
-        CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+        {
+            CPosition* ap = World_GetPosition(&game->ecs, attackerId);
+            FloatMsg_Spawn(game, ap->x, ap->y, ORANGE, "Critical!");
+        }
     }
     if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
         damage *= 2;
@@ -208,7 +211,10 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     if (GetRandomValue(1, 100) <= as->lck) {
         damage *= CRIT_MULT;
         dmgColor = ORANGE;
-        CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+        {
+            CPosition* ap = World_GetPosition(&game->ecs, attackerId);
+            FloatMsg_Spawn(game, ap->x, ap->y, ORANGE, "Critical!");
+        }
     }
     if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
         damage *= 2;
@@ -365,7 +371,10 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
                 damage *= CRIT_MULT;
                 if (damage < MIN_DAMAGE) damage = MIN_DAMAGE;
                 dmgColor = ORANGE;
-                CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+                {
+                    CPosition* ap = World_GetPosition(&game->ecs, attackerId);
+                    FloatMsg_Spawn(game, ap->x, ap->y, ORANGE, "Critical!");
+                }
             }
             if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
                 damage *= 2;
