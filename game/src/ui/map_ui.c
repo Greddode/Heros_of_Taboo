@@ -5,7 +5,7 @@
 
 void MapUI_Update(GameWorld* gw) {
     if (!gw) return;
-    if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_ESCAPE) ||
+    if (IsKeyPressed(KEY_ESCAPE) ||
         IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
         IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) ||
         IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) ||
