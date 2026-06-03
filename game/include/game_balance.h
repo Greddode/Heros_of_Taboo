@@ -68,6 +68,9 @@
 
 //   Critical hit:  damage * CRIT_MULT when LCK% roll succeeds
 #define CRIT_MULT                2
+#define MEGA_CRIT_THRESHOLD    100   // Minimum crit damage to trigger mega-crit check
+#define MEGA_CRIT_CHANCE        50   // Percentage chance to double a crit that exceeds threshold
+#define DUAL_WIELD_OFFHAND_MULT 0.5f // Off-hand follow-up damage multiplier
 #define MIN_DAMAGE               1   // Minimum damage after all reductions
 
 // --- Dodge / evasion ---------------------------------------------------------

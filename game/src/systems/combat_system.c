@@ -55,9 +55,22 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     }
 
     int damage = calc_damage_after_defense(calc_melee_damage(as->attack, as->str), ms->defense);
+    Color dmgColor = WHITE;
     if (GetRandomValue(1, 100) <= as->lck) {
         damage *= CRIT_MULT;
+        dmgColor = ORANGE;
         CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+    }
+    if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
+        damage *= 2;
+        dmgColor = RED;
+        CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
+    }
+
+    {
+        int tw = game->map->tileWidth;
+        int th = game->map->tileHeight;
+        DamageNumber_Spawn(&game->damageNumbers, damage, targetX, targetY, tw, th, dmgColor);
     }
 
     ms->hp -= damage;
@@ -68,6 +81,48 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
         World_GetHitFlash(&game->ecs, mon)->timer = HIT_FLASH_DURATION;
     }
     CombatLog_Add(&game->combatLog, BLACK, "You hit %s for %d!", monName, damage);
+
+    // Off-hand follow-up strike (dual wield)
+    if (ms->hp > 0 && IsDualWielding(game)) {
+        int offDodgePct = calc_dodge_chance(ms->dex);
+        if (offDodgePct > 0 && GetRandomValue(1, 100) <= offDodgePct) {
+            CombatLog_Add(&game->combatLog, BLACK, "%s dodges your off-hand!", monName);
+        } else {
+            int offRaw = calc_melee_damage(as->attack, as->str);
+            int offDmg = calc_damage_after_defense(offRaw, ms->defense);
+            offDmg = (int)((float)offDmg * DUAL_WIELD_OFFHAND_MULT);
+            if (offDmg < 1) offDmg = 1;
+            Color offColor = WHITE;
+            if (GetRandomValue(1, 100) <= as->lck) {
+                offDmg *= CRIT_MULT;
+                offColor = ORANGE;
+                CombatLog_Add(&game->combatLog, BLACK, "Off-hand critical hit!");
+            }
+            if (offDmg > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
+                offDmg *= 2;
+                offColor = RED;
+                CombatLog_Add(&game->combatLog, RED, "Off-hand MEGA CRITICAL HIT!!");
+            }
+            ms->hp -= offDmg;
+            {
+                int tw = game->map->tileWidth;
+                int th = game->map->tileHeight;
+                DamageNumber_Spawn(&game->damageNumbers, offDmg, targetX, targetY, tw, th, offColor);
+            }
+            CombatLog_Add(&game->combatLog, BLACK, "Off-hand hits %s for %d!", monName, offDmg);
+            if (ms->hp <= 0) {
+                ms->alive = false;
+                ms->hp = 0;
+                {
+                    CPosition* dp = World_GetPosition(&game->ecs, mon);
+                    SpatialHash_Remove(game, mon, dp->x, dp->y);
+                }
+                game->aliveMonsterCount--;
+                GainExperience(game, ms->expValue);
+                CombatLog_Add(&game->combatLog, BLACK, "%s defeated by off-hand! (+%d exp)", monName, ms->expValue);
+            }
+        }
+    }
 
     if (ms->hp <= 0) {
         ms->alive = false;
@@ -149,9 +204,22 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     }
 
     int damage = calc_damage_after_defense(calc_ranged_damage(as->dex), ms->defense);
+    Color dmgColor = WHITE;
     if (GetRandomValue(1, 100) <= as->lck) {
         damage *= CRIT_MULT;
+        dmgColor = ORANGE;
         CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+    }
+    if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
+        damage *= 2;
+        dmgColor = RED;
+        CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
+    }
+
+    {
+        int tw = game->map->tileWidth;
+        int th = game->map->tileHeight;
+        DamageNumber_Spawn(&game->damageNumbers, damage, hitX, hitY, tw, th, dmgColor);
     }
 
     ms->hp -= damage;
@@ -292,10 +360,23 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
             }
 
             int damage = calc_damage_after_defense(calc_throw_damage(savedAttack, savedDex), ms->defense);
+            Color dmgColor = WHITE;
             if (GetRandomValue(1, 100) <= savedLck) {
                 damage *= CRIT_MULT;
                 if (damage < MIN_DAMAGE) damage = MIN_DAMAGE;
+                dmgColor = ORANGE;
                 CombatLog_Add(&game->combatLog, BLACK, "Critical hit!");
+            }
+            if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
+                damage *= 2;
+                dmgColor = RED;
+                CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
+            }
+
+            {
+                int tw = game->map->tileWidth;
+                int th = game->map->tileHeight;
+                DamageNumber_Spawn(&game->damageNumbers, damage, hitX, hitY, tw, th, dmgColor);
             }
 
             ms->hp -= damage;

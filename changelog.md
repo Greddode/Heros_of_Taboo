@@ -21,6 +21,20 @@ All notable changes to this project will be documented in this file.
 
 - **Test count clarification** — Verified 28 unit tests (up from initial 16), all passing
 
+### Gameplay Features
+
+- **Equipment Rebalance** — Leather Vest now also grants +2 DEX; Wooden Shield now also grants +2 LCK. Descriptions updated.
+- **Mega-Crits** — Critical hits dealing >100 damage have a 50% chance to double again. Logs "MEGA CRITICAL HIT!!" in RED. Constants in `game_balance.h`: `MEGA_CRIT_THRESHOLD`, `MEGA_CRIT_CHANCE`. Applied to melee, ranged, and throw attacks.
+- **Floating Damage Numbers** — Damage/heal numbers now float above hit targets instead of only appearing in combat log: white (normal), orange (crit), red (mega-crit), green (heal). System via `DamageNumberPool` in `GameWorld` with `DamageNumber_Spawn`/`UpdateAll`. Rendered world-space in `renderer.c`. Also floats above player when taking hits from monsters.
+- **Dual Wield** — Single-handed, non-ranged melee weapons can now be equipped in the off-hand slot. After a main-hand melee hit (if target survives), fires an off-hand follow-up strike with: independent dodge roll, 50% damage (`DUAL_WIELD_OFFHAND_MULT = 0.5f`), full crit + mega-crit eligibility, and own floating number. Eligible weapons shown with `(dual)` tag in inventory. Helpers: `IsWeaponDualWieldable()`, `IsDualWielding()`.
+
+### ECS Performance Optimizations
+
+- **Spatial Hash Grid** — `EntityId monsterGrid[MAP_HEIGHT][MAP_WIDTH]` in `GameWorld`. `World_FindMonsterAt` reduced from O(n) to O(1). Updated eagerly on spawn, move, death, floor transition.
+- **Alive Monster Counter** — Cached `int aliveMonsterCount` avoids O(n) scan per frame.
+- **AI Query Batching** — Pre-fetched component pointers passed through `ProcessMonsterAI` and all 4 movement functions, eliminating redundant ECS lookups.
+- **Profiling report updated** — `docs/profilingreport.md` now shows status of all 5 bottlenecks.
+
 ---
 
 ## [v0.0.9] - 2026-06-02

@@ -66,6 +66,8 @@ void EquipItemSilent(GameWorld* game, EquipType type);
 void UnequipSlot(GameWorld* game, EquipSlot slot);
 bool IsEquipSlotOccupied(const GameWorld* game, EquipSlot slot);
 bool IsTwoHandedEquipped(const GameWorld* game);
+bool IsWeaponDualWieldable(EquipType type);
+bool IsDualWielding(const GameWorld* game);
 bool AddEquipToInventory(GameWorld* game, EquipType type);
 bool RemoveEquipFromInventory(GameWorld* game, int slot);
 

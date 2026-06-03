@@ -94,9 +94,10 @@ static void DrawInventoryTab(const GameWorld* game, const InventoryUIState* ui, 
             const EquipData* d = GetEquipData(game->equipInventory[i]);
             if (d) {
                 char line[128];
-                snprintf(line, sizeof(line), "[%s] %s%s",
+                snprintf(line, sizeof(line), "[%s] %s%s%s",
                          EQUIP_SLOT_LABELS[(int)d->slot], d->name,
-                         d->twoHanded ? " (two-handed)" : "");
+                         d->twoHanded ? " (two-handed)" : "",
+                         IsWeaponDualWieldable(game->equipInventory[i]) ? " (dual)" : "");
                 if (idx == ui->selection)
                     DrawText(">", lx - (int)(18 * scale), ly, (int)(16 * scale), YELLOW);
                 DrawText(line, lx + (int)(2 * scale), ly, (int)(16 * scale), c);

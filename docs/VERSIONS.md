@@ -2,7 +2,7 @@
 
 | Tag | Commit | Date | Description |
 |-----|--------|------|-------------|
-| `v0.0.10` | `e82fc51` | 2026-06-03 | Documentation: comprehensive AGENTS.md rewrite with architecture, profiling, patterns, build setup |
+| `v0.0.10` | HEAD | 2026-06-03 | Gameplay: equipment rebalance, mega-crits, floating damage, dual wield + ECS perf (spatial hash, AI batching) |
 | `v0.0.9` | `145518c` | 2026-06-02 | Bug fixes: tile tearing, wrap, ranged AI, magic def, map close, HP scaling, ranged weapons |
 | `v0.0.8` | `801114e` | 2026-06-02 | Refactoring: game_balance.h, equipment_bonus, floor_init, unit tests (28), validation, profiling, API docs |
 

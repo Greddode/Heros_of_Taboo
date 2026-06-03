@@ -8,6 +8,22 @@
 #include "game_types.h"
 #include "inventory.h"
 
+#define MAX_DAMAGE_NUMBERS 32
+#define DAMAGE_NUMBER_LIFETIME 0.8f
+#define DAMAGE_NUMBER_FLOAT_SPEED 20.0f
+
+typedef struct {
+    bool active;
+    char text[16];
+    Vector2 pos;          // world-space position
+    float timer;
+    Color color;
+} DamageNumber;
+
+typedef struct {
+    DamageNumber entries[MAX_DAMAGE_NUMBERS];
+} DamageNumberPool;
+
 typedef struct GameWorld {
     // ECS
     World ecs;
@@ -16,6 +32,9 @@ typedef struct GameWorld {
     // Performance: monster spatial hash grid (tile → entity lookup)
     EntityId monsterGrid[MAP_HEIGHT][MAP_WIDTH];
     int aliveMonsterCount;
+
+    // Floating damage numbers
+    DamageNumberPool damageNumbers;
 
     // Map
     MapData* map;
@@ -83,5 +102,8 @@ typedef struct GameWorld {
 } GameWorld;
 
 void GameWorld_Init(GameWorld* gw);
+
+void DamageNumber_Spawn(DamageNumberPool* pool, int value, int tileX, int tileY, int tw, int th, Color color);
+void DamageNumber_UpdateAll(DamageNumberPool* pool, float dt);
 
 #endif

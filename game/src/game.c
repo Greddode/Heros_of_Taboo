@@ -43,6 +43,8 @@ float GetGuiScale(void) {
 void UpdateGame(GameWorld* game) {
     if (!game) return;
 
+    DamageNumber_UpdateAll(&game->damageNumbers, GetFrameTime());
+
     World* w = &game->ecs;
 
     if (game->animTimer > 0.0f) {

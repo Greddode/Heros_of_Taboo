@@ -176,6 +176,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
 
             int tw = gw->map->tileWidth;
             int th = gw->map->tileHeight;
+            DamageNumber_Spawn(&gw->damageNumbers, dmg, playerX, playerY, tw, th, RED);
             gw->projectile.active = true;
             gw->projectile.sx = mp->x * tw + tw / 2.0f;
             gw->projectile.sy = mp->y * th + th / 2.0f;
@@ -239,11 +240,16 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
+                {
+                    int tw = gw->map->tileWidth;
+                    int th = gw->map->tileHeight;
+                    DamageNumber_Spawn(&gw->damageNumbers, dmg, playerX, playerY, tw, th, RED);
+                }
                 GameAudio_PlayHitSound();
-                CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
-                hf->timer = 0.15f;
-                CHitFlash* phf = World_GetHitFlash(&gw->ecs, gw->playerEntity);
-                phf->timer = 0.15f;
+                CHitFlash* hf2 = World_GetHitFlash(&gw->ecs, monster);
+                hf2->timer = 0.15f;
+                CHitFlash* phf2 = World_GetHitFlash(&gw->ecs, gw->playerEntity);
+                phf2->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
                 CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", World_GetName(&gw->ecs, monster)->name, dmg);
@@ -293,6 +299,11 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
+                {
+                    int tw = gw->map->tileWidth;
+                    int th = gw->map->tileHeight;
+                    DamageNumber_Spawn(&gw->damageNumbers, dmg, playerX, playerY, tw, th, RED);
+                }
                 GameAudio_PlayHitSound();
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;

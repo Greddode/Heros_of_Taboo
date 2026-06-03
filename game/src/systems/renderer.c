@@ -5,6 +5,7 @@
 #include "ui/inspector.h"
 #include "ui/inventory_ui.h"
 #include "resources.h"
+#include "game_balance.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -263,6 +264,20 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
                 DrawRectangle((int)sx - 2, (int)sy - 2, 4, 4, game->projectile.color);
             }
         }
+    }
+
+    // Floating damage numbers (world-space)
+    for (int i = 0; i < MAX_DAMAGE_NUMBERS; i++) {
+        if (!game->damageNumbers.entries[i].active) continue;
+        DamageNumber* dn = &game->damageNumbers.entries[i];
+        float alpha = dn->timer / DAMAGE_NUMBER_LIFETIME;
+        if (alpha > 1.0f) alpha = 1.0f;
+        Color c = dn->color;
+        c.a = (unsigned char)(255.0f * alpha);
+        int fs = (int)(14.0f * game->camera.zoom / DEFAULT_CAMERA_ZOOM);
+        if (fs < 10) fs = 10;
+        int tw = MeasureText(dn->text, fs);
+        DrawText(dn->text, (int)(dn->pos.x - tw / 2), (int)dn->pos.y, fs, c);
     }
 
     EndMode2D();

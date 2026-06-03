@@ -45,7 +45,7 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     { EQUIP_STEEL_HELM,     "Steel Helm",      "A sturdy steel helm.\n+3 DEF, +3 CON",         "resources/sprites/items/equipment/armors/steel_helm.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_HEAD, 0, 3, 0, 0,0,0,3,0, false, false },
 
     // Armor - Chest
-    { EQUIP_LEATHER_VEST,   "Leather Vest",    "A flexible leather vest.\n+2 DEF, +2 CON",     "resources/sprites/items/equipment/armors/leather_vest.png",   EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 2, 0, 0,0,0,2,0, false, false },
+    { EQUIP_LEATHER_VEST,   "Leather Vest",    "A flexible leather vest.\n+2 DEF, +2 CON, +2 DEX",     "resources/sprites/items/equipment/armors/leather_vest.png",   EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 2, 0, 0,2,0,2,0, false, false },
     { EQUIP_CHAIN_MAIL,     "Chain Mail",      "Interlocking rings of steel.\n+4 DEF, +4 CON", "resources/sprites/items/equipment/armors/chain_mail.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 4, 0, 0,0,0,4,0, false, false },
     { EQUIP_PLATE_MAIL,     "Plate Mail",      "Full plate armour.\n+6 DEF, +6 CON",          "resources/sprites/items/equipment/armors/plate_mail.png",     EQUIP_CAT_ARMOR, EQUIP_SLOT_CHEST, 0, 6, 0, 0,0,0,6,0, false, false },
 
@@ -57,7 +57,7 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     { EQUIP_WAR_HAMMER,     "War Hammer",      "A massive two-handed hammer.\n+10 ATK, +1 DEF, blocks off-hand", "resources/sprites/items/equipment/weapons/warhammer.png", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 10, 1, 0, 0,0,0,0,0, true, false },
 
     // Off-hand
-    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",   "A light wooden shield.\n+2 DEF",             "resources/sprites/items/equipment/armors/wooden_shield.png",  EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 2, 0, 0,0,0,0,0, false, false },
+    { EQUIP_WOODEN_SHIELD,  "Wooden Shield",   "A light wooden shield.\n+2 DEF, +2 LCK",             "resources/sprites/items/equipment/armors/wooden_shield.png",  EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 2, 0, 0,0,0,0,2, false, false },
     { EQUIP_IRON_SHIELD,    "Iron Shield",     "A sturdy iron shield.\n+4 DEF",               "resources/sprites/items/equipment/armors/iron_shield.png",    EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 4, 0, 0,0,0,0,0, false, false },
     { EQUIP_STEEL_SHIELD,   "Steel Shield",    "A heavy steel tower shield.\n+6 DEF",        "resources/sprites/items/equipment/armors/steel_shield.png",   EQUIP_CAT_ARMOR, EQUIP_SLOT_OFF_HAND, 0, 6, 0, 0,0,0,0,0, false, false },
 
@@ -138,6 +138,12 @@ bool InventoryUse(GameWorld* game, int slot) {
         ps->hp += heal;
         if (ps->hp > ps->maxHp)
             ps->hp = ps->maxHp;
+        {
+            CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+            int tw = game->map->tileWidth;
+            int th = game->map->tileHeight;
+            DamageNumber_Spawn(&game->damageNumbers, heal, pp->x, pp->y, tw, th, GREEN);
+        }
         CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, MGCx%.0f%%)!",
                       GetItemName(s->type), healPercent, heal,
                       (1.0f + (float)ps->intel * POTION_INT_SCALE) * 100);
@@ -188,7 +194,15 @@ bool EquipItem(GameWorld* game, EquipType type) {
         int slotIdx = (int)data->slot;
     CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
 
-    if (data->slot == EQUIP_SLOT_OFF_HAND && IsTwoHandedEquipped(game)) {
+    // If a dual-wieldable weapon is equipped to the main-hand slot that's already occupied,
+    // auto-redirect to off-hand slot if it's free.
+    if (data->slot == EQUIP_SLOT_WEAPON && IsWeaponDualWieldable(type) &&
+        game->equipped[EQUIP_SLOT_WEAPON] != EQUIP_NONE &&
+        game->equipped[EQUIP_SLOT_OFF_HAND] == EQUIP_NONE) {
+        slotIdx = EQUIP_SLOT_OFF_HAND;
+    }
+
+    if (slotIdx == EQUIP_SLOT_OFF_HAND && IsTwoHandedEquipped(game)) {
         CombatLog_Add(&game->combatLog, BLACK, "Cannot equip off-hand with a two-handed weapon!");
         return false;
     }
@@ -253,6 +267,22 @@ bool IsTwoHandedEquipped(const GameWorld* game) {
     if (weapon == EQUIP_NONE) return false;
     const EquipData* data = GetEquipData(weapon);
     return data && data->twoHanded;
+}
+
+bool IsWeaponDualWieldable(EquipType type) {
+    const EquipData* d = GetEquipData(type);
+    if (!d || d->type == EQUIP_NONE) return false;
+    return !d->twoHanded && !d->isRanged && d->category == EQUIP_CAT_WEAPON;
+}
+
+bool IsDualWielding(const GameWorld* game) {
+    if (!game) return false;
+    EquipType mainWeapon = game->equipped[EQUIP_SLOT_WEAPON];
+    EquipType offWeapon = game->equipped[EQUIP_SLOT_OFF_HAND];
+    if (mainWeapon == EQUIP_NONE || offWeapon == EQUIP_NONE) return false;
+    const EquipData* md = GetEquipData(mainWeapon);
+    if (!md || md->twoHanded || md->isRanged) return false;
+    return IsWeaponDualWieldable(offWeapon);
 }
 
 bool AddEquipToInventory(GameWorld* game, EquipType type) {

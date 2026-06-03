@@ -189,6 +189,10 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 | **v0.0.9 Bug Fixes** | 7 critical bugs | ✅ Complete | Tile tearing, wrap, ranged AI, magic def, map close, HP scaling, ranged weapons |
 | **v0.0.9 Performance** | Spatial hash, cached counter, AI batching | ✅ Complete | O(1) lookups, 0-scan counter, pre-fetched pointers |
 | **Git Tags** | Version tracking | ✅ Complete | `v0.0.8`, `v0.0.9` created, mapped in `docs/VERSIONS.md` |
+| **v0.0.10 Equipment** | Rebalance leather vest + wooden shield | ✅ Complete | +2 DEX on vest, +2 LCK on shield |
+| **v0.0.10 Mega-Crits** | Double crits >100 damage | ✅ Complete | `MEGA_CRIT_THRESHOLD`/`MEGA_CRIT_CHANCE` in `game_balance.h`, 3 attack functions |
+| **v0.0.10 Floating Damage** | Numbers float above hit targets | ✅ Complete | `DamageNumberPool` in `world.h`, spawn/update/render pipeline |
+| **v0.0.10 Dual Wield** | Single-handed weapons in off-hand | ✅ Complete | `IsWeaponDualWieldable`, `IsDualWielding`, off-hand follow-up strike |
 
 ---
 
@@ -232,44 +236,9 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 
 ## Remaining Work & Known Issues
 
-### 🔴 High Priority (Blocking Performance)
-
-**1. ECS Spatial Hash Optimization** ✅ COMPLETE
-   - Implemented grid-based spatial hash in `spatial_hash.c/.h` with cache invalidation on move/spawn/death/floor transition
-   - `World_FindMonsterAt` now O(1) via `monsterGrid[y][x]` lookup
-   - 5 unit tests covering add/remove/move/exclude/init-clear
-
-**2. ECS Query Batching in AI Loop** ✅ COMPLETE
-   - Pre-fetched `CPosition*`, `CStats*`, `CAI*` pointers passed through `ProcessMonsterAI` and all 4 movement helpers
-   - Eliminated redundant `World_GetXxx()` calls in AI call chain
-
-**3. Alive-Count Caching** ✅ COMPLETE
-   - `int aliveMonsterCount` tracked in `GameWorld`, incremented on spawn, decremented on death
-   - `World_CountAliveMonsters` and `World_AreAllMonstersDead` now O(1)
-
-### 🟡 Medium Priority (Testing & CI/CD) [RECOMMENDED FOR AI]
-
-**4. CI/CD Pipeline** ✅ COMPLETE
-   - `.github/workflows/ci.yml` added — runs unit tests, cross-compiles Linux/Windows/macOS, lint check
-   - **Note**: Lint step checks for `v0.0.10` entry in `changelog.md` — update before merging
-
-**5. Integration Tests** ✅ COMPLETE
-   - **Current**: 28 unit tests (formulas, validation, spatial hash, alive counter)
-   - Added 5 spatial/perf tests: add/remove/move/exclude/init-clear + alive counter lifecycle
-   - **Effort**: 2–3 hours
-   - **Value**: Validates gameplay contracts
-
-### 🟢 Low Priority (Documentation & Cleanup)
-
-**6. Repository Bloat** ✅ COMPLETE
-   - `premake5.exe` removed from git tracking, added to `.gitignore`
-
-**7. Changelog Reorganization** ✅ COMPLETE
-   - Pre-refactor history moved to `HISTORY.md`
-   - `changelog.md` now contains only current releases
-
-**8. Build Documentation** ✅ COMPLETE
-   - `BUILD.md` added with w64devkit setup, raylib build, platform-specific steps
+All high/medium/low priority items from v0.0.9 have been completed.
+The profiling report's render filter (#4) and animation cache (#5) optimizations
+remain open in `docs/profilingreport.md` for future performance work.
 
 ---
 
@@ -597,18 +566,18 @@ make clean
 
 ### Current Tasks
 
-**Task 1.3: Equipment Rebalance** 🔲 TODO
+**Task 1.3: Equipment Rebalance** ✅ COMPLETE
 - `EQUIP_LEATHER_VEST`: add `+2 DEX` — `inventory.c` EQUIP_TABLE entry
 - `EQUIP_WOODEN_SHIELD`: add `+2 LCK` — `inventory.c` EQUIP_TABLE entry
 - Update descriptions to reflect new stats
 
-**Task 1.4: Mega-Crits** 🔲 TODO
+**Task 1.4: Mega-Crits** ✅ COMPLETE
 - If a crit produces damage > 100, 50% chance to double it again
 - Add constants `MEGA_CRIT_THRESHOLD` and `MEGA_CRIT_CHANCE` to `game/include/game_balance.h`
 - Apply in all 3 attack functions in `combat_system.c`: melee, ranged, throw
 - Log `"MEGA CRITICAL HIT!!"` in RED to combat log
 
-**Task 1.5: Floating Damage Numbers** 🔲 TODO
+**Task 1.5: Floating Damage Numbers** ✅ COMPLETE
 - Replace combat log damage messages with numbers that float above the hit target and fade out
 - Add `DamageNumber` struct and pool to `GameWorld` in `world.h`
 - Add `DamageNumber_Spawn()` and `DamageNumber_UpdateAll()` to `world.c`
@@ -617,7 +586,7 @@ make clean
 - Spawn a green heal number above the player on potion use in `inventory.c`
 - Messages should also float above the player (not just monsters)
 
-**Task 1.6: Dual Wield Single-Handed Weapons** 🔲 TODO
+**Task 1.6: Dual Wield Single-Handed Weapons** ✅ COMPLETE
 - Allow single-handed, non-ranged melee weapons to be equipped in `EQUIP_SLOT_OFF_HAND`
 - Add `IsWeaponDualWieldable(EquipType)` and `IsDualWielding(GameWorld*)` helpers to `inventory.h/.c`
 - Update `EquipItem()` to permit a dual-wieldable weapon in the off-hand slot
@@ -748,6 +717,7 @@ See `docs/VERSIONS.md` for Git tag mapping:
 
 | Version | Tag | Date | Focus |
 |---------|-----|------|-------|
+| v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.9 | `v0.0.9` | 2026-06-03 | Bug fixes (7 critical: tile tearing, AI, magic, HP scaling, etc.) |
 | v0.0.8 | `v0.0.8` | 2026-06-02 | Refactoring (formulas, equipment bonus, floor init, tests, profiling, API docs) |
@@ -951,6 +921,10 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 | **v0.0.9 Bug Fixes** | 7 critical bugs | ✅ Complete | Tile tearing, wrap, ranged AI, magic def, map close, HP scaling, ranged weapons |
 | **v0.0.9 Performance** | Spatial hash, cached counter, AI batching | ✅ Complete | O(1) lookups, 0-scan counter, pre-fetched pointers |
 | **Git Tags** | Version tracking | ✅ Complete | `v0.0.8`, `v0.0.9` created, mapped in `docs/VERSIONS.md` |
+| **v0.0.10 Equipment** | Rebalance leather vest + wooden shield | ✅ Complete | +2 DEX on vest, +2 LCK on shield |
+| **v0.0.10 Mega-Crits** | Double crits >100 damage | ✅ Complete | `MEGA_CRIT_THRESHOLD`/`MEGA_CRIT_CHANCE` in `game_balance.h`, 3 attack functions |
+| **v0.0.10 Floating Damage** | Numbers float above hit targets | ✅ Complete | `DamageNumberPool` in `world.h`, spawn/update/render pipeline |
+| **v0.0.10 Dual Wield** | Single-handed weapons in off-hand | ✅ Complete | `IsWeaponDualWieldable`, `IsDualWielding`, off-hand follow-up strike |
 
 ---
 
@@ -994,44 +968,9 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 
 ## Remaining Work & Known Issues
 
-### 🔴 High Priority (Blocking Performance)
-
-**1. ECS Spatial Hash Optimization** ✅ COMPLETE
-   - Implemented grid-based spatial hash in `spatial_hash.c/.h` with cache invalidation on move/spawn/death/floor transition
-   - `World_FindMonsterAt` now O(1) via `monsterGrid[y][x]` lookup
-   - 5 unit tests covering add/remove/move/exclude/init-clear
-
-**2. ECS Query Batching in AI Loop** ✅ COMPLETE
-   - Pre-fetched `CPosition*`, `CStats*`, `CAI*` pointers passed through `ProcessMonsterAI` and all 4 movement helpers
-   - Eliminated redundant `World_GetXxx()` calls in AI call chain
-
-**3. Alive-Count Caching** ✅ COMPLETE
-   - `int aliveMonsterCount` tracked in `GameWorld`, incremented on spawn, decremented on death
-   - `World_CountAliveMonsters` and `World_AreAllMonstersDead` now O(1)
-
-### 🟡 Medium Priority (Testing & CI/CD) [RECOMMENDED FOR AI]
-
-**4. CI/CD Pipeline** ✅ COMPLETE
-   - `.github/workflows/ci.yml` added — runs unit tests, cross-compiles Linux/Windows/macOS, lint check
-   - **Note**: Lint step checks for `v0.0.10` entry in `changelog.md` — update before merging
-
-**5. Integration Tests** ✅ COMPLETE
-   - **Current**: 28 unit tests (formulas, validation, spatial hash, alive counter)
-   - Added 5 spatial/perf tests: add/remove/move/exclude/init-clear + alive counter lifecycle
-   - **Effort**: 2–3 hours
-   - **Value**: Validates gameplay contracts
-
-### 🟢 Low Priority (Documentation & Cleanup)
-
-**6. Repository Bloat** ✅ COMPLETE
-   - `premake5.exe` removed from git tracking, added to `.gitignore`
-
-**7. Changelog Reorganization** ✅ COMPLETE
-   - Pre-refactor history moved to `HISTORY.md`
-   - `changelog.md` now contains only current releases
-
-**8. Build Documentation** ✅ COMPLETE
-   - `BUILD.md` added with w64devkit setup, raylib build, platform-specific steps
+All high/medium/low priority items from v0.0.9 have been completed.
+The profiling report's render filter (#4) and animation cache (#5) optimizations
+remain open in `docs/profilingreport.md` for future performance work.
 
 ---
 
@@ -1359,18 +1298,18 @@ make clean
 
 ### Current Tasks
 
-**Task 1.3: Equipment Rebalance** 🔲 TODO
+**Task 1.3: Equipment Rebalance** ✅ COMPLETE
 - `EQUIP_LEATHER_VEST`: add `+2 DEX` — `inventory.c` EQUIP_TABLE entry
 - `EQUIP_WOODEN_SHIELD`: add `+2 LCK` — `inventory.c` EQUIP_TABLE entry
 - Update descriptions to reflect new stats
 
-**Task 1.4: Mega-Crits** 🔲 TODO
+**Task 1.4: Mega-Crits** ✅ COMPLETE
 - If a crit produces damage > 100, 50% chance to double it again
 - Add constants `MEGA_CRIT_THRESHOLD` and `MEGA_CRIT_CHANCE` to `game/include/game_balance.h`
 - Apply in all 3 attack functions in `combat_system.c`: melee, ranged, throw
 - Log `"MEGA CRITICAL HIT!!"` in RED to combat log
 
-**Task 1.5: Floating Damage Numbers** 🔲 TODO
+**Task 1.5: Floating Damage Numbers** ✅ COMPLETE
 - Replace combat log damage messages with numbers that float above the hit target and fade out
 - Add `DamageNumber` struct and pool to `GameWorld` in `world.h`
 - Add `DamageNumber_Spawn()` and `DamageNumber_UpdateAll()` to `world.c`
@@ -1379,7 +1318,7 @@ make clean
 - Spawn a green heal number above the player on potion use in `inventory.c`
 - Messages should also float above the player (not just monsters)
 
-**Task 1.6: Dual Wield Single-Handed Weapons** 🔲 TODO
+**Task 1.6: Dual Wield Single-Handed Weapons** ✅ COMPLETE
 - Allow single-handed, non-ranged melee weapons to be equipped in `EQUIP_SLOT_OFF_HAND`
 - Add `IsWeaponDualWieldable(EquipType)` and `IsDualWielding(GameWorld*)` helpers to `inventory.h/.c`
 - Update `EquipItem()` to permit a dual-wieldable weapon in the off-hand slot
@@ -1510,6 +1449,7 @@ See `docs/VERSIONS.md` for Git tag mapping:
 
 | Version | Tag | Date | Focus |
 |---------|-----|------|-------|
+| v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.9 | `v0.0.9` | 2026-06-03 | Bug fixes (7 critical: tile tearing, AI, magic, HP scaling, etc.) |
 | v0.0.8 | `v0.0.8` | 2026-06-02 | Refactoring (formulas, equipment bonus, floor init, tests, profiling, API docs) |
@@ -1713,6 +1653,10 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 | **v0.0.9 Bug Fixes** | 7 critical bugs | ✅ Complete | Tile tearing, wrap, ranged AI, magic def, map close, HP scaling, ranged weapons |
 | **v0.0.9 Performance** | Spatial hash, cached counter, AI batching | ✅ Complete | O(1) lookups, 0-scan counter, pre-fetched pointers |
 | **Git Tags** | Version tracking | ✅ Complete | `v0.0.8`, `v0.0.9` created, mapped in `docs/VERSIONS.md` |
+| **v0.0.10 Equipment** | Rebalance leather vest + wooden shield | ✅ Complete | +2 DEX on vest, +2 LCK on shield |
+| **v0.0.10 Mega-Crits** | Double crits >100 damage | ✅ Complete | `MEGA_CRIT_THRESHOLD`/`MEGA_CRIT_CHANCE` in `game_balance.h`, 3 attack functions |
+| **v0.0.10 Floating Damage** | Numbers float above hit targets | ✅ Complete | `DamageNumberPool` in `world.h`, spawn/update/render pipeline |
+| **v0.0.10 Dual Wield** | Single-handed weapons in off-hand | ✅ Complete | `IsWeaponDualWieldable`, `IsDualWielding`, off-hand follow-up strike |
 
 ---
 
@@ -1756,44 +1700,9 @@ for (EntityId e = 1; e < gw->ecs.count; e++) {
 
 ## Remaining Work & Known Issues
 
-### 🔴 High Priority (Blocking Performance)
-
-**1. ECS Spatial Hash Optimization** ✅ COMPLETE
-   - Implemented grid-based spatial hash in `spatial_hash.c/.h` with cache invalidation on move/spawn/death/floor transition
-   - `World_FindMonsterAt` now O(1) via `monsterGrid[y][x]` lookup
-   - 5 unit tests covering add/remove/move/exclude/init-clear
-
-**2. ECS Query Batching in AI Loop** ✅ COMPLETE
-   - Pre-fetched `CPosition*`, `CStats*`, `CAI*` pointers passed through `ProcessMonsterAI` and all 4 movement helpers
-   - Eliminated redundant `World_GetXxx()` calls in AI call chain
-
-**3. Alive-Count Caching** ✅ COMPLETE
-   - `int aliveMonsterCount` tracked in `GameWorld`, incremented on spawn, decremented on death
-   - `World_CountAliveMonsters` and `World_AreAllMonstersDead` now O(1)
-
-### 🟡 Medium Priority (Testing & CI/CD) [RECOMMENDED FOR AI]
-
-**4. CI/CD Pipeline** ✅ COMPLETE
-   - `.github/workflows/ci.yml` added — runs unit tests, cross-compiles Linux/Windows/macOS, lint check
-   - **Note**: Lint step checks for `v0.0.10` entry in `changelog.md` — update before merging
-
-**5. Integration Tests** ✅ COMPLETE
-   - **Current**: 28 unit tests (formulas, validation, spatial hash, alive counter)
-   - Added 5 spatial/perf tests: add/remove/move/exclude/init-clear + alive counter lifecycle
-   - **Effort**: 2–3 hours
-   - **Value**: Validates gameplay contracts
-
-### 🟢 Low Priority (Documentation & Cleanup)
-
-**6. Repository Bloat** ✅ COMPLETE
-   - `premake5.exe` removed from git tracking, added to `.gitignore`
-
-**7. Changelog Reorganization** ✅ COMPLETE
-   - Pre-refactor history moved to `HISTORY.md`
-   - `changelog.md` now contains only current releases
-
-**8. Build Documentation** ✅ COMPLETE
-   - `BUILD.md` added with w64devkit setup, raylib build, platform-specific steps
+All high/medium/low priority items from v0.0.9 have been completed.
+The profiling report's render filter (#4) and animation cache (#5) optimizations
+remain open in `docs/profilingreport.md` for future performance work.
 
 ---
 
@@ -2121,18 +2030,18 @@ make clean
 
 ### Current Tasks
 
-**Task 1.3: Equipment Rebalance** 🔲 TODO
+**Task 1.3: Equipment Rebalance** ✅ COMPLETE
 - `EQUIP_LEATHER_VEST`: add `+2 DEX` — `inventory.c` EQUIP_TABLE entry
 - `EQUIP_WOODEN_SHIELD`: add `+2 LCK` — `inventory.c` EQUIP_TABLE entry
 - Update descriptions to reflect new stats
 
-**Task 1.4: Mega-Crits** 🔲 TODO
+**Task 1.4: Mega-Crits** ✅ COMPLETE
 - If a crit produces damage > 100, 50% chance to double it again
 - Add constants `MEGA_CRIT_THRESHOLD` and `MEGA_CRIT_CHANCE` to `game/include/game_balance.h`
 - Apply in all 3 attack functions in `combat_system.c`: melee, ranged, throw
 - Log `"MEGA CRITICAL HIT!!"` in RED to combat log
 
-**Task 1.5: Floating Damage Numbers** 🔲 TODO
+**Task 1.5: Floating Damage Numbers** ✅ COMPLETE
 - Replace combat log damage messages with numbers that float above the hit target and fade out
 - Add `DamageNumber` struct and pool to `GameWorld` in `world.h`
 - Add `DamageNumber_Spawn()` and `DamageNumber_UpdateAll()` to `world.c`
@@ -2141,7 +2050,7 @@ make clean
 - Spawn a green heal number above the player on potion use in `inventory.c`
 - Messages should also float above the player (not just monsters)
 
-**Task 1.6: Dual Wield Single-Handed Weapons** 🔲 TODO
+**Task 1.6: Dual Wield Single-Handed Weapons** ✅ COMPLETE
 - Allow single-handed, non-ranged melee weapons to be equipped in `EQUIP_SLOT_OFF_HAND`
 - Add `IsWeaponDualWieldable(EquipType)` and `IsDualWielding(GameWorld*)` helpers to `inventory.h/.c`
 - Update `EquipItem()` to permit a dual-wieldable weapon in the off-hand slot
@@ -2272,6 +2181,7 @@ See `docs/VERSIONS.md` for Git tag mapping:
 
 | Version | Tag | Date | Focus |
 |---------|-----|------|-------|
+| v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.10 | `v0.0.10` | 2026-06-03 | Equipment rebalance, mega-crits, floating damage numbers, dual wield |
 | v0.0.9 | `v0.0.9` | 2026-06-03 | Bug fixes (7 critical: tile tearing, AI, magic, HP scaling, etc.) |
 | v0.0.8 | `v0.0.8` | 2026-06-02 | Refactoring (formulas, equipment bonus, floor init, tests, profiling, API docs) |
