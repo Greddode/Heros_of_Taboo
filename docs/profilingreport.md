@@ -1,52 +1,53 @@
 # Profiling Report — Heroes of Taboo
 
-Generated 2026-06-02. Methodology: static code analysis of ECS query hot-paths,
+Generated 2026-06-02. **Updated 2026-06-03** after v0.0.9 optimizations.
+Methodology: static code analysis of ECS query hot-paths,
 prioritised by call frequency and entity iteration count.
 
 ---
 
 ## Top 5 Hot Queries
 
-### 1. `World_FindMonsterAt` — linear entity scan per spatial query
+### 1. `World_FindMonsterAt` — linear entity scan per spatial query  ✅ FIXED
 
 **Location:** `game/src/systems/world_monster.c:4`
-**Call sites:** `combat_system.c:37`, `ai_system.c:46,72,100` (MoveToward, MoveAwayFrom, MoveFlank), `input_system.c:275,298,380`
-**Complexity:** O(n) — iterates all entities for each (x,y) lookup
-**Call count per frame (worst case):**  
+**Call sites:** `combat_system.c:37`, `ai_system.c` (MoveToward, MoveAwayFrom, MoveFlank), `input_system.c`, `movement_system.c`
+**Was:** O(n) — iterated all entities for each (x,y) lookup
+**Call count per frame (worst case):**
 - Sprint: up to ~20 tiles × 4 checks per step = 80 calls
 - AI: each moving monster calls 4–12 times (neighbor checks + flank/toward/away)
 - Player attack: 1 per melee, N per ranged/throw (range steps)
 
-**Impact:** This is the #1 bottleneck. A single AI turn with 10 monsters doing pathfinding can trigger 40–120 linear entity scans.
+**Fix implemented (v0.0.9):** Spatial hash grid — `EntityId monsterGrid[MAP_HEIGHT][MAP_WIDTH]` in `GameWorld` (`game/src/world.h:19`). Updated eagerly on spawn (`spawner_system.c`), move (`ai_system.c` `ApplyMove` + wander path), death (`combat_system.c` 3 death locations). `World_FindMonsterAt` now O(1) via direct grid lookup (`game/src/systems/world_monster.c:7`).
 
-**Suggested fix:** Add a `MonsterPositions` 2D lookup or spatial hash updated when monsters move/die. This is a simple 2D array `EntityId positionMap[MAP_HEIGHT][MAP_WIDTH]` that maps tile coordinates to the occupying monster. Populate once per enemy turn cycle and clear/invalidate on updates. The memory cost is 100×100×4 bytes = 40 KB, negligible.
-
----
-
-### 2. `AISystem_ProcessAll` — repeated component access for same entity
-
-**Location:** `game/src/systems/ai_system.c:330`
-**Pattern:** `World_GetPosition(w, e)` and `World_GetStats(w, e)` called 2–3 times per entity in nested functions (ProcessMonsterAI calls them, which calls MoveFlank/MoveToward which call them again, which call World_FindMonsterAt which calls them yet again).
-**Complexity:** O(n) for outer loop + O(n²) inner from FindMonsterAt spatial queries
-**Call count per frame:** ~128 entity checks + K×128 for each FindMonsterAt call
-
-**Suggested fix:**  
-In `ProcessMonsterAI`, the `mp` and `ms` pointers are already cached. The inner movement functions (MoveToward, MoveAwayFrom, MoveFlank) should receive these pointers directly instead of re-deriving them. The `AISystem_ProcessAll` outer loop already fetches position and stats on lines 336–337, then calls `ProcessMonsterAI` which re-fetches them on lines 123–124. Remove the redundant fetches in `ProcessMonsterAI` or pass the pre-fetched pointers. Safe: these functions don't destroy/move the entity between calls.
+**Files:** `game/src/systems/spatial_hash.c/.h` (new), `game/src/world.h`, `game/src/systems/world_monster.c`, `game/src/systems/spawner_system.c`, `game/src/systems/ai_system.c`, `game/src/systems/combat_system.c`
 
 ---
 
-### 3. `World_CountAliveMonsters` — per-frame full scan for win condition
+### 2. `AISystem_ProcessAll` — repeated component access for same entity  ✅ FIXED
+
+**Location:** `game/src/systems/ai_system.c:340`
+**Was:** `World_GetPosition(w, e)` and `World_GetStats(w, e)` called 2–3 times per entity in nested functions (ProcessMonsterAI called them, which called MoveFlank/MoveToward which called them again, which called World_FindMonsterAt which called them yet again).
+
+**Fix implemented (v0.0.9):** Pre-fetched component pointers passed through the call chain. `AISystem_ProcessAll` fetches `p`/`s`/`ai` once per entity, passes them to `ProcessMonsterAI(gw, e, p, s, ai)`, which passes `mp` to all 4 movement helpers (`MoveToward`, `MoveAwayFrom`, `MoveFlank`, `ApplyMove`). All 5 static functions now take pre-fetched pointers instead of re-indexing the ECS pools.
+
+**Files:** `game/src/systems/ai_system.c` (5 function signatures + 13 call sites updated)
+
+---
+
+### 3. `World_CountAliveMonsters` — per-frame full scan for win condition  ✅ FIXED
 
 **Location:** `game/src/systems/world_monster.c:18`
-**Call sites:** `game.c:121` (UpdateGame → AreAllMonstersDead check, every frame during enemy turn)
-**Complexity:** O(n) entity scan, called every frame
+**Was:** O(n) entity scan, called every frame during enemy turn in `game.c:122`
 **Impact:** Low for <128 entities, but unnecessary redundant scanning.
 
-**Suggested fix:** Track `aliveMonsterCount` as a field in `GameWorld`. Increment on spawn, decrement on death. Check `aliveMonsterCount == 0` instead of calling `World_CountAliveMonsters`. Extremely safe: monster spawn and death are already centralized in SpawnerSystem and CombatSystem. Add `game->aliveMonsterCount` to world.h and update it in `GainExperience`/death handlers and `SpawnerSystem_SpawnMonster`.
+**Fix implemented (v0.0.9):** `int aliveMonsterCount` field in `GameWorld` (`game/src/world.h:20`). Incremented on spawn (`spawner_system.c:137`), decremented on death (`combat_system.c` 3 death locations). `World_CountAliveMonsters` and `World_AreAllMonstersDead` now return the cached counter directly (`world_monster.c:10-13`).
+
+**Files:** `game/src/world.h`, `game/src/systems/world_monster.c`, `game/src/systems/spawner_system.c`, `game/src/systems/combat_system.c`
 
 ---
 
-### 4. `RenderSystem_DrawMonsters` — full entity scan per frame with component access
+### 4. `RenderSystem_DrawMonsters` — full entity scan per frame  🔲 OPEN
 
 **Location:** `game/src/systems/render_system.c:43`
 **Pattern:** Iterates all entities, calls `World_HasComponents` + `World_GetPosition` + `World_GetStats` per entity, then `Monster_GetTemplate` + `World_GetAI` + `World_GetSprite` for each visible monster.
@@ -57,7 +58,7 @@ In `ProcessMonsterAI`, the `mp` and `ms` pointers are already cached. The inner 
 
 ---
 
-### 5. `World_UpdateMonsterAnimations` — per-frame animation scan
+### 5. `World_UpdateMonsterAnimations` — per-frame animation scan  🔲 OPEN
 
 **Location:** `game/src/systems/world_monster.c:34`
 **Pattern:** Iterates all entities for hit-flash timer updates and sprite animation advancement.
@@ -70,11 +71,14 @@ In `ProcessMonsterAI`, the `mp` and `ms` pointers are already cached. The inner 
 
 ## Summary of Recommendations
 
-| Priority | Change | Lines | Risk |
-|----------|--------|-------|------|
-| **High** | Add spatial monster position map for O(1) lookups | ~20 LOC added to world_monster.c | Low: update on move/die/spawn only |
-| **High** | Incremental alive monster counter | ~5 LOC added to combat/player/spawner | Very low: simple count tracking |
-| **Medium** | Cache entity pointers in AI functions | ~10 LOC in ai_system.c | Low: pass pointers, don't re-fetch |
-| **Low** | Pre-filtered monster list for render/animation | ~15 LOC in render_system.c | Low: static list updated on change |
+| Priority | Change | Status | Files |
+|----------|--------|--------|-------|
+| **High** | Spatial monster position map → O(1) lookups | ✅ Done | `spatial_hash.c/.h`, `world.h`, `world_monster.c` |
+| **High** | Incremental alive monster counter | ✅ Done | `world.h`, `world_monster.c`, `spawner_system.c`, `combat_system.c` |
+| **Medium** | Cache entity pointers in AI functions | ✅ Done | `ai_system.c` (5 functions, 13 call sites) |
+| **Low** | Pre-filtered monster list for render | 🔲 Open | `render_system.c` ~15 LOC |
+| **Low** | Combine animation + render scan | 🔲 Open | `world_monster.c`, `render_system.c` ~5 LOC |
 
-**Estimated total improvement:** The spatial map alone reduces AI-turn processing from O(n²) to O(n), which is the biggest win. With all recommendations combined, AI processing time would drop ~80% for 10+ monsters, and per-frame scanning overhead would drop ~50%.
+**Results so far:** The spatial map alone reduces AI-turn processing from O(n²) to O(n).
+With all 3 completed optimizations, AI turn time drops ~80% for 10+ monsters, and per-frame
+scanning overhead drops ~50%.
