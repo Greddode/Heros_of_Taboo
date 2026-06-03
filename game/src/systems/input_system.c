@@ -256,9 +256,15 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
 
 void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
     (void)ui;
-    if ((game->state == STATE_PLAYER_TURN || game->state == STATE_ENEMY_TURN) && (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_Z))) {
-        game->state = STATE_MAP;
-        return;
+    if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_Z)) {
+        if (game->state == STATE_MAP) {
+            game->state = STATE_PLAYER_TURN;
+            return;
+        }
+        if (game->state == STATE_PLAYER_TURN || game->state == STATE_ENEMY_TURN) {
+            game->state = STATE_MAP;
+            return;
+        }
     }
     if (game->state != STATE_PLAYER_TURN) return;
     if (game->animTimer > 0.0f) return;
