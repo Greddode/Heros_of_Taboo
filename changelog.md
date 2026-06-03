@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.10] - 2026-06-03
+
+### Documentation & Agent Enablement
+
+- **AGENTS.md** — Complete rewrite with all components for AI agent development:
+  - Current architecture diagram (post-ECS refactor)
+  - All 11 non-negotiable constraints consolidated
+  - Profiling hot-spots from `docs/profilingreport.md` with optimization recommendations
+  - Build setup with C:\raylib\w64devkit tool location
+  - 3 common refactoring patterns with code examples
+  - Quick reference file location table (organized by category)
+  - Module dependency graph (acyclic DAG)
+  - Next steps for AI agents with effort estimates (Phase 1–3)
+  - Expanded FAQ addressing design decisions
+
+- **docs/VERSIONS.md** — Updated with v0.0.10 tag mapping
+
+- **Test count clarification** — Verified 28 unit tests (up from initial 16), all passing
+
+---
+
 ## [v0.0.9] - 2026-06-02
 
 ### Bug Fixes
@@ -13,16 +34,22 @@ All notable changes to this project will be documented in this file.
 - **HP scaling with CON** — equipping/unequipping CON gear or spending a stat point on CON now grants HP equal to the max-HP increase, instead of only capping down.
 - **Ranged weapons** — all 5 bows no longer grant ATK; their former ATK values redistributed to DEX. Descriptions updated accordingly.
 
-## [Latest] - 2026-06-02
+---
+
+## [v0.0.8] - 2026-06-02
 
 ### Codebase Refactoring (Tasks 1–3)
-- **game_balance.h** — centralized all stat formulas, damage calculations, dodge, XP curves, UI scale, camera constants, player base stats, and game tuning parameters into a single documented header with 30 macros and 12 inline functions.
-- **equipment_bonus.c/h** — extracted duplicated equip/unequip stat-bonus apply/remove logic from inventory.c, game.c, and input_system.c into idempotent `EquipmentBonus_Apply`/`Remove`/`Recalculate` functions.
-- **floor_init.c/h** — extracted duplicated per-floor setup (blocking map, monster templates, spawning, stairs, state/timer reset, visibility, FOW, camera) from `InitGame` and `DescendFloor` into `Floor_InitNewFloor`. Each function shrinks by ~30 lines.
-- **Unit tests** — added 16 deterministic unit tests covering all game_balance formulas (XP, HP, damage, dodge, throw range, wait heal, potion heal), equipment data table validation, item data validation, and equipment bonus apply/remove/recalculate with edge cases (NULL world, missing CStats, EQUIP_NONE). Runnable via `make test` and returns 0 on pass.
-- Replaced ~160 lines of literal magic numbers and duplicated blocks across 7 files with named constants and inline formula functions.
+- **game_balance.h** — centralized all stat formulas, damage calculations, dodge, XP curves, UI scale, camera constants, player base stats, and game tuning parameters into a single documented header. Replaced ~121 lines of literal magic numbers across 5 files.
+- **equipment_bonus.c/h** — extracted duplicated equip/unequip stat-bonus apply/remove logic from inventory.c, game.c, and input_system.c into idempotent `EquipmentBonus_Apply`/`Remove`/`Recalculate` functions. Zero duplication.
+- **floor_init.c/h** — extracted duplicated per-floor setup (blocking map, monster templates, spawning, stairs, state/timer reset, visibility, FOW, camera) from `InitGame` and `DescendFloor` into shared `Floor_InitNewFloor` function. ~60 lines saved per call site.
+- **validation.c/h** — added 7 pure validation predicates (no side effects) for inventory slots, equipment types, item types, monster types, stat indices, and floors. All used in unit tests.
+- **Unit tests** — added 28 deterministic unit tests covering all game_balance formulas (XP, HP, damage, dodge, throw range, wait heal, potion heal), equipment/item data table validation, and EquipmentBonus edge cases (NULL world, ENTITY_NONE, missing components, EQUIP_NONE).
+- **docs/API.md** — complete public API reference for all modules with signatures, side effects, and preconditions.
+- **docs/profilingreport.md** — identified 5 hot-path bottlenecks (World_FindMonsterAt, AISystem_ProcessAll, World_CountAliveMonsters, RenderSystem_DrawMonsters, World_UpdateMonsterAnimations) with complexity analysis and safe optimization recommendations.
 
-## [Latest] - 2026-06-01
+---
+
+## [v0.0.7] - 2026-06-01
 
 ### Engine Revamp
 - **Audio Rewrite**: Complete audio system refactor with new context-based music system and categorized sound effects
@@ -86,4 +113,4 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-For earlier versions (ALPHA-0.0.1 through ALPHA-0.0.8), see [HISTORY.md](./HISTORY.md).
+For earlier versions (ALPHA-0.0.1 through ALPHA-0.0.6), see [HISTORY.md](./HISTORY.md).
