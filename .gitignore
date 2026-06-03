@@ -15,3 +15,4 @@ obj
 *.exe
 *.obj
 game/-
+premake5.exe

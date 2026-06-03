@@ -11,6 +11,8 @@
 #include "world.h"
 #include "ecs.h"
 #include "resources.h"
+#include "systems/world_monster.h"
+#include "systems/spatial_hash.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -406,6 +408,160 @@ static bool test_clamp_int(void)
 }
 
 // =============================================================================
+// Spatial hash integration tests
+// =============================================================================
+
+static bool test_spatial_hash_basic(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    CHECK_EQ(gw.aliveMonsterCount, 0, "initial monster count is 0");
+
+    // spawn something that isn't a monster — should not touch grid
+    EntityId e = World_CreateEntity(&gw.ecs);
+    CHECK(e != ENTITY_NONE, "entity creation");
+    World_AddComponent(&gw.ecs, e, COMP_POSITION);
+    World_AddComponent(&gw.ecs, e, COMP_STATS);
+    World_GetStats(&gw.ecs, e)->alive = true;
+
+    // No COMP_AI — not a monster, not in grid
+    CHECK_EQ(World_FindMonsterAt(&gw, 5, 5, ENTITY_NONE), ENTITY_NONE, "no monster in grid");
+
+    // Create a real monster (with COMP_AI) and add to grid manually
+    EntityId m = World_CreateEntity(&gw.ecs);
+    CHECK(m != ENTITY_NONE, "monster entity creation");
+    World_AddComponent(&gw.ecs, m, COMP_POSITION);
+    World_AddComponent(&gw.ecs, m, COMP_STATS);
+    World_GetStats(&gw.ecs, m)->alive = true;
+    World_AddComponent(&gw.ecs, m, COMP_AI);
+
+    SpatialHash_Add(&gw, m, 10, 20);
+    CHECK_EQ(World_FindMonsterAt(&gw, 10, 20, ENTITY_NONE), m, "find monster at (10,20)");
+    CHECK_EQ(World_FindMonsterAt(&gw, 10, 21, ENTITY_NONE), ENTITY_NONE, "wrong tile returns none");
+
+    SpatialHash_Remove(&gw, m, 10, 20);
+    CHECK_EQ(World_FindMonsterAt(&gw, 10, 20, ENTITY_NONE), ENTITY_NONE, "removed monster not found");
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_spatial_hash_move(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    EntityId m = World_CreateEntity(&gw.ecs);
+    CHECK(m != ENTITY_NONE, "entity creation");
+    World_AddComponent(&gw.ecs, m, COMP_POSITION | COMP_STATS | COMP_AI);
+    World_GetStats(&gw.ecs, m)->alive = true;
+
+    CPosition* p = World_GetPosition(&gw.ecs, m);
+    p->x = 3; p->y = 4;
+
+    SpatialHash_Add(&gw, m, 3, 4);
+    CHECK_EQ(World_FindMonsterAt(&gw, 3, 4, ENTITY_NONE), m, "monster at start");
+
+    // Move to (5,6)
+    SpatialHash_Move(&gw, m, 3, 4, 5, 6);
+    CHECK_EQ(World_FindMonsterAt(&gw, 3, 4, ENTITY_NONE), ENTITY_NONE, "old tile cleared");
+    CHECK_EQ(World_FindMonsterAt(&gw, 5, 6, ENTITY_NONE), m, "monster at new tile");
+
+    // Move again to (0,0)
+    SpatialHash_Move(&gw, m, 5, 6, 0, 0);
+    CHECK_EQ(World_FindMonsterAt(&gw, 5, 6, ENTITY_NONE), ENTITY_NONE, "intermediate tile cleared");
+    CHECK_EQ(World_FindMonsterAt(&gw, 0, 0, ENTITY_NONE), m, "monster at (0,0)");
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_spatial_hash_exclude(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    EntityId a = World_CreateEntity(&gw.ecs);
+    EntityId b = World_CreateEntity(&gw.ecs);
+    CHECK(a != ENTITY_NONE && b != ENTITY_NONE, "entity creation");
+    World_AddComponent(&gw.ecs, a, COMP_POSITION | COMP_STATS | COMP_AI);
+    World_AddComponent(&gw.ecs, b, COMP_POSITION | COMP_STATS | COMP_AI);
+    World_GetStats(&gw.ecs, a)->alive = true;
+    World_GetStats(&gw.ecs, b)->alive = true;
+
+    SpatialHash_Add(&gw, a, 7, 7);
+    SpatialHash_Add(&gw, b, 7, 7);  // overwrites — two monsters can't share tile
+
+    // Without exclude, should find whatever is in the grid
+    CHECK_EQ(World_FindMonsterAt(&gw, 7, 7, ENTITY_NONE), b, "b occupies tile after overwrite");
+
+    // Excluding b should still find b in the grid (or none if grid is stale)
+    if (World_HasComponents(&gw.ecs, b, COMP_AI)) {
+        // grid has b — excluding b returns none
+        CHECK_EQ(World_FindMonsterAt(&gw, 7, 7, b), ENTITY_NONE, "exclude b returns none");
+    }
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_alive_monster_counter(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+    CHECK_EQ(gw.aliveMonsterCount, 0, "initial count zero");
+
+    // Spawn a monster (simulate what SpawnerSystem_SpawnMonster does)
+    EntityId m = World_CreateEntity(&gw.ecs);
+    CHECK(m != ENTITY_NONE, "entity creation");
+    World_AddComponent(&gw.ecs, m, COMP_POSITION | COMP_STATS | COMP_AI);
+    World_GetStats(&gw.ecs, m)->alive = true;
+    SpatialHash_Add(&gw, m, 0, 0);
+    gw.aliveMonsterCount++;
+
+    CHECK_EQ(gw.aliveMonsterCount, 1, "count after spawn");
+    CHECK_EQ(World_CountAliveMonsters(&gw), 1, "count function matches");
+
+    // Kill it (simulate combat death)
+    World_GetStats(&gw.ecs, m)->alive = false;
+    SpatialHash_Remove(&gw, m, 0, 0);
+    gw.aliveMonsterCount--;
+
+    CHECK_EQ(gw.aliveMonsterCount, 0, "count after death");
+    CHECK(World_AreAllMonstersDead(&gw), "all monsters dead");
+
+    // Reinit clears counter
+    GameWorld_Init(&gw);
+    CHECK_EQ(gw.aliveMonsterCount, 0, "count after reinit");
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_game_world_init_clears_grid(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    // After init, grid should be cleared (all ENTITY_NONE)
+    CHECK_EQ(World_FindMonsterAt(&gw, 50, 50, ENTITY_NONE), ENTITY_NONE, "init clears grid");
+
+    // Add something, reinit, verify cleared
+    EntityId m = World_CreateEntity(&gw.ecs);
+    World_AddComponent(&gw.ecs, m, COMP_POSITION | COMP_STATS | COMP_AI);
+    World_GetStats(&gw.ecs, m)->alive = true;
+    SpatialHash_Add(&gw, m, 30, 40);
+    CHECK_EQ(World_FindMonsterAt(&gw, 30, 40, ENTITY_NONE), m, "monster present");
+
+    GameWorld_Init(&gw);
+    CHECK_EQ(World_FindMonsterAt(&gw, 30, 40, ENTITY_NONE), ENTITY_NONE, "reinit clears grid");
+
+    TEST_PASS();
+    return true;
+}
+
+// =============================================================================
 // Test runner
 // =============================================================================
 
@@ -445,6 +601,13 @@ static struct {
     {"validate_stat_index",      test_validate_stat_index},
     {"validate_floor",           test_validate_floor},
     {"clamp_int",                test_clamp_int},
+
+    // Spatial hash / performance
+    {"spatial_hash_basic",       test_spatial_hash_basic},
+    {"spatial_hash_move",        test_spatial_hash_move},
+    {"spatial_hash_exclude",     test_spatial_hash_exclude},
+    {"alive_monster_counter",    test_alive_monster_counter},
+    {"game_world_init_clears_grid", test_game_world_init_clears_grid},
 };
 
 int main(void)

@@ -1,34 +1,27 @@
 #include "world_monster.h"
+#include "spatial_hash.h"
 #include <stddef.h>
 
 EntityId World_FindMonsterAt(GameWorld* gw, int x, int y, EntityId exclude) {
     if (!gw) return ENTITY_NONE;
-    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
-        if (!gw->ecs.alive[e]) continue;
-        if (e == exclude) continue;
-        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS | COMP_AI)) continue;
-        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
-        CPosition* p = World_GetPosition(&gw->ecs, e);
-        CStats* s = World_GetStats(&gw->ecs, e);
-        if (s->alive && p->x == x && p->y == y) return e;
-    }
+    if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return ENTITY_NONE;
+    EntityId e = gw->monsterGrid[y][x];
+    if (e == ENTITY_NONE || e == exclude) return ENTITY_NONE;
+    if (!gw->ecs.alive[e]) return ENTITY_NONE;
+    if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS | COMP_AI)) return ENTITY_NONE;
+    if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) return ENTITY_NONE;
+    if (World_GetStats(&gw->ecs, e)->alive) return e;
     return ENTITY_NONE;
 }
 
 int World_CountAliveMonsters(GameWorld* gw) {
     if (!gw) return 0;
-    int count = 0;
-    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
-        if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&gw->ecs, e, COMP_STATS | COMP_AI)) continue;
-        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
-        if (World_GetStats(&gw->ecs, e)->alive) count++;
-    }
-    return count;
+    return gw->aliveMonsterCount;
 }
 
 bool World_AreAllMonstersDead(GameWorld* gw) {
-    return World_CountAliveMonsters(gw) == 0;
+    if (!gw) return true;
+    return gw->aliveMonsterCount <= 0;
 }
 
 void World_UpdateMonsterAnimations(GameWorld* gw, float dt) {

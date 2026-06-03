@@ -8,7 +8,7 @@
 #include "game_audio.h"
 #include "ui/combat_log.h"
 
-bool MovementSystem_IsWalkable(const GameWorld* gw, int x, int y) {
+bool MovementSystem_IsWalkable(GameWorld* gw, int x, int y) {
     if (!gw || !gw->map) return false;
     if (x < 0 || x >= gw->map->width || y < 0 || y >= gw->map->height) return false;
     if (gw->blocking[y][x]) return false;

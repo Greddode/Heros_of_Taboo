@@ -13,6 +13,10 @@ typedef struct GameWorld {
     World ecs;
     EntityId playerEntity;
 
+    // Performance: monster spatial hash grid (tile → entity lookup)
+    EntityId monsterGrid[MAP_HEIGHT][MAP_WIDTH];
+    int aliveMonsterCount;
+
     // Map
     MapData* map;
     // Pointers into ResourceManager cache (owned by resources.c).

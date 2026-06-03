@@ -1,6 +1,7 @@
 #include "combat_system.h"
 #include "world.h"
 #include "world_monster.h"
+#include "spatial_hash.h"
 #include "inventory.h"
 #include <stddef.h>
 #include <math.h>
@@ -71,6 +72,11 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     if (ms->hp <= 0) {
         ms->alive = false;
         ms->hp = 0;
+        {
+            CPosition* dp = World_GetPosition(&game->ecs, mon);
+            SpatialHash_Remove(game, mon, dp->x, dp->y);
+        }
+        game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
         CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
     }
@@ -157,6 +163,11 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     if (ms->hp <= 0) {
         ms->alive = false;
         ms->hp = 0;
+        {
+            CPosition* dp = World_GetPosition(&game->ecs, target);
+            SpatialHash_Remove(game, target, dp->x, dp->y);
+        }
+        game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
         CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
     }
@@ -296,6 +307,11 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
             if (ms->hp <= 0) {
                 ms->alive = false;
                 ms->hp = 0;
+                {
+                    CPosition* dp = World_GetPosition(&game->ecs, target);
+                    SpatialHash_Remove(game, target, dp->x, dp->y);
+                }
+                game->aliveMonsterCount--;
                 GainExperience(game, ms->expValue);
                 CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
             }

@@ -2,6 +2,7 @@
 #include "data/loot_data.h"
 #include "data/monster_data.h"
 #include "world_monster.h"
+#include "spatial_hash.h"
 #include "resources.h"
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +130,9 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
 
     World_AddComponent(&gw->ecs, e, COMP_HIT_FLASH);
     World_GetHitFlash(&gw->ecs, e)->timer = 0;
+
+    SpatialHash_Add(gw, e, x, y);
+    gw->aliveMonsterCount++;
 
     return e;
 }

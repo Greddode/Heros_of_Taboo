@@ -3,6 +3,7 @@
 #include "ui/combat_log.h"
 #include "data/monster_data.h"
 #include "world_monster.h"
+#include "spatial_hash.h"
 #include <math.h>
 
 static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
@@ -110,13 +111,15 @@ static Direction MoveFlank(GameWorld* gw, EntityId mover, int targetX, int targe
 
 static void ApplyMove(GameWorld* gw, EntityId e, Direction dir) {
     CPosition* p = World_GetPosition(&gw->ecs, e);
+    int oldX = p->x, oldY = p->y;
     switch (dir) {
         case DIR_UP:    p->y--; break;
         case DIR_DOWN:  p->y++; break;
         case DIR_LEFT:  p->x--; break;
         case DIR_RIGHT: p->x++; break;
-        default: break;
+        default: return;
     }
+    SpatialHash_Move(gw, e, oldX, oldY, p->x, p->y);
 }
 
 static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
@@ -325,6 +328,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             }
             if (tx >= 0 && tx < mapWidth && ty >= 0 && ty < mapHeight &&
                 !gw->blocking[ty][tx] && World_FindMonsterAt(gw, tx, ty, monster) == ENTITY_NONE) {
+                SpatialHash_Move(gw, monster, mp->x, mp->y, tx, ty);
                 mp->x = tx;
                 mp->y = ty;
                 break;

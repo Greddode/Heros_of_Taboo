@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgl1-mesa-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev libxkbcommon-dev
+
+      - name: Build raylib
+        run: |
+          git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git raylib-master
+          cd raylib-master/src
+          make PLATFORM=PLATFORM_DESKTOP -j$(nproc)
+          mkdir -p ../../bin/Debug ../../bin/Release
+          cp libraylib.a ../../bin/Debug/
+          cp libraylib.a ../../bin/Release/
+
+      - name: Build project
+        run: make -C game config=debug_x64 -j$(nproc)
+
+      - name: Run unit tests
+        run: make -C game config=debug_x64 test
+
+  cross-compile-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW cross-compiler
+        run: sudo apt-get install -y -qq gcc-mingw-w64-x86-64
+
+      - name: Build raylib (MinGW)
+        run: |
+          git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git raylib-master
+          cd raylib-master/src
+          make CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar \
+            PLATFORM=PLATFORM_DESKTOP -j$(nproc)
+          mkdir -p ../../bin/Debug ../../bin/Release
+          cp libraylib.a ../../bin/Debug/
+          cp libraylib.a ../../bin/Release/
+
+      - name: Cross-compile project
+        run: make -C game config=release_x64 -j$(nproc) CC=x86_64-w64-mingw32-gcc
