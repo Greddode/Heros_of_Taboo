@@ -1,6 +1,7 @@
 #include "world.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 void GameWorld_Init(GameWorld* gw) {
     memset(gw, 0, sizeof(GameWorld));
@@ -32,5 +33,38 @@ void DamageNumber_UpdateAll(DamageNumberPool* pool, float dt) {
         pool->entries[i].pos.y -= DAMAGE_NUMBER_FLOAT_SPEED * dt;
         if (pool->entries[i].timer <= 0.0f)
             pool->entries[i].active = false;
+    }
+}
+
+void FloatMsg_Spawn(GameWorld* gw, int tileX, int tileY, Color color, const char* fmt, ...) {
+    if (!gw || !fmt) return;
+    for (int i = 0; i < MAX_FLOAT_MSGS; i++) {
+        if (!gw->floatMsgs.entries[i].active) {
+            va_list args;
+            va_start(args, fmt);
+            vsnprintf(gw->floatMsgs.entries[i].text, sizeof(gw->floatMsgs.entries[i].text), fmt, args);
+            va_end(args);
+            gw->floatMsgs.entries[i].worldX = (float)(tileX * gw->map->tileWidth + gw->map->tileWidth / 2);
+            gw->floatMsgs.entries[i].worldY = (float)(tileY * gw->map->tileHeight);
+            gw->floatMsgs.entries[i].velY = FLOAT_MSG_VEL_Y;
+            gw->floatMsgs.entries[i].alpha = 1.0f;
+            gw->floatMsgs.entries[i].lifetime = FLOAT_MSG_LIFETIME;
+            gw->floatMsgs.entries[i].color = color;
+            gw->floatMsgs.entries[i].active = true;
+            return;
+        }
+    }
+}
+
+void FloatMsg_UpdateAll(GameWorld* gw, float dt) {
+    if (!gw) return;
+    for (int i = 0; i < MAX_FLOAT_MSGS; i++) {
+        if (!gw->floatMsgs.entries[i].active) continue;
+        gw->floatMsgs.entries[i].lifetime -= dt;
+        gw->floatMsgs.entries[i].worldY += gw->floatMsgs.entries[i].velY * dt;
+        gw->floatMsgs.entries[i].alpha = gw->floatMsgs.entries[i].lifetime / FLOAT_MSG_LIFETIME;
+        if (gw->floatMsgs.entries[i].alpha < 0.0f) gw->floatMsgs.entries[i].alpha = 0.0f;
+        if (gw->floatMsgs.entries[i].lifetime <= 0.0f)
+            gw->floatMsgs.entries[i].active = false;
     }
 }

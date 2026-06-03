@@ -44,6 +44,7 @@ void UpdateGame(GameWorld* game) {
     if (!game) return;
 
     DamageNumber_UpdateAll(&game->damageNumbers, GetFrameTime());
+    FloatMsg_UpdateAll(game, GetFrameTime());
 
     World* w = &game->ecs;
 
@@ -126,11 +127,17 @@ void UpdateGame(GameWorld* game) {
                 if (!game->escapeSpawned) {
                     SpawnEscapeTile(game);
                     game->escapeSpawned = true;
-                    CombatLog_Add(&game->combatLog, GREEN, "A teleport circle has appeared somewhere for you to escape!");
+                    {
+                        const CPosition* pp = World_GetPosition(w, game->playerEntity);
+                        FloatMsg_Spawn(game, pp->x, pp->y, SKYBLUE, "Escape!");
+                    }
                 }
             } else if (!game->floorClearedNotified) {
                 game->floorClearedNotified = true;
-                CombatLog_Add(&game->combatLog, YELLOW, "This floor sounds eerily quiet now...");
+                {
+                    const CPosition* pp = World_GetPosition(w, game->playerEntity);
+                    FloatMsg_Spawn(game, pp->x, pp->y, GOLD, "Floor Clear!");
+                }
             }
         }
 
@@ -329,8 +336,11 @@ void DescendFloor(GameWorld* game) {
 
     char floorMsg[64];
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);
-    CombatLog_Add(&game->combatLog, BLACK, floorMsg);
     TraceLog(LOG_INFO, "%s", floorMsg);
+    {
+        CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+        FloatMsg_Spawn(game, pp->x, pp->y, WHITE, "Floor %d", game->currentFloor);
+    }
 }
 
 bool InitGame(GameWorld* game, const char* tmxFile) {

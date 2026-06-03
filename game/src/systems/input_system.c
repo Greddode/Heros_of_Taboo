@@ -337,8 +337,8 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
         }
     } else if (IsKeyPressed(KEY_PERIOD) || IsKeyPressed(KEY_SPACE)) {
         game->sprintBypassRoom = false; game->turnCount++; game->timeWaited++;
-        if (game->timeWaited >= 15 && !game->shadowSpawned && game->currentFloor < game->maxFloors) { SpawnShadow(game); game->shadowSpawned = true; CombatLog_Add(&game->combatLog, RED, "You feel a presence come to this floor"); CombatLog_Add(&game->combatLog, RED, "What a horrible night to have a curse..."); }
-        if (ps && ps->hp < ps->maxHp) { int waitHeal = 1 + (ps->intel / 2); ps->hp += waitHeal; if (ps->hp > ps->maxHp) ps->hp = ps->maxHp; CombatLog_Add(&game->combatLog, BLACK, "Wait heals %d HP", waitHeal); }
+        if (game->timeWaited >= 15 && !game->shadowSpawned && game->currentFloor < game->maxFloors) { SpawnShadow(game); game->shadowSpawned = true; if (ppos) FloatMsg_Spawn(game, ppos->x, ppos->y, (Color){80, 0, 120, 255}, "A Shadow stirs..."); }
+        if (ps && ps->hp < ps->maxHp) { int waitHeal = 1 + (ps->intel / 2); ps->hp += waitHeal; if (ps->hp > ps->maxHp) ps->hp = ps->maxHp; if (ppos) FloatMsg_Spawn(game, ppos->x, ppos->y, GREEN, "+%d HP", waitHeal); }
         game->enemyTurnCooldown = 0.08f; game->state = STATE_ENEMY_TURN; return;
     }
 

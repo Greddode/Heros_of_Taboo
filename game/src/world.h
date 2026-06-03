@@ -12,6 +12,24 @@
 #define DAMAGE_NUMBER_LIFETIME 0.8f
 #define DAMAGE_NUMBER_FLOAT_SPEED 20.0f
 
+#define MAX_FLOAT_MSGS 16
+#define FLOAT_MSG_LIFETIME 1.5f
+#define FLOAT_MSG_VEL_Y -30.0f
+
+typedef struct {
+    bool active;
+    char text[64];
+    float worldX, worldY;
+    float velY;
+    float alpha;
+    float lifetime;
+    Color color;
+} FloatMsg;
+
+typedef struct {
+    FloatMsg entries[MAX_FLOAT_MSGS];
+} FloatMsgPool;
+
 typedef struct {
     bool active;
     char text[16];
@@ -35,6 +53,8 @@ typedef struct GameWorld {
 
     // Floating damage numbers
     DamageNumberPool damageNumbers;
+    // Floating status messages
+    FloatMsgPool floatMsgs;
 
     // Map
     MapData* map;
@@ -105,5 +125,8 @@ void GameWorld_Init(GameWorld* gw);
 
 void DamageNumber_Spawn(DamageNumberPool* pool, int value, int tileX, int tileY, int tw, int th, Color color);
 void DamageNumber_UpdateAll(DamageNumberPool* pool, float dt);
+
+void FloatMsg_Spawn(GameWorld* gw, int tileX, int tileY, Color color, const char* fmt, ...);
+void FloatMsg_UpdateAll(GameWorld* gw, float dt);
 
 #endif

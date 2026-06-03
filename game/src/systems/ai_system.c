@@ -164,7 +164,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
             if (GetRandomValue(1, 100) <= ms->lck) {
                 dmg = dmg * 2;
                 if (dmg < 1) dmg = 1;
-                CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
             }
 
             playerStats->hp -= dmg;
@@ -236,7 +236,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
-                    CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                    FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
@@ -295,7 +295,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
-                    CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                    FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
