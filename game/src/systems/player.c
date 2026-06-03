@@ -2,7 +2,6 @@
 #include "game.h"
 #include "world.h"
 #include "game_audio.h"
-#include "ui/combat_log.h"
 #include "game_balance.h"
 #include <stdio.h>
 

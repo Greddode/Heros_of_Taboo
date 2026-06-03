@@ -2,7 +2,6 @@
 #include "map/map_helpers.h"
 #include "systems/renderer.h"
 #include "data/monster_data.h"
-#include "ui/combat_log.h"
 
 #include <stdio.h>
 #include <math.h>

@@ -1,7 +1,6 @@
 #include "game.h"
 #include "systems/render_system.h"
 #include "systems/spawner_system.h"
-#include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include "ui/inventory_ui.h"
 #include "resources.h"
@@ -352,13 +351,6 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
     DrawText(infoText, panelX, textY, (int)(14 * scale), BLACK);
 
     // Combat log (bottom-right)
-    {
-        Texture2D* logFrame = Resources_LoadTexture("resources/sprites/ui/UI_Flat_Frame01a.png");
-        Texture2D* logSlot = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
-        CombatLog_Render(&game->combatLog, GetScreenWidth() - (int)(370 * scale), GetScreenHeight() - (int)(10 * scale), 14, (int)(18 * scale),
-                         logFrame && logFrame->id > 0 ? *logFrame : (Texture2D){0}, 16,
-                         logSlot && logSlot->id > 0 ? *logSlot : (Texture2D){0}, 8);
-    }
 
     // Monster info (top-right)
     float iscale = GetUIScale();
