@@ -122,13 +122,17 @@ static void DrawInventoryTab(const GameWorld* game, const InventoryUIState* ui, 
     // Action-menu popup
     if (ui->subState == INV_ACTION_MENU && total > 0) {
         bool isEquip = IsInventorySlotEquip(game, ui->selection);
-        const char* actions[4];
+        int equipIdx = isEquip ? ui->selection - game->inventorySlotCount : -1;
+        EquipType eType = isEquip ? game->equipInventory[equipIdx] : EQUIP_NONE;
+        bool canDual = isEquip && IsWeaponDualWieldable(eType);
+        const char* actions[5];
         int actionCount;
         if (isEquip) {
             actions[0] = "Equip";
-            actions[1] = "Drop";
-            actions[2] = "Back";
-            actionCount = 3;
+            actions[1] = canDual ? "Dual Wield" : "Drop";
+            actions[2] = canDual ? "Drop" : "Back";
+            actions[3] = canDual ? "Back" : NULL;
+            actionCount = canDual ? 4 : 3;
         } else {
             actions[0] = "Use";
             actions[1] = "Drop";

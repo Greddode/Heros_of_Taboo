@@ -94,6 +94,10 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
             if (GetRandomValue(1, 100) <= as->lck) {
                 offDmg *= CRIT_MULT;
                 offColor = ORANGE;
+                {
+                    CPosition* ap = World_GetPosition(&game->ecs, attackerId);
+                    FloatMsg_Spawn(game, ap->x, ap->y, ORANGE, "Off-hand!");
+                }
             }
             if (offDmg > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
                 offDmg *= 2;

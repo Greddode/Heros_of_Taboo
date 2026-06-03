@@ -194,7 +194,10 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) { ui->subState = INV_ACTION_MENU; ui->actionSelection = 0; }
         } else if (ui->subState == INV_ACTION_MENU && ui->tab == INV_TAB_INVENTORY) {
             bool isEquip = ui->selection >= game->inventorySlotCount;
-            int maxAction = isEquip ? 2 : 3;
+            int equipIdx = isEquip ? ui->selection - game->inventorySlotCount : -1;
+            EquipType eType = isEquip ? game->equipInventory[equipIdx] : EQUIP_NONE;
+            bool canDual = isEquip && IsWeaponDualWieldable(eType);
+            int maxAction = isEquip ? (canDual ? 3 : 2) : 3;
             if (IsKeyPressed(KEY_UP) && ui->actionSelection > 0) ui->actionSelection--;
             if (IsKeyPressed(KEY_DOWN) && ui->actionSelection < maxAction) ui->actionSelection++;
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
@@ -204,7 +207,17 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                         if (EquipItem(game, game->equipInventory[equipIdx])) RemoveEquipFromInventory(game, equipIdx);
                         ui->subState = INV_BROWSE;
                         if (ui->selection >= game->inventorySlotCount + game->equipInventoryCount) ui->selection = game->inventorySlotCount + game->equipInventoryCount - 1;
-                    } else if (ui->actionSelection == 1) {
+                    } else if (canDual && ui->actionSelection == 1) {
+                        int equipIdx = ui->selection - game->inventorySlotCount;
+                        EquipType eType = game->equipInventory[equipIdx];
+                        if (game->equipped[EQUIP_SLOT_OFF_HAND] != EQUIP_NONE)
+                            UnequipSlot(game, EQUIP_SLOT_OFF_HAND);
+                        RemoveEquipFromInventory(game, equipIdx);
+                        game->equipped[EQUIP_SLOT_OFF_HAND] = eType;
+                        EquipmentBonus_Apply(&game->ecs, pe, eType);
+                        if (ppos) FloatMsg_Spawn(game, ppos->x, ppos->y, WHITE, "Dual wielding!");
+                        ui->subState = INV_BROWSE;
+                    } else if (ui->actionSelection == (canDual ? 2 : 1)) {
                         int equipIdx = ui->selection - game->inventorySlotCount;
                         EquipType eType = game->equipInventory[equipIdx];
                         const EquipData* d = GetEquipData(eType);
