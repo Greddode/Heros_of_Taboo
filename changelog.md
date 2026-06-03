@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.9] - 2026-06-02
+
+### Bug Fixes
+- **Tile tearing** — `TileToScreen` now snaps to whole pixels, preventing sub-pixel positions during player movement.
+- **Inspector word wrap** — fixed buffer overflow (256→512), single-word overflow dropped silently, and `maxWidth` corrected to account for left/right padding.
+- **Ranged AI priority** — ranged monsters now: retreat if adjacent, flank into cardinal line if diagonal, advance if out of range, or hold position.
+- **Magic defense formula** — changed from `intel * 3` to `defense / 2 + intel * 2`, making both DEF and INT meaningful against magic attacks.
+- **Map close keys** — pressing M or Z while map is open already closes it (verified, no change needed).
+- **HP scaling with CON** — equipping/unequipping CON gear or spending a stat point on CON now grants HP equal to the max-HP increase, instead of only capping down.
+- **Ranged weapons** — all 5 bows no longer grant ATK; their former ATK values redistributed to DEX. Descriptions updated accordingly.
+
 ## [Latest] - 2026-06-02
 
 ### Codebase Refactoring (Tasks 1–3)
