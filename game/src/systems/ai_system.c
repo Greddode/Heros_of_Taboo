@@ -159,9 +159,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             if (ai->attackType == ATTACK_RANGED) {
                 dmg = ms->attack + (int)(ms->dex * 1.5f) - playerStats->defense;
             } else {
-                dmg = ms->attack + ms->intel;
-                int magicRes = playerStats->intel * 3;
-                dmg -= magicRes;
+                int magicDef = playerStats->defense / 2 + playerStats->intel * 2;
+                dmg = ms->attack + ms->intel - magicDef;
             }
             if (dmg < 1) dmg = 1;
 
@@ -260,9 +259,16 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, playerX, playerY);
             if (flankDir != DIR_NONE) ApplyMove(gw, monster, flankDir);
         } else {
-            Direction kiteDir = MoveAwayFrom(gw, monster, playerX, playerY);
-            if (kiteDir == DIR_NONE) kiteDir = MoveToward(gw, monster, playerX, playerY);
-            if (kiteDir != DIR_NONE) ApplyMove(gw, monster, kiteDir);
+            if (dist <= 1) {
+                Direction awayDir = MoveAwayFrom(gw, monster, playerX, playerY);
+                if (awayDir != DIR_NONE) ApplyMove(gw, monster, awayDir);
+            } else if (dist <= ai->attackRange && dx != 0 && dy != 0) {
+                Direction flankDir = MoveFlank(gw, monster, playerX, playerY);
+                if (flankDir != DIR_NONE) ApplyMove(gw, monster, flankDir);
+            } else if (dist > ai->attackRange) {
+                Direction towardDir = MoveToward(gw, monster, playerX, playerY);
+                if (towardDir != DIR_NONE) ApplyMove(gw, monster, towardDir);
+            }
         }
         if (ai->attackType != ATTACK_MELEE) return;
     }

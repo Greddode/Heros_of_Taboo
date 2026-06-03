@@ -71,11 +71,11 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
     { EQUIP_BERSERKER_BAND,    "Berserker Band",     "Strength at a cost.\n+5 STR, -2 DEF",            "resources/sprites/items/equipment/accessories/fallback_ring.png",    EQUIP_CAT_ACCESSORY, EQUIP_SLOT_ACCESSORY, 0, -2, 0, 5,0,0,0,0, false, false },
 
     // Ranged weapons
-    { EQUIP_SIMPLE_BOW,    "Simple Bow",       "A rough hunting bow.\n+3 ATK, +1 DEX\nRange: 4",   "resources/sprites/items/equipment/weapons/simple_bow.png",   EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 3, 0, 0, 0,1,0,0,0, true, true },
-    { EQUIP_DWARVEN_BOW,   "Dwarven Bow",      "A stout dwarven shortbow.\n+5 ATK, +2 DEX\nRange: 5", "resources/sprites/items/equipment/weapons/dwarven_bow.png", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 5, 0, 0, 0,2,0,0,0, true, true },
-    { EQUIP_ELVEN_BOW,     "Elven Bow",        "A graceful elven longbow.\n+7 ATK, +4 DEX\nRange: 7", "resources/sprites/items/equipment/weapons/elven_bow.png",   EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 7, 0, 0, 0,4,0,0,0, true, true },
-    { EQUIP_GREATBOW,      "Greatbow",         "A massive war bow.\n+10 ATK, +2 DEX\nRange: 8",     "resources/sprites/items/equipment/weapons/greatbow.png",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 10, 0, 0, 0,2,0,0,0, true, true },
-    { EQUIP_CROSSBOW,      "Crossbow",         "A mechanical crossbow.\n+8 ATK, +3 DEX\nRange: 6",   "resources/sprites/items/equipment/weapons/crossbow.png",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 8, 0, 0, 0,3,0,0,0, true, true },
+    { EQUIP_SIMPLE_BOW,    "Simple Bow",       "A rough hunting bow.\n+3 DEX\nRange: 4",   "resources/sprites/items/equipment/weapons/simple_bow.png",   EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 0, 0, 0, 0,3,0,0,0, true, true },
+    { EQUIP_DWARVEN_BOW,   "Dwarven Bow",      "A stout dwarven shortbow.\n+5 DEX\nRange: 5", "resources/sprites/items/equipment/weapons/dwarven_bow.png", EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 0, 0, 0, 0,5,0,0,0, true, true },
+    { EQUIP_ELVEN_BOW,     "Elven Bow",        "A graceful elven longbow.\n+8 DEX\nRange: 7", "resources/sprites/items/equipment/weapons/elven_bow.png",   EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 0, 0, 0, 0,8,0,0,0, true, true },
+    { EQUIP_GREATBOW,      "Greatbow",         "A massive war bow.\n+9 DEX\nRange: 8",     "resources/sprites/items/equipment/weapons/greatbow.png",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 0, 0, 0, 0,9,0,0,0, true, true },
+    { EQUIP_CROSSBOW,      "Crossbow",         "A mechanical crossbow.\n+7 DEX\nRange: 6",   "resources/sprites/items/equipment/weapons/crossbow.png",     EQUIP_CAT_WEAPON, EQUIP_SLOT_WEAPON, 0, 0, 0, 0,7,0,0,0, true, true },
 };
 
 // ---- Helpers ---------------------------------------------------------------

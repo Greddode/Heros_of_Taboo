@@ -7,7 +7,7 @@
 #include <string.h>
 
 static int DrawWrappedLine(const char* text, int x, int y, int maxWidth, int fontSize, Color color) {
-    char lineBuf[256] = "";
+    char lineBuf[512] = "";
     const char* word = text;
     while (*word) {
         while (*word == ' ') word++;
@@ -17,16 +17,21 @@ static int DrawWrappedLine(const char* text, int x, int y, int maxWidth, int fon
         int wordLen = (int)(wordEnd - word);
         int curLen = (int)strlen(lineBuf);
         int sep = (curLen > 0) ? 1 : 0;
-        char testBuf[256];
+        char testBuf[512];
         memcpy(testBuf, lineBuf, curLen);
         if (sep) testBuf[curLen] = ' ';
         memcpy(testBuf + curLen + sep, word, wordLen);
         testBuf[curLen + sep + wordLen] = '\0';
-        if (MeasureText(testBuf, fontSize) > maxWidth && curLen > 0) {
-            DrawText(lineBuf, x, y, fontSize, color);
-            y += fontSize + 4;
-            memcpy(lineBuf, word, wordLen);
-            lineBuf[wordLen] = '\0';
+        if (MeasureText(testBuf, fontSize) > maxWidth) {
+            if (curLen > 0) {
+                DrawText(lineBuf, x, y, fontSize, color);
+                y += fontSize + 4;
+                memcpy(lineBuf, word, wordLen);
+                lineBuf[wordLen] = '\0';
+            } else {
+                memcpy(lineBuf, word, wordLen);
+                lineBuf[wordLen] = '\0';
+            }
         } else {
             if (sep) lineBuf[curLen] = ' ';
             memcpy(lineBuf + curLen + sep, word, wordLen);
@@ -139,7 +144,7 @@ void Inspector_Render(const GameWorld* game, InspectorType type, int x, int y, i
 
             int descSize = (int)(14 * scale);
             const char* desc = d->description;
-            int descH = DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
+            int descH = DrawDesc(desc, lx, ly, (x + w) - lx - (int)(10 * scale), descSize, BLACK);
             ly += descH + (int)(4 * scale);
 
             ly += (int)(40 * scale);
@@ -197,7 +202,7 @@ void Inspector_Render(const GameWorld* game, InspectorType type, int x, int y, i
 
             const char* desc = GetItemDescription(selType);
             int descSize = (int)(14 * scale);
-            int descH = DrawDesc(desc, lx, ly, w - (int)(20 * scale), descSize, BLACK);
+            int descH = DrawDesc(desc, lx, ly, (x + w) - lx - (int)(10 * scale), descSize, BLACK);
             ly += descH + (int)(4 * scale);
 
             snprintf(buf, sizeof(buf), "Qty: %d", game->inventory[selectedSlot].quantity);

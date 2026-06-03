@@ -47,7 +47,10 @@ void EquipmentBonus_Recalculate(World* w, EntityId unit)
     if (!World_HasComponents(w, unit, COMP_STATS)) return;
 
     CStats* s = World_GetStats(w, unit);
+    int oldMax = s->maxHp;
     s->maxHp = calc_max_hp(s->con);
-    if (s->hp > s->maxHp)
-        s->hp = s->maxHp;
+    if (s->maxHp > oldMax && oldMax > 0)
+        s->hp += (s->maxHp - oldMax);
+    if (s->hp > s->maxHp) s->hp = s->maxHp;
+    if (s->hp < 1)        s->hp = 1;
 }

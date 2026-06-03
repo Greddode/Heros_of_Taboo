@@ -116,7 +116,7 @@ void RevealFOW(GameWorld* game) {
 }
 
 Vector2 TileToScreen(int x, int y, int tw, int th) {
-    return (Vector2){ (float)(x * tw), (float)(y * th) };
+    return (Vector2){ (float)((int)(x * tw)), (float)((int)(y * th)) };
 }
 
 void SpawnEscapeTile(GameWorld* game) {

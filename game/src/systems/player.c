@@ -37,8 +37,12 @@ bool AllocateStatPoint(CStats* s, int statIdx) {
         default: return false;
     }
     s->statPoints--;
+    int oldMax = s->maxHp;
     s->maxHp = calc_max_hp(s->con);
+    if (s->maxHp > oldMax && oldMax > 0)
+        s->hp += (s->maxHp - oldMax);
     if (s->hp > s->maxHp) s->hp = s->maxHp;
+    if (s->hp < 1)        s->hp = 1;
     return true;
 }
 
