@@ -1,6 +1,5 @@
 #include "ai_system.h"
 #include "game_audio.h"
-#include "ui/combat_log.h"
 #include "data/monster_data.h"
 #include "world_monster.h"
 #include "spatial_hash.h"
@@ -148,7 +147,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
             if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;
-                CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                 return;
             }
 
@@ -164,7 +162,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
             if (GetRandomValue(1, 100) <= ms->lck) {
                 dmg = dmg * 2;
                 if (dmg < 1) dmg = 1;
-                CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
             }
 
             playerStats->hp -= dmg;
@@ -215,7 +213,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
             else GameAudio_PlayRangedAttackSound();
             TraceLog(LOG_INFO, "%s %s you for %d damage (HP: %d)!",
                      World_GetName(&gw->ecs, monster)->name, verb, dmg, playerStats->hp);
-            CombatLog_Add(&gw->combatLog, BLACK, "%s %s you for %d!", World_GetName(&gw->ecs, monster)->name, verb, dmg);
             return;
         }
 
@@ -228,7 +225,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                     CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                     hf->timer = 0.15f;
-                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                     return;
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
@@ -236,7 +232,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
-                    CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                    FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
@@ -252,7 +248,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 phf2->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
-                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", World_GetName(&gw->ecs, monster)->name, dmg);
                 return;
             }
         }
@@ -287,7 +282,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
                     CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                     hf->timer = 0.15f;
-                    CombatLog_Add(&gw->combatLog, BLACK, "You dodge the %s's attack!", World_GetName(&gw->ecs, monster)->name);
                     return;
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
@@ -295,7 +289,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
-                    CombatLog_Add(&gw->combatLog, BLACK, "Critical hit!");
+                    FloatMsg_Spawn(gw, playerX, playerY, ORANGE, "Critical!");
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
@@ -311,7 +305,6 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 phf->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
-                CombatLog_Add(&gw->combatLog, BLACK, "%s hits you for %d!", World_GetName(&gw->ecs, monster)->name, dmg);
                 return;
             }
         }

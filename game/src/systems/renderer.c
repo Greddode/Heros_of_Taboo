@@ -1,7 +1,6 @@
 #include "game.h"
 #include "systems/render_system.h"
 #include "systems/spawner_system.h"
-#include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include "ui/inventory_ui.h"
 #include "resources.h"
@@ -280,6 +279,18 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
         DrawText(dn->text, (int)(dn->pos.x - tw / 2), (int)dn->pos.y, fs, c);
     }
 
+    // Floating status messages (world-space)
+    for (int i = 0; i < MAX_FLOAT_MSGS; i++) {
+        if (!game->floatMsgs.entries[i].active) continue;
+        FloatMsg* fm = &game->floatMsgs.entries[i];
+        Color c = fm->color;
+        c.a = (unsigned char)(255.0f * fm->alpha);
+        int fs = (int)(16.0f * game->camera.zoom / DEFAULT_CAMERA_ZOOM);
+        if (fs < 12) fs = 12;
+        int tw = MeasureText(fm->text, fs);
+        DrawText(fm->text, (int)(fm->worldX - tw / 2), (int)fm->worldY, fs, c);
+    }
+
     EndMode2D();
 
     // HUD (screen space)
@@ -340,13 +351,6 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
     DrawText(infoText, panelX, textY, (int)(14 * scale), BLACK);
 
     // Combat log (bottom-right)
-    {
-        Texture2D* logFrame = Resources_LoadTexture("resources/sprites/ui/UI_Flat_Frame01a.png");
-        Texture2D* logSlot = Resources_LoadTexture("resources/sprites/ui/UI_Flat_FrameSlot01b.png");
-        CombatLog_Render(&game->combatLog, GetScreenWidth() - (int)(370 * scale), GetScreenHeight() - (int)(10 * scale), 14, (int)(18 * scale),
-                         logFrame && logFrame->id > 0 ? *logFrame : (Texture2D){0}, 16,
-                         logSlot && logSlot->id > 0 ? *logSlot : (Texture2D){0}, 8);
-    }
 
     // Monster info (top-right)
     float iscale = GetUIScale();

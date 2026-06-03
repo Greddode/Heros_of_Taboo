@@ -6,7 +6,6 @@
 #include "map/map_helpers.h"
 #include "inventory.h"
 #include "game_audio.h"
-#include "ui/combat_log.h"
 
 bool MovementSystem_IsWalkable(GameWorld* gw, int x, int y) {
     if (!gw || !gw->map) return false;
@@ -55,7 +54,7 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
         gw->state = STATE_ENEMY_TURN;
 
         // Collect potions
-        {
+        if (gw->inventorySlotCount < MAX_INVENTORY_SLOTS) {
             ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS];
             int pCount = SpawnerSystem_CollectPickupsAt(gw, ppos->x, ppos->y, pTypes, pQtys, MAX_POTIONS);
             for (int i = 0; i < pCount; i++) {
@@ -65,13 +64,14 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                     else break;
                 }
                 if (picked > 0) {
-                    CombatLog_Add(&gw->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i]));
                     GameAudio_PlayPickupSound();
                 }
             }
+        } else if (gw->inventorySlotCount >= MAX_INVENTORY_SLOTS) {
+            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
         // Collect equipment
-        {
+        if (gw->equipInventoryCount < MAX_INVENTORY_SLOTS) {
             EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP];
             int eCount = SpawnerSystem_CollectEquipAt(gw, ppos->x, ppos->y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
             for (int i = 0; i < eCount; i++) {
@@ -82,11 +82,12 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                 }
                 if (picked > 0) {
                     const EquipData* d = GetEquipData(eTypes[i]);
-                    CombatLog_Add(&gw->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
                     GameAudio_PlayPickupSound();
                     SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
                 }
             }
+        } else if (gw->equipInventoryCount >= MAX_INVENTORY_SLOTS) {
+            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
 
         // Stair / escape checks

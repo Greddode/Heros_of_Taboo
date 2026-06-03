@@ -1,9 +1,10 @@
 #include "game.h"
-#include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include "resources.h"
 #include "game_balance.h"
 #include "equipment_bonus.h"
+#include "systems/spawner_system.h"
+#include "systems/world_monster.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -144,9 +145,6 @@ bool InventoryUse(GameWorld* game, int slot) {
             int th = game->map->tileHeight;
             DamageNumber_Spawn(&game->damageNumbers, heal, pp->x, pp->y, tw, th, GREEN);
         }
-        CombatLog_Add(&game->combatLog, BLACK, "Used %s - restores %d%% (+%d HP, MGCx%.0f%%)!",
-                      GetItemName(s->type), healPercent, heal,
-                      (1.0f + (float)ps->intel * POTION_INT_SCALE) * 100);
     }
 
     s->quantity--;
@@ -203,7 +201,6 @@ bool EquipItem(GameWorld* game, EquipType type) {
     }
 
     if (slotIdx == EQUIP_SLOT_OFF_HAND && IsTwoHandedEquipped(game)) {
-        CombatLog_Add(&game->combatLog, BLACK, "Cannot equip off-hand with a two-handed weapon!");
         return false;
     }
 
@@ -219,7 +216,6 @@ bool EquipItem(GameWorld* game, EquipType type) {
 
     game->equipped[slotIdx] = type;
 
-    CombatLog_Add(&game->combatLog, BLACK, "Equipped %s", data->name);
     return true;
 }
 
@@ -253,9 +249,26 @@ void UnequipSlot(GameWorld* game, EquipSlot slot) {
 
     game->equipped[slotIdx] = EQUIP_NONE;
 
-    AddEquipToInventory(game, oldType);
+    if (game->equipInventoryCount < MAX_INVENTORY_SLOTS) {
+        AddEquipToInventory(game, oldType);
+    } else {
+        CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+        int dropX = pp->x, dropY = pp->y;
+        if (game->blocking[dropY][dropX] || World_FindMonsterAt(game, dropX, dropY, ENTITY_NONE) != ENTITY_NONE) {
+            int nx[] = { 0, 0, -1, 1 };
+            int ny[] = { -1, 1, 0, 0 };
+            for (int d = 0; d < 4; d++) {
+                int tx = pp->x + nx[d], ty = pp->y + ny[d];
+                if (tx >= 0 && tx < game->map->width && ty >= 0 && ty < game->map->height &&
+                    !game->blocking[ty][tx] && World_FindMonsterAt(game, tx, ty, ENTITY_NONE) == ENTITY_NONE) {
+                    dropX = tx; dropY = ty; break;
+                }
+            }
+        }
+        SpawnerSystem_AddEquipAt(game, dropX, dropY, oldType, 1);
+        FloatMsg_Spawn(game, dropX, dropY, YELLOW, "No room - item dropped!");
+    }
 
-    CombatLog_Add(&game->combatLog, BLACK, "Unequipped %s", data->name);
 }
 
 bool IsEquipSlotOccupied(const GameWorld* game, EquipSlot slot) {

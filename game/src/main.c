@@ -150,7 +150,11 @@ int main(void)
                 bool escPressed = escDown && !prevEscDown;
                 prevEscDown = escDown;
 
-                if (escPressed) {
+                bool wasMap = (game.state == STATE_MAP);
+                if (wasMap)
+                    MapUI_Update(&game);
+
+                if (escPressed && !wasMap) {
                     if (settingsMenuOpen) {
                         settingsMenuOpen = false;
                     } else if (gameMenuOpen) {
@@ -158,8 +162,6 @@ int main(void)
                     } else if (game.state == STATE_INVENTORY) {
                     } else if (game.state == STATE_GAME_OVER || game.state == STATE_WIN) {
                         nextScene = SCENE_MENU;
-                } else if (game.state == STATE_MAP) {
-                    MapUI_Update(&game);
                 } else {
                         gameMenuOpen = true;
                     }

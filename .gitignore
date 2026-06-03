@@ -16,3 +16,4 @@ obj
 *.obj
 game/-
 premake5.exe
+AGENTS.md
