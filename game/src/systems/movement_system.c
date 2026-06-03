@@ -54,7 +54,7 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
         gw->state = STATE_ENEMY_TURN;
 
         // Collect potions
-        {
+        if (gw->inventorySlotCount < MAX_INVENTORY_SLOTS) {
             ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS];
             int pCount = SpawnerSystem_CollectPickupsAt(gw, ppos->x, ppos->y, pTypes, pQtys, MAX_POTIONS);
             for (int i = 0; i < pCount; i++) {
@@ -67,9 +67,11 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                     GameAudio_PlayPickupSound();
                 }
             }
+        } else if (gw->inventorySlotCount >= MAX_INVENTORY_SLOTS) {
+            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
         // Collect equipment
-        {
+        if (gw->equipInventoryCount < MAX_INVENTORY_SLOTS) {
             EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP];
             int eCount = SpawnerSystem_CollectEquipAt(gw, ppos->x, ppos->y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
             for (int i = 0; i < eCount; i++) {
@@ -84,6 +86,8 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                     SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
                 }
             }
+        } else if (gw->equipInventoryCount >= MAX_INVENTORY_SLOTS) {
+            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
 
         // Stair / escape checks

@@ -3,6 +3,8 @@
 #include "resources.h"
 #include "game_balance.h"
 #include "equipment_bonus.h"
+#include "systems/spawner_system.h"
+#include "systems/world_monster.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -247,7 +249,25 @@ void UnequipSlot(GameWorld* game, EquipSlot slot) {
 
     game->equipped[slotIdx] = EQUIP_NONE;
 
-    AddEquipToInventory(game, oldType);
+    if (game->equipInventoryCount < MAX_INVENTORY_SLOTS) {
+        AddEquipToInventory(game, oldType);
+    } else {
+        CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+        int dropX = pp->x, dropY = pp->y;
+        if (game->blocking[dropY][dropX] || World_FindMonsterAt(game, dropX, dropY, ENTITY_NONE) != ENTITY_NONE) {
+            int nx[] = { 0, 0, -1, 1 };
+            int ny[] = { -1, 1, 0, 0 };
+            for (int d = 0; d < 4; d++) {
+                int tx = pp->x + nx[d], ty = pp->y + ny[d];
+                if (tx >= 0 && tx < game->map->width && ty >= 0 && ty < game->map->height &&
+                    !game->blocking[ty][tx] && World_FindMonsterAt(game, tx, ty, ENTITY_NONE) == ENTITY_NONE) {
+                    dropX = tx; dropY = ty; break;
+                }
+            }
+        }
+        SpawnerSystem_AddEquipAt(game, dropX, dropY, oldType, 1);
+        FloatMsg_Spawn(game, dropX, dropY, YELLOW, "No room - item dropped!");
+    }
 
 }
 
