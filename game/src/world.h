@@ -4,7 +4,6 @@
 #include "raylib.h"
 #include "ecs.h"
 #include "map/tmx/tmx.h"
-#include "ui/combat_log.h"
 #include "game_types.h"
 #include "inventory.h"
 
@@ -95,9 +94,6 @@ typedef struct GameWorld {
 
     // Camera
     Camera2D camera;
-
-    // Combat log
-    CombatLog combatLog;
 
     // Level-up flash
     float levelUpTimer;

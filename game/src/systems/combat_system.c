@@ -7,7 +7,6 @@
 #include <math.h>
 #include "game_audio.h"
 #include "systems/player.h"
-#include "ui/combat_log.h"
 #include "resources.h"
 #include "game_balance.h"
 #include <string.h>
@@ -50,7 +49,6 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
         if (World_HasComponents(&game->ecs, attackerId, COMP_HIT_FLASH))
             World_GetHitFlash(&game->ecs, attackerId)->timer = HIT_FLASH_DURATION;
-        CombatLog_Add(&game->combatLog, BLACK, "%s dodges your attack!", monName);
         return true;
     }
 
@@ -67,7 +65,6 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
         damage *= 2;
         dmgColor = RED;
-        CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
     }
 
     {
@@ -83,13 +80,11 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
     if (World_HasComponents(&game->ecs, mon, COMP_HIT_FLASH)) {
         World_GetHitFlash(&game->ecs, mon)->timer = HIT_FLASH_DURATION;
     }
-    CombatLog_Add(&game->combatLog, BLACK, "You hit %s for %d!", monName, damage);
 
     // Off-hand follow-up strike (dual wield)
     if (ms->hp > 0 && IsDualWielding(game)) {
         int offDodgePct = calc_dodge_chance(ms->dex);
         if (offDodgePct > 0 && GetRandomValue(1, 100) <= offDodgePct) {
-            CombatLog_Add(&game->combatLog, BLACK, "%s dodges your off-hand!", monName);
         } else {
             int offRaw = calc_melee_damage(as->attack, as->str);
             int offDmg = calc_damage_after_defense(offRaw, ms->defense);
@@ -99,12 +94,10 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
             if (GetRandomValue(1, 100) <= as->lck) {
                 offDmg *= CRIT_MULT;
                 offColor = ORANGE;
-                CombatLog_Add(&game->combatLog, BLACK, "Off-hand critical hit!");
             }
             if (offDmg > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
                 offDmg *= 2;
                 offColor = RED;
-                CombatLog_Add(&game->combatLog, RED, "Off-hand MEGA CRITICAL HIT!!");
             }
             ms->hp -= offDmg;
             {
@@ -112,7 +105,6 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
                 int th = game->map->tileHeight;
                 DamageNumber_Spawn(&game->damageNumbers, offDmg, targetX, targetY, tw, th, offColor);
             }
-            CombatLog_Add(&game->combatLog, BLACK, "Off-hand hits %s for %d!", monName, offDmg);
             if (ms->hp <= 0) {
                 ms->alive = false;
                 ms->hp = 0;
@@ -122,7 +114,6 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
                 }
                 game->aliveMonsterCount--;
                 GainExperience(game, ms->expValue);
-                CombatLog_Add(&game->combatLog, BLACK, "%s defeated by off-hand! (+%d exp)", monName, ms->expValue);
             }
         }
     }
@@ -136,7 +127,6 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
         }
         game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
-        CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
     }
     return true;
 }
@@ -147,7 +137,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     EquipType weapon = game->equipped[EQUIP_SLOT_WEAPON];
     const EquipData* wdata = GetEquipData(weapon);
     if (!wdata || !wdata->isRanged) {
-        CombatLog_Add(&game->combatLog, DARKGRAY, "No ranged weapon equipped.");
         return false;
     }
 
@@ -167,7 +156,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     if (apos->facingDir == DIR_UP || apos->facingDir == DIR_DOWN) {
         if (!HasLineOfSight(apos->x, apos->y, apos->x + dx * range, apos->y + dy * range,
                             game->blocking, range)) {
-            CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing in range.");
             return false;
         }
     }
@@ -189,7 +177,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     }
 
     if (target == ENTITY_NONE) {
-        CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing in range.");
         return false;
     }
 
@@ -202,7 +189,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
 
     int dodgePct = calc_dodge_chance(ms->dex);
     if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
-        CombatLog_Add(&game->combatLog, BLACK, "%s dodges your arrow!", monName);
         return true;
     }
 
@@ -219,7 +205,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
         damage *= 2;
         dmgColor = RED;
-        CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
     }
 
     {
@@ -232,7 +217,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
     GameAudio_PlayRangedAttackSound();
     if (World_HasComponents(&game->ecs, target, COMP_HIT_FLASH))
         World_GetHitFlash(&game->ecs, target)->timer = HIT_FLASH_DURATION;
-    CombatLog_Add(&game->combatLog, BLACK, "You shoot %s for %d!", monName, damage);
 
     if (ms->hp <= 0) {
         ms->alive = false;
@@ -243,7 +227,6 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
         }
         game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
-        CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
     }
 
     int tw = game->map->tileWidth;
@@ -276,7 +259,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
     EquipType weapon = game->equipped[EQUIP_SLOT_WEAPON];
     const EquipData* wdata = GetEquipData(weapon);
     if (!wdata || wdata->isRanged || weapon == EQUIP_NONE) {
-        CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to throw.");
         return false;
     }
 
@@ -350,7 +332,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
     game->projectileTimer = PROJECTILE_ANIM_DURATION;
     game->projectileDuration = PROJECTILE_ANIM_DURATION;
 
-    CombatLog_Add(&game->combatLog, BLACK, "You throw your %s!", weaponName);
 
     if (target != ENTITY_NONE) {
         CStats* ms = World_GetStats(&game->ecs, target);
@@ -361,7 +342,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
 
             int dodgePct = calc_dodge_chance(ms->dex);
             if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
-                CombatLog_Add(&game->combatLog, BLACK, "%s dodges your %s!", monName, weaponName);
                 return true;
             }
 
@@ -379,7 +359,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
             if (damage > MEGA_CRIT_THRESHOLD && GetRandomValue(1, 100) <= MEGA_CRIT_CHANCE) {
                 damage *= 2;
                 dmgColor = RED;
-                CombatLog_Add(&game->combatLog, RED, "MEGA CRITICAL HIT!!");
             }
 
             {
@@ -392,7 +371,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
             GameAudio_PlayRangedAttackSound();
             if (World_HasComponents(&game->ecs, target, COMP_HIT_FLASH))
                 World_GetHitFlash(&game->ecs, target)->timer = HIT_FLASH_DURATION;
-            CombatLog_Add(&game->combatLog, BLACK, "Your thrown %s hits %s for %d!", weaponName, monName, damage);
 
             if (ms->hp <= 0) {
                 ms->alive = false;
@@ -403,7 +381,6 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
                 }
                 game->aliveMonsterCount--;
                 GainExperience(game, ms->expValue);
-                CombatLog_Add(&game->combatLog, BLACK, "%s defeated! (+%d exp)", monName, ms->expValue);
             }
         }
     }

@@ -1,6 +1,5 @@
 #include "game.h"
 #include "ui/inventory_ui.h"
-#include "ui/combat_log.h"
 #include "ui/inspector.h"
 #include "systems/renderer.h"
 #include "systems/spawner_system.h"

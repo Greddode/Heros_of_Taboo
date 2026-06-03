@@ -6,7 +6,6 @@
 #include "map/map_helpers.h"
 #include "inventory.h"
 #include "game_audio.h"
-#include "ui/combat_log.h"
 
 bool MovementSystem_IsWalkable(GameWorld* gw, int x, int y) {
     if (!gw || !gw->map) return false;
@@ -65,7 +64,6 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                     else break;
                 }
                 if (picked > 0) {
-                    CombatLog_Add(&gw->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i]));
                     GameAudio_PlayPickupSound();
                 }
             }
@@ -82,7 +80,6 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                 }
                 if (picked > 0) {
                     const EquipData* d = GetEquipData(eTypes[i]);
-                    CombatLog_Add(&gw->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment");
                     GameAudio_PlayPickupSound();
                     SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
                 }

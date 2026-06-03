@@ -7,7 +7,6 @@
 #include "systems/world_monster.h"
 #include "systems/player_system.h"
 #include "systems/player.h"
-#include "ui/combat_log.h"
 #include "map/procedural.h"
 #include "resources.h"
 #include "game_balance.h"

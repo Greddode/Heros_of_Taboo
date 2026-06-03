@@ -4,7 +4,6 @@
 #include "map/map_helpers.h"
 #include "inventory.h"
 #include "equipment_bonus.h"
-#include "ui/combat_log.h"
 #include "systems/spawner_system.h"
 #include "systems/ai_system.h"
 #include "systems/combat_system.h"
@@ -175,7 +174,6 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                     EquipmentBonus_Remove(w, pe, oldType);
                     game->equipped[(int)slot] = EQUIP_NONE;
                     SpawnerSystem_AddEquipAt(game, ppos->x, ppos->y, oldType, 1);
-                    CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", data ? data->name : "item");
                 }
                 ui->subState = INV_BROWSE;
             } else { ui->subState = INV_BROWSE; }
@@ -211,7 +209,7 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                         EquipType eType = game->equipInventory[equipIdx];
                         const EquipData* d = GetEquipData(eType);
                         RemoveEquipFromInventory(game, equipIdx);
-                        if (d) { SpawnerSystem_AddEquipAt(game, ppos->x, ppos->y, eType, 1); CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", d->name); }
+                        if (d) { SpawnerSystem_AddEquipAt(game, ppos->x, ppos->y, eType, 1); }
                         ui->subState = INV_BROWSE;
                         if (ui->selection >= game->inventorySlotCount + game->equipInventoryCount) ui->selection = game->inventorySlotCount + game->equipInventoryCount - 1;
                     } else { ui->subState = INV_BROWSE; }
@@ -223,7 +221,6 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                         ItemType type = slot->type;
                         slot->quantity--;
                         SpawnerSystem_AddPotionAt(game, ppos->x, ppos->y, type, 1);
-                        CombatLog_Add(&game->combatLog, BLACK, "Dropped %s", GetItemName(type));
                         if (slot->quantity <= 0) { for (int i = ui->selection; i < game->inventorySlotCount - 1; i++) game->inventory[i] = game->inventory[i + 1]; game->inventorySlotCount--; if (ui->selection >= game->inventorySlotCount) ui->selection = game->inventorySlotCount - 1; }
                         ui->subState = INV_BROWSE;
                     } else if (ui->actionSelection == 2) {
@@ -232,7 +229,6 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
                         int total = slot->quantity;
                         slot->quantity = 0;
                         SpawnerSystem_AddPotionAt(game, ppos->x, ppos->y, type, total);
-                        CombatLog_Add(&game->combatLog, BLACK, "Dropped %d x %s", total, GetItemName(type));
                         for (int i = ui->selection; i < game->inventorySlotCount - 1; i++) game->inventory[i] = game->inventory[i + 1];
                         game->inventorySlotCount--;
                         if (ui->selection >= game->inventorySlotCount) ui->selection = game->inventorySlotCount - 1;
@@ -305,8 +301,8 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
                     bool alive = AISystem_ProcessAll(game, game->timeWaited);
                     if (!alive) { game->state = STATE_GAME_OVER; return; }
                     if (ps && ps->hp < hpBefore) break;
-                    { ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS]; int pCount = SpawnerSystem_CollectPickupsAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, pTypes, pQtys, MAX_POTIONS); for (int i = 0; i < pCount; i++) { int picked = 0; for (int q = 0; q < pQtys[i]; q++) { if (InventoryAdd(game, pTypes[i])) picked++; else break; } if (picked > 0) { CombatLog_Add(&game->combatLog, BLACK, "Picked up %d x %s", picked, GetItemName(pTypes[i])); GameAudio_PlayPickupSound(); } } }
-                    { EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP]; int eCount = SpawnerSystem_CollectEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes, eQtys, MAX_EQUIP_ON_MAP); for (int i = 0; i < eCount; i++) { int picked = 0; for (int q = 0; q < eQtys[i]; q++) { if (AddEquipToInventory(game, eTypes[i])) picked++; else break; } if (picked > 0) { const EquipData* d = GetEquipData(eTypes[i]); CombatLog_Add(&game->combatLog, BLACK, "Picked up %s", d ? d->name : "equipment"); GameAudio_PlayPickupSound(); SpawnerSystem_ReduceEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes[i], picked); } } }
+                    { ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS]; int pCount = SpawnerSystem_CollectPickupsAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, pTypes, pQtys, MAX_POTIONS); for (int i = 0; i < pCount; i++) { int picked = 0; for (int q = 0; q < pQtys[i]; q++) { if (InventoryAdd(game, pTypes[i])) picked++; else break; }                     if (picked > 0) { GameAudio_PlayPickupSound(); } } }
+                    { EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP]; int eCount = SpawnerSystem_CollectEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes, eQtys, MAX_EQUIP_ON_MAP); for (int i = 0; i < eCount; i++) { int picked = 0; for (int q = 0; q < eQtys[i]; q++) { if (AddEquipToInventory(game, eTypes[i])) picked++; else break; } if (picked > 0) { const EquipData* d = GetEquipData(eTypes[i]); GameAudio_PlayPickupSound(); SpawnerSystem_ReduceEquipAt(game, ppos ? ppos->x : 0, ppos ? ppos->y : 0, eTypes[i], picked); } } }
                 }
                 if (!stoppedAtRoom) game->sprintBypassRoom = false;
                 for (int i = 0; i < snapCount; i++) { CPosition* mp = World_GetPosition(&game->ecs, monSnap[i].id); mp->prevX = monSnap[i].prevX; mp->prevY = monSnap[i].prevY; if (World_HasComponents(&game->ecs, monSnap[i].id, COMP_HIT_FLASH)) World_GetHitFlash(&game->ecs, monSnap[i].id)->timer = monSnap[i].hitFlash; }
@@ -358,7 +354,6 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
             int tx = ppos ? ppos->x : 0, ty = ppos ? ppos->y : 0;
             switch (fdir) { case DIR_UP: ty--; break; case DIR_DOWN: ty++; break; case DIR_LEFT: tx--; break; case DIR_RIGHT: tx++; break; default: break; }
             if (CombatSystem_PlayerMeleeAttack(game, pe, tx, ty)) { game->turnCount++; game->enemyTurnCooldown = 0.15f; game->state = STATE_ENEMY_TURN; game->sprintBypassRoom = false; game->selectedMonsterEntity = ENTITY_NONE; }
-            else CombatLog_Add(&game->combatLog, DARKGRAY, "Nothing to attack there");
         }
     }
 
