@@ -26,8 +26,7 @@ static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
     return true;
 }
 
-static Direction MoveToward(GameWorld* gw, EntityId mover, int targetX, int targetY) {
-    CPosition* mp = World_GetPosition(&gw->ecs, mover);
+static Direction MoveToward(GameWorld* gw, EntityId mover, CPosition* mp, int targetX, int targetY) {
     int mapWidth = gw->map->width;
     int mapHeight = gw->map->height;
 
@@ -52,8 +51,7 @@ static Direction MoveToward(GameWorld* gw, EntityId mover, int targetX, int targ
     return bestDir;
 }
 
-static Direction MoveAwayFrom(GameWorld* gw, EntityId mover, int targetX, int targetY) {
-    CPosition* mp = World_GetPosition(&gw->ecs, mover);
+static Direction MoveAwayFrom(GameWorld* gw, EntityId mover, CPosition* mp, int targetX, int targetY) {
     int mapWidth  = gw->map->width;
     int mapHeight = gw->map->height;
 
@@ -79,8 +77,7 @@ static Direction MoveAwayFrom(GameWorld* gw, EntityId mover, int targetX, int ta
     return bestDir;
 }
 
-static Direction MoveFlank(GameWorld* gw, EntityId mover, int targetX, int targetY) {
-    CPosition* mp = World_GetPosition(&gw->ecs, mover);
+static Direction MoveFlank(GameWorld* gw, EntityId mover, CPosition* mp, int targetX, int targetY) {
     int mapWidth  = gw->map->width;
     int mapHeight = gw->map->height;
 
@@ -109,8 +106,7 @@ static Direction MoveFlank(GameWorld* gw, EntityId mover, int targetX, int targe
     return bestDir;
 }
 
-static void ApplyMove(GameWorld* gw, EntityId e, Direction dir) {
-    CPosition* p = World_GetPosition(&gw->ecs, e);
+static void ApplyMove(GameWorld* gw, EntityId e, CPosition* p, Direction dir) {
     int oldX = p->x, oldY = p->y;
     switch (dir) {
         case DIR_UP:    p->y--; break;
@@ -122,10 +118,8 @@ static void ApplyMove(GameWorld* gw, EntityId e, Direction dir) {
     SpatialHash_Move(gw, e, oldX, oldY, p->x, p->y);
 }
 
-static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
-    CPosition* mp = World_GetPosition(&gw->ecs, monster);
-    CStats* ms = World_GetStats(&gw->ecs, monster);
-    CAI* ai = World_GetAI(&gw->ecs, monster);
+static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
+                              CPosition* mp, CStats* ms, CAI* ai) {
     const MonsterTemplate* tpl = Monster_GetTemplate(ai->type);
     if (!tpl) return;
 
@@ -258,19 +252,19 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
         }
 
         if (ai->attackType == ATTACK_MELEE) {
-            Direction flankDir = MoveFlank(gw, monster, playerX, playerY);
-            if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, playerX, playerY);
-            if (flankDir != DIR_NONE) ApplyMove(gw, monster, flankDir);
+            Direction flankDir = MoveFlank(gw, monster, mp, playerX, playerY);
+            if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, mp, playerX, playerY);
+            if (flankDir != DIR_NONE) ApplyMove(gw, monster, mp, flankDir);
         } else {
             if (dist <= 1) {
-                Direction awayDir = MoveAwayFrom(gw, monster, playerX, playerY);
-                if (awayDir != DIR_NONE) ApplyMove(gw, monster, awayDir);
+                Direction awayDir = MoveAwayFrom(gw, monster, mp, playerX, playerY);
+                if (awayDir != DIR_NONE) ApplyMove(gw, monster, mp, awayDir);
             } else if (dist <= ai->attackRange && dx != 0 && dy != 0) {
-                Direction flankDir = MoveFlank(gw, monster, playerX, playerY);
-                if (flankDir != DIR_NONE) ApplyMove(gw, monster, flankDir);
+                Direction flankDir = MoveFlank(gw, monster, mp, playerX, playerY);
+                if (flankDir != DIR_NONE) ApplyMove(gw, monster, mp, flankDir);
             } else if (dist > ai->attackRange) {
-                Direction towardDir = MoveToward(gw, monster, playerX, playerY);
-                if (towardDir != DIR_NONE) ApplyMove(gw, monster, towardDir);
+                Direction towardDir = MoveToward(gw, monster, mp, playerX, playerY);
+                if (towardDir != DIR_NONE) ApplyMove(gw, monster, mp, towardDir);
             }
         }
         if (ai->attackType != ATTACK_MELEE) return;
@@ -311,9 +305,9 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster) {
             }
         }
 
-        Direction huntDir = MoveFlank(gw, monster, ai->lastSeenX, ai->lastSeenY);
-        if (huntDir == DIR_NONE) huntDir = MoveToward(gw, monster, ai->lastSeenX, ai->lastSeenY);
-        if (huntDir != DIR_NONE) ApplyMove(gw, monster, huntDir);
+        Direction huntDir = MoveFlank(gw, monster, mp, ai->lastSeenX, ai->lastSeenY);
+        if (huntDir == DIR_NONE) huntDir = MoveToward(gw, monster, mp, ai->lastSeenX, ai->lastSeenY);
+        if (huntDir != DIR_NONE) ApplyMove(gw, monster, mp, huntDir);
     }
     else if (dist <= tpl->detectionRange + 8) {
         for (int attempt = 0; attempt < 4; attempt++) {
@@ -358,12 +352,12 @@ bool AISystem_ProcessAll(GameWorld* gw, int timeWaited) {
             ai->shadowTurnCounter = 0;
         }
 
-        ProcessMonsterAI(gw, e);
+        ProcessMonsterAI(gw, e, p, s, ai);
         CStats* ps = World_GetStats(&gw->ecs, gw->playerEntity);
         if (ps->hp <= 0) return false;
 
         if (ai->type == MONSTER_SHADOW && timeWaited >= 35) {
-            ProcessMonsterAI(gw, e);
+            ProcessMonsterAI(gw, e, p, s, ai);
             ps = World_GetStats(&gw->ecs, gw->playerEntity);
             if (ps->hp <= 0) return false;
         }
