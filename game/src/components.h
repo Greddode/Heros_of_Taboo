@@ -60,6 +60,7 @@ typedef struct {
     int shadowTurnCounter;
     EquipType equippedWeapon;
     EquipType equippedArmor;
+    int attackCooldown;
 } CAI;
 
 typedef struct {

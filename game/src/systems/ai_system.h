@@ -3,8 +3,7 @@
 
 #include "world.h"
 
-// Run AI for all entities with COMP_AI | COMP_POSITION | COMP_STATS.
-// Returns false if the player was killed.
+AbilityType AI_GetActiveAbility(GameWorld* gw, EntityId entity);
 bool AISystem_ProcessAll(GameWorld* gw, int timeWaited);
 
 #endif

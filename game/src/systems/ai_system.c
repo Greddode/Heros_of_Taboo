@@ -5,6 +5,21 @@
 #include "spatial_hash.h"
 #include <math.h>
 
+AbilityType AI_GetActiveAbility(GameWorld* gw, EntityId entity)
+{
+    if (World_HasComponents(&gw->ecs, entity, COMP_ABILITIES)) {
+        CAbilities* ab = World_GetAbilities(&gw->ecs, entity);
+        if (ab->count > 0) return ab->abilities[0];
+    }
+    // Fallback: use attack type for monsters without CAbilities (TMX spawns, old saves)
+    if (World_HasComponents(&gw->ecs, entity, COMP_AI)) {
+        CAI* ai = World_GetAI(&gw->ecs, entity);
+        if (ai->attackType == ATTACK_RANGED || ai->attackType == ATTACK_MAGIC)
+            return ABILITY_RANGED;
+    }
+    return ABILITY_PUNCH;
+}
+
 static bool MonsterLineOfSight(int x0, int y0, int x1, int y1,
                                 const unsigned char blocking[][MAP_WIDTH], int maxDist) {
     int dx = abs(x1 - x0);
@@ -122,6 +137,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
     const MonsterTemplate* tpl = Monster_GetTemplate(ai->type);
     if (!tpl) return;
 
+    AbilityType ability = AI_GetActiveAbility(gw, monster);
+
     CPosition* playerPos = World_GetPosition(&gw->ecs, gw->playerEntity);
     CStats* playerStats = World_GetStats(&gw->ecs, gw->playerEntity);
     int playerX = playerPos->x;
@@ -139,7 +156,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
         ai->lastSeenY = playerY;
         ai->huntTurns = 4;
 
-        if (ai->attackType != ATTACK_MELEE && dist <= ai->attackRange &&
+        if (ability == ABILITY_RANGED && dist <= ai->attackRange &&
             (dx == 0 || dy == 0) &&
             MonsterLineOfSight(mp->x, mp->y, playerX, playerY, gw->blocking, ai->attackRange)) {
             int dodgePct = playerStats->dex * 2;
@@ -219,8 +236,13 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
 
         int neighborX[] = { mp->x, mp->x, mp->x - 1, mp->x + 1 };
         int neighborY[] = { mp->y - 1, mp->y + 1, mp->y, mp->y };
+        bool canAttack = !(ability == ABILITY_HEAVY_MELEE && ai->attackCooldown > 0);
         for (int i = 0; i < 4; i++) {
             if (neighborX[i] == playerX && neighborY[i] == playerY) {
+                if (!canAttack) {
+                    ai->attackCooldown--;
+                    break;
+                }
                 int dodgePct = playerStats->dex * 2;
                 if (dodgePct > 60) dodgePct = 60;
                 if (dodgePct > 0 && GetRandomValue(1, 100) <= dodgePct) {
@@ -230,6 +252,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
                 if (dmg < 1) dmg = 1;
+                if (ability == ABILITY_LIGHT_MELEE) dmg = (int)((float)dmg * 0.85f);
+                else if (ability == ABILITY_HEAVY_MELEE) dmg = (int)((float)dmg * 1.40f);
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
@@ -249,15 +273,12 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 phf2->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
+                if (ability == ABILITY_HEAVY_MELEE) ai->attackCooldown = 1;
                 return;
             }
         }
 
-        if (ai->attackType == ATTACK_MELEE) {
-            Direction flankDir = MoveFlank(gw, monster, mp, playerX, playerY);
-            if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, mp, playerX, playerY);
-            if (flankDir != DIR_NONE) ApplyMove(gw, monster, mp, flankDir);
-        } else {
+        if (ability == ABILITY_RANGED) {
             if (dist <= 1) {
                 Direction awayDir = MoveAwayFrom(gw, monster, mp, playerX, playerY);
                 if (awayDir != DIR_NONE) ApplyMove(gw, monster, mp, awayDir);
@@ -268,8 +289,18 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 Direction towardDir = MoveToward(gw, monster, mp, playerX, playerY);
                 if (towardDir != DIR_NONE) ApplyMove(gw, monster, mp, towardDir);
             }
+        } else {
+            // Melee / Heavy / Punch: move toward and attack when adjacent
+            if (ability == ABILITY_HEAVY_MELEE) {
+                if (ai->attackCooldown > 0) {
+                    ai->attackCooldown--;
+                }
+            }
+            Direction flankDir = MoveFlank(gw, monster, mp, playerX, playerY);
+            if (flankDir == DIR_NONE) flankDir = MoveToward(gw, monster, mp, playerX, playerY);
+            if (flankDir != DIR_NONE) ApplyMove(gw, monster, mp, flankDir);
         }
-        if (ai->attackType != ATTACK_MELEE) return;
+        if (ability != ABILITY_RANGED) return;
     }
     else if (ai->huntTurns > 0 && ai->lastSeenX >= 0) {
         ai->huntTurns--;
@@ -287,6 +318,8 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 int dmg = ms->attack + ms->str * 2 - playerStats->defense;
                 if (dmg < 1) dmg = 1;
+                if (ability == ABILITY_LIGHT_MELEE) dmg = (int)((float)dmg * 0.85f);
+                else if (ability == ABILITY_HEAVY_MELEE) dmg = (int)((float)dmg * 1.40f);
                 if (GetRandomValue(1, 100) <= ms->lck) {
                     dmg = dmg * 2;
                     if (dmg < 1) dmg = 1;
@@ -306,6 +339,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 phf->timer = 0.15f;
                 TraceLog(LOG_INFO, "%s attacks you for %d damage (HP: %d)!",
                          World_GetName(&gw->ecs, monster)->name, dmg, playerStats->hp);
+                if (ability == ABILITY_HEAVY_MELEE) ai->attackCooldown = 1;
                 return;
             }
         }
