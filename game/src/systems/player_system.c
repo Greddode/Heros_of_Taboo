@@ -56,4 +56,11 @@ void PlayerSystem_Spawn(GameWorld* gw) {
     World_AddComponent(&gw->ecs, e, COMP_HIT_FLASH);
     CHitFlash* hf = World_GetHitFlash(&gw->ecs, e);
     hf->timer = 0;
+
+    World_AddComponent(&gw->ecs, e, COMP_ABILITIES);
+    CAbilities* a = World_GetAbilities(&gw->ecs, e);
+    a->abilities[0] = ABILITY_PUNCH;
+    a->count = 1;
+    a->maxMp = MP_BASE + s->intel * MP_PER_INT;
+    a->mp = a->maxMp;
 }

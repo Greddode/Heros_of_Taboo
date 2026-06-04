@@ -29,6 +29,7 @@ typedef struct World {
     CPickup        pickups[MAX_ENTITIES];
     CName          names[MAX_ENTITIES];
     CHitFlash      hitFlashes[MAX_ENTITIES];
+    CAbilities     abilities[MAX_ENTITIES];
 } World;
 
 void World_Init(World* w);
@@ -64,5 +65,6 @@ static inline CAI*            World_GetAI(World* w, EntityId e)        { ECS_ASS
 static inline CPickup*        World_GetPickup(World* w, EntityId e)    { ECS_ASSERT_COMPONENT(w, e, PICKUP);        return &w->pickups[e]; }
 static inline CName*          World_GetName(World* w, EntityId e)      { ECS_ASSERT_COMPONENT(w, e, NAME);          return &w->names[e]; }
 static inline CHitFlash*      World_GetHitFlash(World* w, EntityId e)  { ECS_ASSERT_COMPONENT(w, e, HIT_FLASH);     return &w->hitFlashes[e]; }
+static inline CAbilities*     World_GetAbilities(World* w, EntityId e) { ECS_ASSERT_COMPONENT(w, e, ABILITIES);     return &w->abilities[e]; }
 
 #endif

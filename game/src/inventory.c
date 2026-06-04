@@ -169,6 +169,20 @@ Texture2D* Inventory_LoadPotionTexture(ItemType type) {
     return Resources_LoadTexture(ITEM_SPRITES[type]);
 }
 
+AbilityType Inventory_GetWeaponAbility(EquipType weapon) {
+    switch (weapon) {
+        case EQUIP_NONE:             return ABILITY_PUNCH;
+        case EQUIP_SURVIVAL_KNIFE:
+        case EQUIP_DAGGER:
+        case EQUIP_IRON_SWORD:       return ABILITY_LIGHT_MELEE;
+        case EQUIP_STEEL_SWORD:
+        case EQUIP_WAR_HAMMER:       return ABILITY_HEAVY_MELEE;
+        case EQUIP_SIMPLE_BOW:
+        case EQUIP_ELVEN_BOW:        return ABILITY_RANGED;
+        default:                     return ABILITY_PUNCH;
+    }
+}
+
 void LoadPotionTextures(GameWorld* game) {
     (void)game;
     for (int i = 1; i < ITEM_COUNT; i++) {
@@ -219,6 +233,12 @@ bool EquipItem(GameWorld* game, EquipType type) {
 
     if (type == EQUIP_BAND_OF_GROWTH)
         game->statCapsRemoved = true;
+
+    if (data->category == EQUIP_CAT_WEAPON && World_HasComponents(&game->ecs, game->playerEntity, COMP_ABILITIES)) {
+        CAbilities* a = World_GetAbilities(&game->ecs, game->playerEntity);
+        a->abilities[0] = Inventory_GetWeaponAbility(type);
+        if (a->count < 1) a->count = 1;
+    }
 
     return true;
 }

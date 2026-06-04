@@ -137,6 +137,12 @@
 #define GOLD_RARITY_BONUS_LEGENDARY 500
 #define GOLD_SELL_RATIO             0.5f
 
+// --- MP / abilities ----------------------------------------------------------
+#define MP_BASE            10
+#define MP_PER_INT          2
+#define MP_REGEN_PER_TURN   1
+#define MP_BONUS_ON_KILL    3
+
 // =============================================================================
 // Inline formula functions
 // =============================================================================

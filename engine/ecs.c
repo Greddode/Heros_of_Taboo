@@ -10,6 +10,7 @@ static void ZeroEntityComponents(World* w, EntityId e) {
     memset(&w->pickups[e], 0, sizeof(CPickup));
     memset(&w->names[e], 0, sizeof(CName));
     memset(&w->hitFlashes[e], 0, sizeof(CHitFlash));
+    memset(&w->abilities[e], 0, sizeof(CAbilities));
 }
 
 void World_Init(World* w) {

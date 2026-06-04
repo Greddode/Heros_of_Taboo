@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include "game_types.h"
+#include "data/ability_data.h"
 
 // Bitmask flags — one bit per component
 #define COMP_POSITION       (1u << 0)
@@ -15,6 +16,7 @@
 #define COMP_NAME           (1u << 6)
 #define COMP_PLAYER_TAG     (1u << 7)
 #define COMP_HIT_FLASH      (1u << 8)
+#define COMP_ABILITIES      (1u << 9)
 
 // --- Component structs ---
 
@@ -72,5 +74,15 @@ typedef struct {
 typedef struct {
     float timer;   // seconds remaining; entity flashes white while > 0
 } CHitFlash;
+
+#define MAX_ABILITIES 8
+
+typedef struct {
+    AbilityType abilities[MAX_ABILITIES];
+    int         cooldowns[MAX_ABILITIES];
+    int         count;
+    int         mp;
+    int         maxMp;
+} CAbilities;
 
 #endif

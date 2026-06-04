@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "game_types.h"
 #include "data/equip_data.h"
+#include "data/ability_data.h"
 
 typedef struct GameWorld GameWorld;
 
@@ -77,7 +78,7 @@ bool RemoveEquipFromInventory(GameWorld* game, int slot);
 void LoadPotionTextures(GameWorld* game);
 // Cached equip icon from the resource manager (NULL if none / load failed).
 Texture2D* Inventory_LoadEquipTexture(EquipType type);
-// Cached potion icon from the resource manager (NULL if none / load failed).
 Texture2D* Inventory_LoadPotionTexture(ItemType type);
+AbilityType Inventory_GetWeaponAbility(EquipType weapon);
 
 #endif
