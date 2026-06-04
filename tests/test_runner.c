@@ -13,6 +13,7 @@
 #include "resources.h"
 #include "systems/world_monster.h"
 #include "systems/spatial_hash.h"
+#include "data/monster_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -408,7 +409,45 @@ static bool test_clamp_int(void)
 }
 
 // =============================================================================
-// Spatial hash integration tests
+// Challenge Rating tests
+// =============================================================================
+
+static bool test_floor_1_goblin_cr(void)
+{
+    Monster_InitTemplates();
+    const MonsterTemplate* goblin = Monster_GetTemplate(MONSTER_GOBLIN);
+    CHECK(goblin != NULL, "goblin template exists");
+    float cr = Monster_CalcCR(goblin, 1);
+    CHECK_EQ((int)(cr * 100), 100, "floor 1 goblin CR snaps to 1.0 (1.00)");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_floor_budget_increases(void)
+{
+    float b1 = Monster_GetFloorBudget(1);
+    float b2 = Monster_GetFloorBudget(2);
+    float b5 = Monster_GetFloorBudget(5);
+    CHECK(b1 > 0, "floor 1 budget positive");
+    CHECK(b2 > b1, "floor 2 budget > floor 1");
+    CHECK(b5 > b2, "floor 5 budget > floor 2");
+    CHECK_EQ((int)(b1 * 10), 30, "floor 1 budget = 3.0");
+    CHECK_EQ((int)(b5 * 10), 130, "floor 5 budget = 13.0");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_floor_scale_never_below_one(void)
+{
+    Monster_InitTemplates();
+    const MonsterTemplate* goblin = Monster_GetTemplate(MONSTER_GOBLIN);
+    CHECK(goblin != NULL, "goblin template exists");
+    // minFloor is 1, so floor 0 should clamp scale to 1.0
+    float cr0 = Monster_CalcCR(goblin, 0);
+    CHECK(cr0 > 0, "CR positive even below min floor");
+    TEST_PASS();
+    return true;
+}
 // =============================================================================
 
 static bool test_spatial_hash_basic(void)
@@ -601,6 +640,11 @@ static struct {
     {"validate_stat_index",      test_validate_stat_index},
     {"validate_floor",           test_validate_floor},
     {"clamp_int",                test_clamp_int},
+
+    // Challenge Rating
+    {"floor_1_goblin_cr",        test_floor_1_goblin_cr},
+    {"floor_budget_increases",   test_floor_budget_increases},
+    {"floor_scale_never_below_one", test_floor_scale_never_below_one},
 
     // Spatial hash / performance
     {"spatial_hash_basic",       test_spatial_hash_basic},

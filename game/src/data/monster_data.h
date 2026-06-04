@@ -34,5 +34,8 @@ void Monster_InitTemplates(void);
 const MonsterTemplate* Monster_GetTemplate(MonsterType type);
 // Returns MONSTER_TYPE_COUNT if no match.
 MonsterType Monster_FindTypeByTmxName(const char* tmxTypeName);
+float Monster_CalcCR(const MonsterTemplate* def, int currentFloor);
+float Monster_SnapCRToTier(float rawCR);
+float Monster_GetFloorBudget(int floorNumber);
 
 #endif

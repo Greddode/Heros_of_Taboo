@@ -143,6 +143,12 @@
 #define MP_REGEN_PER_TURN   1
 #define MP_BONUS_ON_KILL    3
 
+// --- Challenge Rating / floor difficulty -------------------------------------
+#define CON_HP_SCALE         5
+#define STR_ATTACK_SCALE      2
+#define FLOOR_DR_BASE        3.0f
+#define FLOOR_DR_PER_FLOOR   2.5f
+
 // =============================================================================
 // Inline formula functions
 // =============================================================================

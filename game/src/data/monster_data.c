@@ -1,6 +1,8 @@
 ﻿#include "monster_data.h"
+#include "game_balance.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 static MonsterTemplate s_templates[MONSTER_TYPE_COUNT];
 static bool s_templatesReady = false;
@@ -326,4 +328,42 @@ MonsterType Monster_FindTypeByTmxName(const char* tmxTypeName) {
             return (MonsterType)i;
     }
     return MONSTER_TYPE_COUNT;
+}
+
+float Monster_SnapCRToTier(float raw) {
+    static const float tiers[] = {
+        0.125f, 0.25f, 0.5f, 1.0f, 2.0f, 3.0f,
+        4.0f, 5.0f, 6.0f, 8.0f, 10.0f, 12.0f, 15.0f, 20.0f
+    };
+    static const int count = 14;
+    float best = tiers[0];
+    float bestDiff = fabsf(raw - tiers[0]);
+    for (int i = 1; i < count; i++) {
+        float diff = fabsf(raw - tiers[i]);
+        if (diff < bestDiff) { bestDiff = diff; best = tiers[i]; }
+    }
+    return best;
+}
+
+float Monster_CalcCR(const MonsterTemplate* def, int currentFloor) {
+    if (!def) return 0.0f;
+
+    int effectiveHp  = def->hp + (def->con * CON_HP_SCALE);
+    int effectiveDef = def->defense;
+    float defensiveScore = (float)effectiveHp + (float)effectiveDef * 3.0f;
+
+    float baseDamage = (float)def->attack + (float)(def->str * STR_ATTACK_SCALE);
+    float critMod    = 1.0f + (float)def->lck / 200.0f;
+    float offensiveScore = baseDamage * critMod * 4.0f;
+
+    float rawCR = (defensiveScore / 20.0f + offensiveScore / 15.0f) / 2.0f;
+
+    float floorScale = 1.0f + (float)(currentFloor - def->minFloor) * 0.12f;
+    if (floorScale < 1.0f) floorScale = 1.0f;
+
+    return Monster_SnapCRToTier(rawCR * floorScale);
+}
+
+float Monster_GetFloorBudget(int floorNumber) {
+    return FLOOR_DR_BASE + (float)(floorNumber - 1) * FLOOR_DR_PER_FLOOR;
 }
