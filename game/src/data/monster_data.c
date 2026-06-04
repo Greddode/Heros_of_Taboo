@@ -91,6 +91,11 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 13,
         .attackType      = ATTACK_MELEE,
         .attackRange     = 1,
+        .weaponPool      = { EQUIP_NONE, EQUIP_SURVIVAL_KNIFE, EQUIP_SIMPLE_BOW },
+        .weaponPoolCount = 3,
+        .armorPool       = { EQUIP_NONE },
+        .armorPoolCount  = 1,
+        .equipDropChance = 25,
     };
 
     s_templates[MONSTER_SKELETON] = (MonsterTemplate){

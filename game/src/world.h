@@ -6,6 +6,7 @@
 #include "map/tmx/tmx.h"
 #include "game_types.h"
 #include "inventory.h"
+#include "data/biome_data.h"
 
 #define MAX_DAMAGE_NUMBERS 32
 #define DAMAGE_NUMBER_LIFETIME 0.8f
@@ -51,6 +52,7 @@ typedef struct GameWorld {
     int aliveMonsterCount;
     int gold;
     bool statCapsRemoved;
+    BiomeType currentBiome;
 
     // Floating damage numbers
     DamageNumberPool damageNumbers;

@@ -14,6 +14,8 @@ void Floor_InitNewFloor(GameWorld* game)
 
     Monster_InitTemplates();
 
+    game->currentBiome = Biome_SelectForFloor(game->currentFloor);
+
     SpawnEntitiesFromObjects(game);
 
     ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];

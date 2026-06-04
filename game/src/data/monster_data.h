@@ -28,6 +28,11 @@ typedef struct {
     int spawnWeight;
     AttackType attackType;
     int attackRange;
+    EquipType weaponPool[4];
+    int       weaponPoolCount;
+    EquipType armorPool[4];
+    int       armorPoolCount;
+    int       equipDropChance;
 } MonsterTemplate;
 
 void Monster_InitTemplates(void);
