@@ -4,6 +4,7 @@
 #include "game_audio.h"
 #include "ui/menu.h"
 #include "ui/map_ui.h"
+#include "ui/shop_ui.h"
 #include "systems/input_system.h"
 #include <string.h>
 #include <time.h>
@@ -181,9 +182,13 @@ int main(void)
                     }
 
                     if (!restartGame) {
+                    if (game.state == STATE_SHOP) {
+                        ShopUI_HandleInput(&game);
+                    } else {
                     InputSystem_Inventory(&game, &invUI);
                     InputSystem_PlayerTurn(&game, &invUI);
                     UpdateGame(&game);
+                    }
 
                         float d = (game.animDuration > 0.0f) ? game.animDuration : MOVE_ANIM_DURATION;
                         float t = (game.animTimer <= 0.0f) ? 1.0f : 1.0f - (game.animTimer / d);

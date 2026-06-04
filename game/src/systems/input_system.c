@@ -274,6 +274,18 @@ void InputSystem_PlayerTurn(GameWorld* game, InventoryUIState* ui) {
     CPosition* ppos = (pe != ENTITY_NONE) ? World_GetPosition(w, pe) : NULL;
     CStats* ps = (pe != ENTITY_NONE) ? World_GetStats(w, pe) : NULL;
 
+    // Shop interaction
+    if (IsKeyPressed(KEY_E) && game->shopkeeperEntity != ENTITY_NONE && ppos) {
+        CPosition* sp = World_GetPosition(w, game->shopkeeperEntity);
+        if (sp) {
+            int dx = sp->x - ppos->x, dy = sp->y - ppos->y;
+            if ((abs(dx) == 1 && dy == 0) || (abs(dy) == 1 && dx == 0)) {
+                game->state = STATE_SHOP;
+                return;
+            }
+        }
+    }
+
     if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
         Direction sprintDir = DIR_NONE;
         if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) sprintDir = DIR_UP;

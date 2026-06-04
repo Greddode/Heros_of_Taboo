@@ -16,6 +16,7 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
 
 // New DR-budget spawner (biome-aware, equipment-aware, CR-based).
 void SpawnMonstersForFloor(GameWorld* game);
+void SpawnShopRoom(GameWorld* game);
 
 // Spawn loot pickups directly into ECS from room data.
 void SpawnerSystem_SpawnPickups(GameWorld* gw);

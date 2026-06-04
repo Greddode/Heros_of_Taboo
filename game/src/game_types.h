@@ -111,7 +111,8 @@ typedef enum {
     STATE_GAME_OVER,
     STATE_WIN,
     STATE_INVENTORY,
-    STATE_MAP
+    STATE_MAP,
+    STATE_SHOP
 } GameState;
 
 // -- Projectile --------------------------------------------------------------

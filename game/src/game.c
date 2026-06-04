@@ -94,7 +94,7 @@ void UpdateGame(GameWorld* game) {
 
     World_UpdateMonsterAnimations(game, GetFrameTime());
 
-    if (game->state == STATE_GAME_OVER || game->state == STATE_WIN) return;
+    if (game->state == STATE_GAME_OVER || game->state == STATE_WIN || game->state == STATE_SHOP) return;
 
     if (game->state == STATE_ENEMY_TURN) {
         if (game->enemyTurnCooldown > 0.0f) {

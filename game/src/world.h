@@ -53,6 +53,7 @@ typedef struct GameWorld {
     int gold;
     bool statCapsRemoved;
     BiomeType currentBiome;
+    EntityId shopkeeperEntity;
 
     // Floating damage numbers
     DamageNumberPool damageNumbers;

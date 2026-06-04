@@ -458,6 +458,65 @@ void SpawnMonstersForFloor(GameWorld* game) {
     TraceLog(LOG_INFO, "Spawner(budget): %d monsters placed (%.1f budget remaining)", spawned, remaining);
 }
 
+void SpawnShopRoom(GameWorld* game)
+{
+    if (!game || !game->map) return;
+
+    ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+    int roomCount = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
+    if (roomCount == 0) return;
+
+    int* tiles = game->map->layers[0].data;
+    int mapW = game->map->width;
+
+    int playerX = 0, playerY = 0;
+    if (game->playerEntity != ENTITY_NONE) {
+        CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+        playerX = pp->x; playerY = pp->y;
+    }
+
+    for (int r = 0; r < roomCount; r++) {
+        // Skip player's room
+        if (playerX >= rooms[r].x && playerX < rooms[r].x + rooms[r].w &&
+            playerY >= rooms[r].y && playerY < rooms[r].y + rooms[r].h)
+            continue;
+
+        // Check if room has monsters
+        bool hasMonster = false;
+        for (int y = rooms[r].y; y < rooms[r].y + rooms[r].h && !hasMonster; y++)
+            for (int x = rooms[r].x; x < rooms[r].x + rooms[r].w && !hasMonster; x++)
+                if (World_FindMonsterAt(game, x, y, ENTITY_NONE) != ENTITY_NONE)
+                    hasMonster = true;
+
+        if (hasMonster) continue;
+
+        // Empty room — place shopkeeper at center
+        int cx = rooms[r].x + rooms[r].w / 2;
+        int cy = rooms[r].y + rooms[r].h / 2;
+        if (cx < 0 || cx >= mapW || cy < 0 || cy >= game->map->height) continue;
+        if (!IsFloorGID(tiles[cy * mapW + cx])) continue;
+
+        EntityId e = World_CreateEntity(&game->ecs);
+        if (e == ENTITY_NONE) return;
+
+        World_AddComponent(&game->ecs, e, COMP_POSITION);
+        CPosition* pos = World_GetPosition(&game->ecs, e);
+        pos->x = cx; pos->y = cy;
+        pos->prevX = cx; pos->prevY = cy;
+
+        World_AddComponent(&game->ecs, e, COMP_FALLBACK_COLOR);
+        World_GetColor(&game->ecs, e)->color = (Color){ 255, 215, 0, 255 };
+
+        World_AddComponent(&game->ecs, e, COMP_NAME);
+        CName* n = World_GetName(&game->ecs, e);
+        strncpy(n->name, "Shopkeeper", sizeof(n->name) - 1);
+
+        game->shopkeeperEntity = e;
+        TraceLog(LOG_INFO, "Shop room spawned at (%d, %d)", cx, cy);
+        return;
+    }
+}
+
 void SpawnerSystem_SpawnPickups(GameWorld* gw) {
     if (!gw || !gw->map) return;
 

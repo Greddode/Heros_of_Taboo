@@ -3,6 +3,7 @@
 #include "systems/spawner_system.h"
 #include "ui/inspector.h"
 #include "ui/inventory_ui.h"
+#include "ui/shop_ui.h"
 #include "resources.h"
 #include "game_balance.h"
 #include "data/monster_data.h"
@@ -187,6 +188,19 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
         }
     }
 
+    // Shopkeeper rendering
+    if (game->shopkeeperEntity != ENTITY_NONE) {
+        World* w = &(game)->ecs;
+        CPosition* sp = World_GetPosition(w, game->shopkeeperEntity);
+        if (sp && game->visibility[sp->y][sp->x] > 0) {
+            int sx = sp->x * tw;
+            int sy = sp->y * th;
+            DrawRectangle(sx + 2, sy + 2, tw - 4, th - 4, (Color){ 255, 215, 0, 255 });
+            int labelSize = 12;
+            DrawText("Shop", sx + tw / 2 - MeasureText("Shop", labelSize) / 2, sy - labelSize - 2, labelSize, GOLD);
+        }
+    }
+
     // Projectile rendering
     if (game->projectile.active && game->projectileDuration > 0.0f) {
         float pt = (game->projectileTimer <= 0.0f) ? 1.0f : 1.0f - (game->projectileTimer / game->projectileDuration);
@@ -367,6 +381,14 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
     snprintf(infoText, sizeof(infoText), "Floor: %d/%d", game->currentFloor, game->maxFloors);
     DrawText(infoText, panelX, textY, (int)(14 * scale), BLACK);
 
+    // Gold display
+    if (game->state != STATE_GAME_OVER && game->state != STATE_WIN) {
+        char goldText[32];
+        snprintf(goldText, sizeof(goldText), "Gold: %dg", game->gold);
+        int goldW = MeasureText(goldText, (int)(14 * scale));
+        DrawText(goldText, GetScreenWidth() - goldW - (int)(10 * scale), (int)(10 * scale), (int)(14 * scale), GOLD);
+    }
+
     // Combat log (bottom-right)
 
     // Monster info (top-right)
@@ -487,4 +509,8 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
 
     // Inventory overlay
     InventoryUI_Render(game, ui);
+
+    // Shop overlay
+    if (game->state == STATE_SHOP)
+        ShopUI_Render(game, scale);
 }

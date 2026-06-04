@@ -382,6 +382,8 @@ bool AISystem_ProcessAll(GameWorld* gw, int timeWaited) {
 
         if (!s->alive) continue;
 
+        if (e == gw->shopkeeperEntity) continue;
+
         p->prevX = p->x;
         p->prevY = p->y;
 

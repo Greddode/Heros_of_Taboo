@@ -10,6 +10,8 @@ void Floor_InitNewFloor(GameWorld* game)
 {
     if (!game || !game->map) return;
 
+    game->shopkeeperEntity = ENTITY_NONE;
+
     BuildBlockingMap(game);
 
     Monster_InitTemplates();
@@ -20,6 +22,9 @@ void Floor_InitNewFloor(GameWorld* game)
 
     SpawnMonstersForFloor(game);
     SpawnerSystem_SpawnPickups(game);
+
+    if (GetRandomValue(1, 100) <= 3)
+        SpawnShopRoom(game);
 
     game->stairX = GetStairX();
     game->stairY = GetStairY();
