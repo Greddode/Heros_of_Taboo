@@ -9,7 +9,21 @@
 #include "systems/player.h"
 #include "resources.h"
 #include "game_balance.h"
+#include "systems/spawner_system.h"
+#include "data/monster_data.h"
 #include <string.h>
+
+static void DropMonsterEquipment(GameWorld* game, EntityId mon) {
+    CAI* mai = World_HasComponents(&game->ecs, mon, COMP_AI) ? World_GetAI(&game->ecs, mon) : NULL;
+    if (!mai) return;
+    const MonsterTemplate* mt = Monster_GetTemplate(mai->type);
+    if (!mt || mt->equipDropChance <= 0) return;
+    CPosition* dp = World_GetPosition(&game->ecs, mon);
+    if (mai->equippedWeapon != EQUIP_NONE && GetRandomValue(1, 100) <= mt->equipDropChance)
+        SpawnerSystem_AddEquipAt(game, dp->x, dp->y, mai->equippedWeapon, 1);
+    if (mai->equippedArmor != EQUIP_NONE && GetRandomValue(1, 100) <= mt->equipDropChance)
+        SpawnerSystem_AddEquipAt(game, dp->x, dp->y, mai->equippedArmor, 1);
+}
 
 static bool HasLineOfSight(int x0, int y0, int x1, int y1,
                             const unsigned char blocking[][MAP_WIDTH], int maxDist) {
@@ -116,6 +130,7 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
                     CPosition* dp = World_GetPosition(&game->ecs, mon);
                     SpatialHash_Remove(game, mon, dp->x, dp->y);
                 }
+                DropMonsterEquipment(game, mon);
                 game->aliveMonsterCount--;
                 GainExperience(game, ms->expValue);
             }
@@ -129,6 +144,7 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
             CPosition* dp = World_GetPosition(&game->ecs, mon);
             SpatialHash_Remove(game, mon, dp->x, dp->y);
         }
+        DropMonsterEquipment(game, mon);
         game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
     }
@@ -229,6 +245,7 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
             CPosition* dp = World_GetPosition(&game->ecs, target);
             SpatialHash_Remove(game, target, dp->x, dp->y);
         }
+        DropMonsterEquipment(game, target);
         game->aliveMonsterCount--;
         GainExperience(game, ms->expValue);
     }
@@ -383,6 +400,7 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
                     CPosition* dp = World_GetPosition(&game->ecs, target);
                     SpatialHash_Remove(game, target, dp->x, dp->y);
                 }
+                DropMonsterEquipment(game, target);
                 game->aliveMonsterCount--;
                 GainExperience(game, ms->expValue);
             }

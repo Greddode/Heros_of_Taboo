@@ -18,17 +18,7 @@ void Floor_InitNewFloor(GameWorld* game)
 
     SpawnEntitiesFromObjects(game);
 
-    ProceduralRoom spawnRooms[MAX_GENERATED_ROOMS];
-    int spawnRoomCount = GetGeneratedRooms(spawnRooms, MAX_GENERATED_ROOMS);
-    if (spawnRoomCount > 0) {
-        int px = (game->playerEntity != ENTITY_NONE)
-            ? World_GetPosition(&game->ecs, game->playerEntity)->x
-            : 1;
-        int py = (game->playerEntity != ENTITY_NONE)
-            ? World_GetPosition(&game->ecs, game->playerEntity)->y
-            : 1;
-        SpawnerSystem_SpawnMonsters(game, spawnRooms, spawnRoomCount, px, py);
-    }
+    SpawnMonstersForFloor(game);
     SpawnerSystem_SpawnPickups(game);
 
     game->stairX = GetStairX();

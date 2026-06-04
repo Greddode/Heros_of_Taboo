@@ -58,6 +58,8 @@ typedef struct {
     int lastSeenX, lastSeenY;
     int huntTurns;
     int shadowTurnCounter;
+    EquipType equippedWeapon;
+    EquipType equippedArmor;
 } CAI;
 
 typedef struct {

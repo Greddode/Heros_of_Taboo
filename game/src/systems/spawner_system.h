@@ -14,6 +14,9 @@ void SpawnerSystem_ConfigureShadow(GameWorld* gw, EntityId shadow, int playerLev
 void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int roomCount,
                                  int playerX, int playerY);
 
+// New DR-budget spawner (biome-aware, equipment-aware, CR-based).
+void SpawnMonstersForFloor(GameWorld* game);
+
 // Spawn loot pickups directly into ECS from room data.
 void SpawnerSystem_SpawnPickups(GameWorld* gw);
 

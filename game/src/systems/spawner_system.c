@@ -1,9 +1,15 @@
 #include "spawner_system.h"
 #include "data/loot_data.h"
 #include "data/monster_data.h"
+#include "data/biome_data.h"
+#include "data/equip_data.h"
 #include "world_monster.h"
 #include "spatial_hash.h"
 #include "resources.h"
+#include "inventory.h"
+#include "equipment_bonus.h"
+#include "game_balance.h"
+#include "data/ability_data.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -243,6 +249,213 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
     #undef ROOM_MAX_FLOORS
 
     TraceLog(LOG_INFO, "Spawner: %d monsters placed", World_CountAliveMonsters(gw));
+}
+
+#define MAX_MONSTERS 100
+
+void SpawnMonstersForFloor(GameWorld* game) {
+    if (!game || !game->map) return;
+
+    const BiomeDef* biome = GetBiomeData(game->currentBiome);
+    if (!biome || biome->monsterCount == 0) {
+        // Fall back to old spawner
+        ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+        int roomCount = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
+        if (roomCount > 0) {
+            int px = 0, py = 0;
+            if (game->playerEntity != ENTITY_NONE) {
+                CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+                px = pp->x; py = pp->y;
+            }
+            SpawnerSystem_SpawnMonsters(game, rooms, roomCount, px, py);
+        }
+        return;
+    }
+
+    int floorNumber = game->currentFloor;
+    float budget = Monster_GetFloorBudget(floorNumber);
+    float remaining = budget;
+    int spawned = 0;
+
+    int* tiles = game->map->layers[0].data;
+    int mapW = game->map->width;
+    int mapH = game->map->height;
+
+    int playerX = 0, playerY = 0;
+    if (game->playerEntity != ENTITY_NONE) {
+        CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
+        playerX = pp->x; playerY = pp->y;
+    }
+    int minDist = MIN_PLAYER_DIST * MIN_PLAYER_DIST;
+
+    while (remaining >= 0.125f && spawned < MAX_MONSTERS) {
+        // Build candidate list: monsters in biome pool whose scaled CR <= remaining
+        int candidates[MONSTER_TYPE_COUNT];
+        float candidateCRs[MONSTER_TYPE_COUNT];
+        int candidateCount = 0;
+
+        for (int i = 0; i < biome->monsterCount; i++) {
+            MonsterType mt = biome->monsterPool[i];
+            const MonsterTemplate* def = Monster_GetTemplate(mt);
+            if (!def || def->spawnWeight <= 0) continue;
+            if (floorNumber < def->minFloor) continue;
+            if (def->maxFloor != -1 && floorNumber > def->maxFloor) continue;
+            float cr = Monster_CalcCR(def, floorNumber);
+            if (cr <= remaining + 0.001f) {
+                candidates[candidateCount] = (int)mt;
+                candidateCRs[candidateCount] = cr;
+                candidateCount++;
+            }
+        }
+
+        if (candidateCount == 0) break;
+
+        // Weight inversely by CR (cheaper monsters more likely to fill budget)
+        float invWeights[MONSTER_TYPE_COUNT];
+        float totalInvWeight = 0.0f;
+        for (int i = 0; i < candidateCount; i++) {
+            invWeights[i] = (candidateCRs[i] > 0.0f) ? 1.0f / candidateCRs[i] : 10.0f;
+            totalInvWeight += invWeights[i];
+        }
+
+        float roll = (float)GetRandomValue(0, (int)(totalInvWeight * 100)) / 100.0f;
+        float acc = 0.0f;
+        int chosenIdx = 0;
+        for (int i = 0; i < candidateCount; i++) {
+            acc += invWeights[i];
+            if (roll <= acc) { chosenIdx = i; break; }
+        }
+
+        MonsterType chosenType = (MonsterType)candidates[chosenIdx];
+        const MonsterTemplate* def = Monster_GetTemplate(chosenType);
+        if (!def) break;
+
+        // Find valid spawn tile (not occupied, walkable, not near player)
+        int sx = -1, sy = -1;
+        for (int attempt = 0; attempt < 200; attempt++) {
+            int tx = GetRandomValue(0, mapW - 1);
+            int ty = GetRandomValue(0, mapH - 1);
+            if (tx < 0 || tx >= mapW || ty < 0 || ty >= mapH) continue;
+            if (game->blocking[ty][tx]) continue;
+            if (!IsFloorGID(tiles[ty * mapW + tx]) || tiles[ty * mapW + tx] == TILE_STAIRS) continue;
+            if (World_FindMonsterAt(game, tx, ty, ENTITY_NONE) != ENTITY_NONE) continue;
+            if (playerX >= 0 && DistSq(tx, ty, playerX, playerY) < minDist) continue;
+            sx = tx; sy = ty; break;
+        }
+        if (sx < 0) break;
+
+        // Scale stats for floor
+        float scale = 1.0f + (float)(floorNumber - def->minFloor) * 0.10f;
+        if (scale < 1.0f) scale = 1.0f;
+        int scaledHp      = (int)((float)def->hp      * scale);
+        int scaledAttack  = (int)((float)def->attack  * scale);
+        int scaledDefense = (int)((float)def->defense * scale);
+
+        // Assign equipment
+        EquipType chosenWeapon = EQUIP_NONE;
+        EquipType chosenArmor  = EQUIP_NONE;
+        float monsterShare = remaining / (budget * 0.3f);
+        if (monsterShare > 1.0f) monsterShare = 1.0f;
+        if (monsterShare < 0.0f) monsterShare = 0.0f;
+
+        if (def->weaponPoolCount > 0) {
+            int wi = (int)(monsterShare * (float)(def->weaponPoolCount - 1) + 0.5f);
+            if (wi >= def->weaponPoolCount) wi = def->weaponPoolCount - 1;
+            chosenWeapon = def->weaponPool[wi];
+        }
+        if (def->armorPoolCount > 0) {
+            int ai = (int)(monsterShare * (float)(def->armorPoolCount - 1) + 0.5f);
+            if (ai >= def->armorPoolCount) ai = def->armorPoolCount - 1;
+            chosenArmor = def->armorPool[ai];
+        }
+
+        // Spawn entity
+        EntityId e = World_CreateEntity(&game->ecs);
+        if (e == ENTITY_NONE) break;
+
+        World_AddComponent(&game->ecs, e, COMP_POSITION);
+        CPosition* pos = World_GetPosition(&game->ecs, e);
+        pos->x = sx; pos->y = sy;
+        pos->prevX = sx; pos->prevY = sy;
+        pos->facingDir = DIR_DOWN;
+
+        World_AddComponent(&game->ecs, e, COMP_STATS);
+        CStats* s = World_GetStats(&game->ecs, e);
+        s->str = def->str;
+        s->dex = def->dex;
+        s->intel = def->intel;
+        s->con = def->con;
+        s->lck = def->lck;
+        s->maxHp = scaledHp + def->con * 5;
+        s->hp = s->maxHp;
+        s->attack = scaledAttack;
+        s->defense = scaledDefense + def->con / 2;
+        s->level = def->level + floorNumber * GetRandomValue(1, 3);
+        if (s->level < 1) s->level = 1;
+        if (def->maxLevel != -1 && s->level > def->maxLevel) s->level = def->maxLevel;
+        s->expValue = (int)((float)def->expValue * scale) + def->lck * 3;
+        s->alive = true;
+        s->statPoints = 0;
+        s->exp = 0;
+        s->expToNext = 0;
+
+        World_AddComponent(&game->ecs, e, COMP_SPRITE_ANIM);
+        CSpriteAnim* spr = World_GetSprite(&game->ecs, e);
+        spr->tex = (def->spritePath && def->frameCount > 0) ? Resources_LoadTexture(def->spritePath) : NULL;
+        spr->row = 0;
+        spr->frame = 0;
+        spr->frameCount = def->frameCount;
+        spr->animTimer = 0;
+        spr->animSpeed = def->animSpeed;
+
+        World_AddComponent(&game->ecs, e, COMP_AI);
+        CAI* ai = World_GetAI(&game->ecs, e);
+        ai->type = chosenType;
+        ai->attackType = def->attackType;
+        ai->attackRange = def->attackRange;
+        ai->detectionRange = def->detectionRange;
+        ai->lastSeenX = -1;
+        ai->lastSeenY = -1;
+        ai->huntTurns = 0;
+        ai->shadowTurnCounter = 0;
+        ai->equippedWeapon = chosenWeapon;
+        ai->equippedArmor  = chosenArmor;
+
+        World_AddComponent(&game->ecs, e, COMP_NAME);
+        CName* n = World_GetName(&game->ecs, e);
+        strncpy(n->name, def->name, sizeof(n->name) - 1);
+        n->name[sizeof(n->name) - 1] = '\0';
+        MaybeAssignMemeName(game, e, chosenType);
+
+        World_AddComponent(&game->ecs, e, COMP_FALLBACK_COLOR);
+        World_GetColor(&game->ecs, e)->color = def->color;
+
+        World_AddComponent(&game->ecs, e, COMP_HIT_FLASH);
+        World_GetHitFlash(&game->ecs, e)->timer = 0;
+
+        // Apply equipment bonuses
+        if (chosenWeapon != EQUIP_NONE)
+            EquipmentBonus_Apply(&game->ecs, e, chosenWeapon);
+        if (chosenArmor != EQUIP_NONE)
+            EquipmentBonus_Apply(&game->ecs, e, chosenArmor);
+
+        // Assign CAbilities from weapon
+        World_AddComponent(&game->ecs, e, COMP_ABILITIES);
+        CAbilities* a = World_GetAbilities(&game->ecs, e);
+        a->abilities[0] = Inventory_GetWeaponAbility(chosenWeapon);
+        a->count = 1;
+        a->maxMp = MP_BASE + def->intel * MP_PER_INT;
+        a->mp = a->maxMp;
+
+        SpatialHash_Add(game, e, sx, sy);
+        game->aliveMonsterCount++;
+        game->monstersEverSpawned = true;
+
+        remaining -= Monster_CalcCR(def, floorNumber);
+        spawned++;
+    }
+
+    TraceLog(LOG_INFO, "Spawner(budget): %d monsters placed (%.1f budget remaining)", spawned, remaining);
 }
 
 void SpawnerSystem_SpawnPickups(GameWorld* gw) {
