@@ -5,6 +5,7 @@
 #include "ui/inventory_ui.h"
 #include "resources.h"
 #include "game_balance.h"
+#include "data/monster_data.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -245,22 +246,38 @@ void RenderGame(GameWorld* game, const InventoryUIState* ui) {
             float sx = game->projectile.sx, sy = game->projectile.sy;
             float dx = cx - sx, dy = cy - sy;
             float len = sqrtf(dx * dx + dy * dy);
-            if (len > 4.0f) {
-                float nx = dx / len, ny = dy / len;
-                float headLen = 12.0f;
-                float shaftEnd = len - headLen;
-                if (shaftEnd < 0) shaftEnd = 0;
-                float sx2 = sx + nx * shaftEnd, sy2 = sy + ny * shaftEnd;
-                DrawLineEx((Vector2){ sx, sy }, (Vector2){ sx2, sy2 }, 3.0f, game->projectile.color);
-                float tipX = sx + nx * len, tipY = sy + ny * len;
-                float perpX = -ny, perpY = nx;
-                float headW = 6.0f;
-                Vector2 v1 = { tipX, tipY };
-                Vector2 v2 = { sx2 + perpX * headW, sy2 + perpY * headW };
-                Vector2 v3 = { sx2 - perpX * headW, sy2 - perpY * headW };
-                DrawTriangle(v1, v2, v3, game->projectile.color);
-            } else {
-                DrawRectangle((int)sx - 2, (int)sy - 2, 4, 4, game->projectile.color);
+            switch (game->projectile.projectileVisual) {
+                case PROJ_SPORE:
+                    DrawCircle((int)cx, (int)cy, 3, GREEN);
+                    break;
+                case PROJ_FIREBALL:
+                    DrawCircle((int)cx, (int)cy, 4, ORANGE);
+                    break;
+                case PROJ_ROCK:
+                    DrawCircle((int)cx, (int)cy, 5, GRAY);
+                    break;
+                case PROJ_SHADOW:
+                    DrawCircle((int)cx, (int)cy, 3, (Color){ 80, 0, 120, 255 });
+                    break;
+                default:
+                    if (len > 4.0f) {
+                        float nx = dx / len, ny = dy / len;
+                        float headLen = 12.0f;
+                        float shaftEnd = len - headLen;
+                        if (shaftEnd < 0) shaftEnd = 0;
+                        float sx2 = sx + nx * shaftEnd, sy2 = sy + ny * shaftEnd;
+                        DrawLineEx((Vector2){ sx, sy }, (Vector2){ sx2, sy2 }, 3.0f, game->projectile.color);
+                        float tipX = sx + nx * len, tipY = sy + ny * len;
+                        float perpX = -ny, perpY = nx;
+                        float headW = 6.0f;
+                        Vector2 v1 = { tipX, tipY };
+                        Vector2 v2 = { sx2 + perpX * headW, sy2 + perpY * headW };
+                        Vector2 v3 = { sx2 - perpX * headW, sy2 - perpY * headW };
+                        DrawTriangle(v1, v2, v3, game->projectile.color);
+                    } else {
+                        DrawRectangle((int)sx - 2, (int)sy - 2, 4, 4, game->projectile.color);
+                    }
+                    break;
             }
         }
     }

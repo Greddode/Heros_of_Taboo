@@ -7,6 +7,14 @@
 
 #define MONSTER_NAME_LEN 32
 
+typedef enum {
+    PROJ_ARROW = 0,
+    PROJ_SPORE,
+    PROJ_FIREBALL,
+    PROJ_ROCK,
+    PROJ_SHADOW,
+} ProjectileVisual;
+
 typedef struct {
     MonsterType type;
     const char* tmxTypeName;
@@ -33,6 +41,7 @@ typedef struct {
     EquipType armorPool[4];
     int       armorPoolCount;
     int       equipDropChance;
+    ProjectileVisual projectileVisual;
 } MonsterTemplate;
 
 void Monster_InitTemplates(void);

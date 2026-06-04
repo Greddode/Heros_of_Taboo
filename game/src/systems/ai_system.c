@@ -204,6 +204,7 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 gw->projectile.animFrameCount = 0;
                 gw->projectile.color       = (Color){ 139, 69, 19, 255 };
             }
+            gw->projectile.projectileVisual = tpl->projectileVisual;
             gw->projectileTimer = PROJECTILE_ANIM_DURATION;
             gw->projectileDuration = PROJECTILE_ANIM_DURATION;
 

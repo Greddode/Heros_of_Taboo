@@ -151,6 +151,7 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 8,
         .attackType      = ATTACK_MAGIC,
         .attackRange     = 4,
+        .projectileVisual = PROJ_SHADOW,
     };
 
     s_templates[MONSTER_FUNGAL_MYCONID] = (MonsterTemplate){
@@ -178,6 +179,7 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 8,
         .attackType      = ATTACK_RANGED,
         .attackRange     = 3,
+        .projectileVisual = PROJ_SPORE,
     };
 
     s_templates[MONSTER_WARP_SKULL] = (MonsterTemplate){
@@ -205,6 +207,7 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 7,
         .attackType      = ATTACK_MAGIC,
         .attackRange     = 3,
+        .projectileVisual = PROJ_SHADOW,
     };
 
     // --- Group 3: Late (floors 6+) ------------------------------------------
@@ -233,6 +236,7 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 6,
         .attackType      = ATTACK_MAGIC,
         .attackRange     = 5,
+        .projectileVisual = PROJ_FIREBALL,
     };
 
     s_templates[MONSTER_OGRE] = (MonsterTemplate){
@@ -287,6 +291,7 @@ void Monster_InitTemplates(void) {
         .spawnWeight     = 5,
         .attackType      = ATTACK_RANGED,
         .attackRange     = 6,
+        .projectileVisual = PROJ_FIREBALL,
     };
 
     // --- Ranger: early floor 2+ (shorter hp, ranged attack) -------------------

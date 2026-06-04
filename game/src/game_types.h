@@ -128,6 +128,7 @@ typedef struct {
     int animFrameCount;
     Texture2D* throwTex;
     float      throwRotation;
+    int        projectileVisual;
 } Projectile;
 
 #endif
