@@ -28,14 +28,15 @@ static void ApplyLevelUp(GameWorld* game) {
 }
 
 // Allocate one stat point to a specific stat
-bool AllocateStatPoint(CStats* s, int statIdx) {
+bool AllocateStatPoint(GameWorld* game, CStats* s, int statIdx) {
     if (s->statPoints <= 0) return false;
+    int cap = game && game->statCapsRemoved ? STAT_CAP_UNLIMITED : STAT_CAP_DEFAULT;
     switch (statIdx) {
-        case 0: s->str++;   break;
-        case 1: s->dex++;   break;
-        case 2: s->intel++; break;
-        case 3: s->con++;   break;
-        case 4: s->lck++;   break;
+        case 0: if (s->str < cap) s->str++;   else return false; break;
+        case 1: if (s->dex < cap) s->dex++;   else return false; break;
+        case 2: if (s->intel < cap) s->intel++; else return false; break;
+        case 3: if (s->con < cap) s->con++;   else return false; break;
+        case 4: if (s->lck < cap) s->lck++;   else return false; break;
         default: return false;
     }
     s->statPoints--;

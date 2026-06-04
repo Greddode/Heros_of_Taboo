@@ -122,7 +122,7 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
             if (ui->statsActiveCol == 0 && ui->statsSelection >= 3 && ui->statsSelection <= 7) statIdx = ui->statsSelection - 3;
             else if (ui->statsActiveCol == 1 && ui->statsSelection >= 1 && ui->statsSelection <= 5) statIdx = ui->statsSelection - 1;
             if (statIdx >= 0 && ps) {
-                AllocateStatPoint(ps, statIdx);
+                AllocateStatPoint(game, ps, statIdx);
                 // Auto-revert to column 1 when last point is spent
                 if (ps->statPoints == 0 && ui->statsActiveCol == 1) {
                     ui->statsActiveCol = 0;

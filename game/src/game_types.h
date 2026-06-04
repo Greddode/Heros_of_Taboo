@@ -100,6 +100,7 @@ typedef enum {
     EQUIP_ELVEN_BOW,
     EQUIP_GREATBOW,
     EQUIP_CROSSBOW,
+    EQUIP_BAND_OF_GROWTH,
     EQUIP_COUNT
 } EquipType;
 

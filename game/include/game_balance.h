@@ -37,6 +37,8 @@
 #define STAT_CAP_INT            99
 #define STAT_CAP_CON            99
 #define STAT_CAP_LCK            99
+#define STAT_CAP_DEFAULT       20
+#define STAT_CAP_UNLIMITED    999
 
 // --- Level-up tuning ---------------------------------------------------------
 #define STAT_POINTS_PER_LEVEL    2   // Stat points awarded on level-up
@@ -127,6 +129,13 @@
 
 // --- UI scroll step (pixels before scale) -----------------------------------
 #define DEFAULT_SCROLL_STEP      20
+
+// --- Gold / pricing ----------------------------------------------------------
+#define GOLD_RARITY_BONUS_COMMON      0
+#define GOLD_RARITY_BONUS_UNCOMMON   50
+#define GOLD_RARITY_BONUS_RARE      150
+#define GOLD_RARITY_BONUS_LEGENDARY 500
+#define GOLD_SELL_RATIO             0.5f
 
 // =============================================================================
 // Inline formula functions

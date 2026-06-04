@@ -49,6 +49,8 @@ typedef struct GameWorld {
     // Performance: monster spatial hash grid (tile → entity lookup)
     EntityId monsterGrid[MAP_HEIGHT][MAP_WIDTH];
     int aliveMonsterCount;
+    int gold;
+    bool statCapsRemoved;
 
     // Floating damage numbers
     DamageNumberPool damageNumbers;

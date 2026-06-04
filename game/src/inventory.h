@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include "game_types.h"
+#include "data/equip_data.h"
 
 typedef struct GameWorld GameWorld;
 
@@ -13,7 +14,7 @@ typedef struct GameWorld GameWorld;
 #define EQUIP_SLOT_COUNT 5
 #define MAX_EQUIPMENT_TYPES 32
 
-typedef struct {
+typedef struct EquipData {
     EquipType type;
     char name[32];
     const char* description;
@@ -30,6 +31,7 @@ typedef struct {
     int bonusLck;
     bool twoHanded;
     bool isRanged;
+    ItemRarity rarity;
 } EquipData;
 
 typedef struct {
