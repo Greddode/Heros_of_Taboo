@@ -22,7 +22,7 @@ Player enters floor
   → Combat occurs (melee, ranged, magic, throw, dual-wield)
   → Loot collected (potions, equipment, gold)
   → Player levels up (stat points, XP curve)
-  → Floor cleared → stairs appear → descend to next floor
+  → Find Stairs → descend to next floor
   → After max floors → escape tile spawns → win condition
 ```
 
@@ -42,7 +42,7 @@ Player enters floor
 | **Fog of war** | Bresenham ray-based visibility with explored/seen/unseen states |
 | **Floating damage numbers** | Animated damage text above hit targets |
 | **Floating status messages** | Animated text for events (level up, floor clear, escape) |
-| **Shop system** | Rare shop rooms with buy/sell interface |
+| **Shop system [NOT TESTED]** | Rare shop rooms with buy/sell interface |
 | **Audio system** | Context-switching music (menu/game) + randomized SFX categories |
 | **UI scaling** | Auto-scaled HUD with configurable GUI scale |
 | **Minimap** | Toggle-able full-map overlay |
