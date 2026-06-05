@@ -82,7 +82,7 @@ static void DrawInventoryTab(const GameWorld* game, const InventoryUIState* ui, 
             char line[128];
             snprintf(line, sizeof(line), "%s x%d", GetItemName(game->inventory[i].type), game->inventory[i].quantity);
             if (i == ui->selection)
-                DrawText(">", lx - (int)(18 * scale), ly, (int)(16 * scale), YELLOW);
+                DrawText(">", ix + (int)(4 * scale), ly, (int)(16 * scale), YELLOW);
             DrawText(line, lx + (int)(2 * scale), ly, (int)(16 * scale), c);
             ly += (int)(22 * scale);
         }
@@ -98,7 +98,7 @@ static void DrawInventoryTab(const GameWorld* game, const InventoryUIState* ui, 
                          d->twoHanded ? " (two-handed)" : "",
                          IsWeaponDualWieldable(game->equipInventory[i]) ? " (dual)" : "");
                 if (idx == ui->selection)
-                    DrawText(">", lx - (int)(18 * scale), ly, (int)(16 * scale), YELLOW);
+                    DrawText(">", ix + (int)(4 * scale), ly, (int)(16 * scale), YELLOW);
                 DrawText(line, lx + (int)(2 * scale), ly, (int)(16 * scale), c);
                 ly += (int)(22 * scale);
             }
@@ -493,9 +493,9 @@ void InventoryUI_Render(GameWorld* game, const InventoryUIState* ui) {
     else if (ui->tab == INV_TAB_STATS)
         DrawText("STATS", ix + (int)(16 * scale), iy + tabH + (int)(12 * scale), titleSize, YELLOW);
 
-    int contentY = iy + tabH + (int)(40 * scale);
-    int contentH = ih - tabH - (int)(100 * scale);
-    BeginScissorMode(ix, contentY, iw, contentH);
+    int contentY = iy + tabH + (int)(12 * scale) + titleSize + (int)(4 * scale);
+    int contentH = ih - (contentY - iy) - (int)(60 * scale);
+    BeginScissorMode(ix + 1, contentY, iw - 2, contentH);
     switch (ui->tab) {
         case INV_TAB_INVENTORY: DrawInventoryTab(game, ui, ix, iy, iw, ih); break;
         case INV_TAB_EQUIPMENT: DrawEquipmentTab(game, ui, ix, iy, iw, ih); break;

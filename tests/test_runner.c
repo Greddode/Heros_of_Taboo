@@ -418,7 +418,7 @@ static bool test_floor_1_goblin_cr(void)
     const MonsterTemplate* goblin = Monster_GetTemplate(MONSTER_GOBLIN);
     CHECK(goblin != NULL, "goblin template exists");
     float cr = Monster_CalcCR(goblin, 1);
-    CHECK_EQ((int)(cr * 100), 100, "floor 1 goblin CR snaps to 1.0 (1.00)");
+    CHECK_EQ((int)(cr * 100), 50, "floor 1 goblin CR snaps to 0.5 (0.50)");
     TEST_PASS();
     return true;
 }
@@ -431,8 +431,8 @@ static bool test_floor_budget_increases(void)
     CHECK(b1 > 0, "floor 1 budget positive");
     CHECK(b2 > b1, "floor 2 budget > floor 1");
     CHECK(b5 > b2, "floor 5 budget > floor 2");
-    CHECK_EQ((int)(b1 * 10), 30, "floor 1 budget = 3.0");
-    CHECK_EQ((int)(b5 * 10), 130, "floor 5 budget = 13.0");
+    CHECK_EQ((int)(b1 * 10), 80, "floor 1 budget = 8.0");
+    CHECK_EQ((int)(b5 * 10), 240, "floor 5 budget = 24.0");
     TEST_PASS();
     return true;
 }

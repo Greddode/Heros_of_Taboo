@@ -366,7 +366,7 @@ float Monster_CalcCR(const MonsterTemplate* def, int currentFloor) {
     float critMod    = 1.0f + (float)def->lck / 200.0f;
     float offensiveScore = baseDamage * critMod * 4.0f;
 
-    float rawCR = (defensiveScore / 20.0f + offensiveScore / 15.0f) / 2.0f;
+    float rawCR = (defensiveScore / 40.0f + offensiveScore / 30.0f) / 2.0f;
 
     float floorScale = 1.0f + (float)(currentFloor - def->minFloor) * 0.12f;
     if (floorScale < 1.0f) floorScale = 1.0f;

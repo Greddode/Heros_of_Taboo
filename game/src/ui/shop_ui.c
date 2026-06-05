@@ -57,7 +57,10 @@ void ShopUI_HandleInput(GameWorld* game)
                 // Selling a potion
                 InventorySlot* slot = &game->inventory[s_selection];
                 if (slot->type != ITEM_NONE && slot->quantity > 0) {
-                    game->gold += 5; // flat 5g for potions
+                    int sellPrice = POTION_SELL_SMALL;
+                    if (slot->type == ITEM_MEDIUM_HP_POTION) sellPrice = POTION_SELL_MEDIUM;
+                    else if (slot->type == ITEM_LARGE_HP_POTION) sellPrice = POTION_SELL_LARGE;
+                    game->gold += sellPrice;
                     slot->quantity--;
                     if (slot->quantity <= 0) {
                         for (int i = s_selection; i < game->inventorySlotCount - 1; i++)
@@ -155,7 +158,10 @@ void ShopUI_Render(GameWorld* game, float scale)
             char buf[128];
             if (i < game->inventorySlotCount) {
                 const char* name = GetItemName(game->inventory[i].type);
-                snprintf(buf, sizeof(buf), "%s x%d — 5g", name, game->inventory[i].quantity);
+                int displayPrice = POTION_SELL_SMALL;
+                if (game->inventory[i].type == ITEM_MEDIUM_HP_POTION) displayPrice = POTION_SELL_MEDIUM;
+                else if (game->inventory[i].type == ITEM_LARGE_HP_POTION) displayPrice = POTION_SELL_LARGE;
+                snprintf(buf, sizeof(buf), "%s x%d — %dg", name, game->inventory[i].quantity, displayPrice);
             } else {
                 int ei = i - game->inventorySlotCount;
                 const EquipData* d = GetEquipData(game->equipInventory[ei]);

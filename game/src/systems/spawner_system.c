@@ -461,6 +461,7 @@ void SpawnMonstersForFloor(GameWorld* game) {
 void SpawnShopRoom(GameWorld* game)
 {
     if (!game || !game->map) return;
+    if (game->currentFloor < 2) return;
 
     ProceduralRoom rooms[MAX_GENERATED_ROOMS];
     int roomCount = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);

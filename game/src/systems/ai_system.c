@@ -3,6 +3,7 @@
 #include "data/monster_data.h"
 #include "world_monster.h"
 #include "spatial_hash.h"
+#include "inventory.h"
 #include <math.h>
 
 AbilityType AI_GetActiveAbility(GameWorld* gw, EntityId entity)
@@ -11,9 +12,12 @@ AbilityType AI_GetActiveAbility(GameWorld* gw, EntityId entity)
         CAbilities* ab = World_GetAbilities(&gw->ecs, entity);
         if (ab->count > 0) return ab->abilities[0];
     }
-    // Fallback: use attack type for monsters without CAbilities (TMX spawns, old saves)
     if (World_HasComponents(&gw->ecs, entity, COMP_AI)) {
         CAI* ai = World_GetAI(&gw->ecs, entity);
+        if (ai->equippedWeapon != EQUIP_NONE) {
+            AbilityType wa = Inventory_GetWeaponAbility(ai->equippedWeapon);
+            if (wa != ABILITY_NONE) return wa;
+        }
         if (ai->attackType == ATTACK_RANGED || ai->attackType == ATTACK_MAGIC)
             return ABILITY_RANGED;
     }

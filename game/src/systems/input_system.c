@@ -36,6 +36,22 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
         if (IsKeyPressed(KEY_E)) { curTab++; if (curTab >= INV_TAB_COUNT) curTab = 0; ui->tab = (InventoryTab)curTab; ui->selection = 0; ui->scrollOffset = 0; if (ui->tab == INV_TAB_STATS) { if (ps && ps->statPoints > 0) { ui->statsActiveCol = 1; ui->statsSelection = 1; } else { ui->statsActiveCol = 0; ui->statsSelection = 3; } } return; }
         int wheel = (int)GetMouseWheelMove();
         if (wheel != 0) { ui->scrollOffset -= wheel * (int)(20 * GetUIScale()); if (ui->scrollOffset < 0) ui->scrollOffset = 0; }
+        if (wheel != 0 && ui->tab == INV_TAB_INVENTORY) {
+            float iscale = GetUIScale();
+            int itemH   = (int)(22 * iscale);
+            int topPad  = (int)(6 * iscale);
+            int contentH = (int)(280 * iscale);
+            int totalInv = game->inventorySlotCount + game->equipInventoryCount;
+            int maxScroll = topPad + totalInv * itemH - contentH;
+            if (ui->scrollOffset > maxScroll) ui->scrollOffset = maxScroll;
+            if (ui->scrollOffset < 0) ui->scrollOffset = 0;
+            int firstVisible = (ui->scrollOffset) / itemH;
+            int lastVisible  = (ui->scrollOffset + contentH) / itemH;
+            if (ui->selection < firstVisible) ui->selection = firstVisible;
+            if (ui->selection > lastVisible)  ui->selection = lastVisible;
+            if (ui->selection >= totalInv) ui->selection = totalInv - 1;
+            if (ui->selection < 0) ui->selection = 0;
+        }
     }
 
     if (ui->subState == INV_BROWSE && ui->tab == INV_TAB_STATS) {
@@ -187,8 +203,8 @@ void InputSystem_Inventory(GameWorld* game, InventoryUIState* ui) {
         if (ui->subState == INV_BROWSE && ui->tab == INV_TAB_INVENTORY && totalInv > 0) {
             float iscale = GetUIScale();
             int itemH = (int)(22 * iscale);
-            int contentH = (int)((400 - 24 - 40 - 60) * iscale);
-            int topPad = (int)(42 * iscale);
+            int contentH = (int)(280 * iscale);
+            int topPad = (int)(6 * iscale);
             if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { if (ui->selection > 0) { ui->selection--; int t = topPad - ui->scrollOffset + ui->selection * itemH; if (t < 0) { ui->scrollOffset += t; if (ui->scrollOffset < 0) ui->scrollOffset = 0; } } }
             if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) { if (ui->selection < totalInv - 1) { ui->selection++; int b = topPad - ui->scrollOffset + (ui->selection + 1) * itemH; if (b > contentH) ui->scrollOffset += (b - contentH); } }
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) { ui->subState = INV_ACTION_MENU; ui->actionSelection = 0; }

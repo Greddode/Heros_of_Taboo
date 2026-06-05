@@ -137,6 +137,11 @@
 #define GOLD_RARITY_BONUS_LEGENDARY 500
 #define GOLD_SELL_RATIO             0.5f
 
+// --- Potion sell prices -------------------------------------------------------
+#define POTION_SELL_SMALL           8
+#define POTION_SELL_MEDIUM         20
+#define POTION_SELL_LARGE          40
+
 // --- MP / abilities ----------------------------------------------------------
 #define MP_BASE            10
 #define MP_PER_INT          2
@@ -146,8 +151,8 @@
 // --- Challenge Rating / floor difficulty -------------------------------------
 #define CON_HP_SCALE         5
 #define STR_ATTACK_SCALE      2
-#define FLOOR_DR_BASE        3.0f
-#define FLOOR_DR_PER_FLOOR   2.5f
+#define FLOOR_DR_BASE        8.0f
+#define FLOOR_DR_PER_FLOOR   4.0f
 
 // =============================================================================
 // Inline formula functions

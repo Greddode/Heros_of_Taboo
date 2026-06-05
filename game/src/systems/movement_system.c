@@ -53,41 +53,53 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
         RevealFOW(gw);
         gw->state = STATE_ENEMY_TURN;
 
-        // Collect potions
-        if (gw->inventorySlotCount < MAX_INVENTORY_SLOTS) {
+        // Collect potions (list first, only collect if room exists)
+        {
             ItemType pTypes[MAX_POTIONS]; int pQtys[MAX_POTIONS];
-            int pCount = SpawnerSystem_CollectPickupsAt(gw, ppos->x, ppos->y, pTypes, pQtys, MAX_POTIONS);
-            for (int i = 0; i < pCount; i++) {
-                int picked = 0;
-                for (int q = 0; q < pQtys[i]; q++) {
-                    if (InventoryAdd(gw, pTypes[i])) picked++;
-                    else break;
-                }
-                if (picked > 0) {
-                    GameAudio_PlayPickupSound();
+            int pCount = SpawnerSystem_ListPotionsAt(gw, ppos->x, ppos->y,
+                             pTypes, pQtys, MAX_POTIONS);
+            if (pCount > 0) {
+                if (gw->inventorySlotCount >= MAX_INVENTORY_SLOTS) {
+                    FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
+                } else {
+                    SpawnerSystem_CollectPickupsAt(gw, ppos->x, ppos->y,
+                        pTypes, pQtys, MAX_POTIONS);
+                    for (int i = 0; i < pCount; i++) {
+                        int picked = 0;
+                        for (int q = 0; q < pQtys[i]; q++) {
+                            if (InventoryAdd(gw, pTypes[i])) picked++;
+                            else break;
+                        }
+                        if (picked > 0) GameAudio_PlayPickupSound();
+                    }
                 }
             }
-        } else if (gw->inventorySlotCount >= MAX_INVENTORY_SLOTS) {
-            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
-        // Collect equipment
-        if (gw->equipInventoryCount < MAX_INVENTORY_SLOTS) {
+        // Collect equipment (list first, only collect if room exists)
+        {
             EquipType eTypes[MAX_EQUIP_ON_MAP]; int eQtys[MAX_EQUIP_ON_MAP];
-            int eCount = SpawnerSystem_CollectEquipAt(gw, ppos->x, ppos->y, eTypes, eQtys, MAX_EQUIP_ON_MAP);
-            for (int i = 0; i < eCount; i++) {
-                int picked = 0;
-                for (int q = 0; q < eQtys[i]; q++) {
-                    if (AddEquipToInventory(gw, eTypes[i])) picked++;
-                    else break;
-                }
-                if (picked > 0) {
-                    const EquipData* d = GetEquipData(eTypes[i]);
-                    GameAudio_PlayPickupSound();
-                    SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
+            int eCount = SpawnerSystem_ListEquipAt(gw, ppos->x, ppos->y,
+                            eTypes, eQtys, MAX_EQUIP_ON_MAP);
+            if (eCount > 0) {
+                if (gw->equipInventoryCount >= MAX_INVENTORY_SLOTS) {
+                    FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
+                } else {
+                    SpawnerSystem_CollectEquipAt(gw, ppos->x, ppos->y,
+                        eTypes, eQtys, MAX_EQUIP_ON_MAP);
+                    for (int i = 0; i < eCount; i++) {
+                        int picked = 0;
+                        for (int q = 0; q < eQtys[i]; q++) {
+                            if (AddEquipToInventory(gw, eTypes[i])) picked++;
+                            else break;
+                        }
+                        if (picked > 0) {
+                            const EquipData* d = GetEquipData(eTypes[i]);
+                            GameAudio_PlayPickupSound();
+                            SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
+                        }
+                    }
                 }
             }
-        } else if (gw->equipInventoryCount >= MAX_INVENTORY_SLOTS) {
-            FloatMsg_Spawn(gw, ppos->x, ppos->y, RED, "Inventory full!");
         }
 
         // Stair / escape checks
