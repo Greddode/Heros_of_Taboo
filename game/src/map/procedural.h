@@ -2,6 +2,7 @@
 #define PROCEDURAL_H
 
 #include "map/tmx/tmx.h"
+#include "data/biome_data.h"
 
 // Tile GID constants — VelmoraRealms tileset (448×400, 28 cols, 700 tiles).
 #define TILE_WALL_CORNER_NW   14
@@ -36,6 +37,10 @@ typedef struct {
     int w, h;    // width and height in tiles
     int cx, cy;  // centre tile (for hall connections)
 } ProceduralRoom;
+
+// Set the current biome for the next procedural map generation.
+// Must be called BEFORE GenerateProceduralMap() so cave carving is active.
+void ProceduralMap_SetBiome(BiomeType biome);
 
 // Generate a complete dungeon map. Returns a MapData that must be freed with UnloadTMX().
 // If generateStairs is non-zero, a stair tile (TILE_STAIRS) is placed in a random room.

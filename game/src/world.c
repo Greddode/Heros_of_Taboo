@@ -23,6 +23,7 @@ void DamageNumber_Spawn(DamageNumberPool* pool, int value, int tileX, int tileY,
             return;
         }
     }
+    TraceLog(LOG_WARNING, "DamageNumber_Spawn: pool full [value=%d at (%d,%d)]", value, tileX, tileY);
 }
 
 void DamageNumber_UpdateAll(DamageNumberPool* pool, float dt) {
@@ -54,6 +55,7 @@ void FloatMsg_Spawn(GameWorld* gw, int tileX, int tileY, Color color, const char
             return;
         }
     }
+    TraceLog(LOG_WARNING, "FloatMsg_Spawn: pool full [at (%d,%d)]", tileX, tileY);
 }
 
 void FloatMsg_UpdateAll(GameWorld* gw, float dt) {

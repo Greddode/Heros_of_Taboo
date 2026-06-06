@@ -147,38 +147,45 @@ void Inspector_Render(const GameWorld* game, InspectorType type, int x, int y, i
             int descH = DrawDesc(desc, lx, ly, (x + w) - lx - (int)(10 * scale), descSize, BLACK);
             ly += descH + (int)(4 * scale);
 
-            ly += (int)(40 * scale);
-
             int statSize = (int)(14 * scale);
+            #define INSPECTOR_BOTTOM (y + h - (int)(12 * scale))
             if (d->bonusAttack > 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "ATK+%d", d->bonusAttack);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusDefense != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "DEF%+d", d->bonusDefense);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusMaxHp > 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "HP+%d", d->bonusMaxHp);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusStr != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "STR%+d", d->bonusStr);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusDex != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "DEX%+d", d->bonusDex);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusInt != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "MGC%+d", d->bonusInt);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusCon != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "CON%+d", d->bonusCon);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
             if (d->bonusLck != 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "LCK%+d", d->bonusLck);
                 DrawText(buf, lx, ly, statSize, BLACK); ly += (int)(18 * scale);
             }
@@ -211,6 +218,7 @@ void Inspector_Render(const GameWorld* game, InspectorType type, int x, int y, i
 
             int heal = GetItemHealAmount(selType);
             if (heal > 0) {
+                if (ly >= INSPECTOR_BOTTOM) return;
                 snprintf(buf, sizeof(buf), "Heals %d HP", heal);
                 DrawText(buf, lx, ly, (int)(14 * scale), BLACK);
             }

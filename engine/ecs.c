@@ -26,7 +26,7 @@ EntityId World_CreateEntity(World* w) {
         e = w->freeList[--w->freeCount];
     } else {
         if (w->count >= MAX_ENTITIES) {
-            TraceLog(LOG_WARNING, "World_CreateEntity: entity pool exhausted (MAX_ENTITIES=%d)", MAX_ENTITIES);
+            TraceLog(LOG_ERROR, "World_CreateEntity: entity pool exhausted (MAX_ENTITIES=%d) — critical failure", MAX_ENTITIES);
             return ENTITY_NONE;
         }
         e = w->count++;

@@ -1,4 +1,6 @@
 #include "spawner_system.h"
+#include "debug_log.h"
+#include "validation.h"
 #include "data/loot_data.h"
 #include "data/monster_data.h"
 #include "data/biome_data.h"
@@ -60,11 +62,27 @@ static int DistSq(int ax, int ay, int bx, int by) {
 }
 
 EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int y, int floor) {
+    if (!gw) return ENTITY_NONE;
+    if ((int)type >= MONSTER_TYPE_COUNT || (int)type < 0) {
+        TraceLog(LOG_ERROR, "SpawnerSystem_SpawnMonster: invalid monster type [type=%d]", (int)type);
+        return ENTITY_NONE;
+    }
+    if (!Validate_TilePos(gw, x, y)) {
+        TraceLog(LOG_WARNING, "SpawnerSystem_SpawnMonster: tile out of bounds [type=%d x=%d y=%d]", (int)type, x, y);
+        return ENTITY_NONE;
+    }
+    if (floor <= 0) {
+        TraceLog(LOG_WARNING, "SpawnerSystem_SpawnMonster: invalid floor [floor=%d]", floor);
+        return ENTITY_NONE;
+    }
     const MonsterTemplate* tpl = Monster_GetTemplate(type);
-    if (!tpl || !gw) return ENTITY_NONE;
+    if (!tpl) return ENTITY_NONE;
 
     EntityId e = World_CreateEntity(&gw->ecs);
-    if (e == ENTITY_NONE) return ENTITY_NONE;
+    if (e == ENTITY_NONE) {
+        TraceLog(LOG_ERROR, "SpawnerSystem_SpawnMonster: World_CreateEntity returned ENTITY_NONE [type=%d at (%d,%d)]", (int)type, x, y);
+        return ENTITY_NONE;
+    }
 
     World_AddComponent(&gw->ecs, e, COMP_POSITION);
     CPosition* pos = World_GetPosition(&gw->ecs, e);
@@ -139,6 +157,9 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
 
     SpatialHash_Add(gw, e, x, y);
     gw->aliveMonsterCount++;
+
+    DebugLog(DEBUG_SPAWNER, "SpawnMonster: %s type=%d at (%d,%d) floor=%d hp=%d/%d atk=%d def=%d lvl=%d exp=%d",
+             n->name, (int)type, x, y, floor, s->hp, s->maxHp, s->attack, s->defense, s->level, s->expValue);
 
     return e;
 }
@@ -242,13 +263,20 @@ void SpawnerSystem_SpawnMonsters(GameWorld* gw, const ProceduralRoom* rooms, int
             }
 
             EntityId spawned = SpawnerSystem_SpawnMonster(gw, type, mx, my, floor);
-            if (spawned != ENTITY_NONE) gw->monstersEverSpawned = true;
+            if (spawned != ENTITY_NONE) {
+                const MonsterTemplate* dt = Monster_GetTemplate(type);
+                DebugLog(DEBUG_SPAWNER, "SpawnFallback: %s type=%d at (%d,%d) floor=%d",
+                         dt ? dt->name : "?", (int)type, mx, my, floor);
+                gw->monstersEverSpawned = true;
+            }
         }
     }
 
     #undef ROOM_MAX_FLOORS
 
-    TraceLog(LOG_INFO, "Spawner: %d monsters placed", World_CountAliveMonsters(gw));
+    int aliveCount = World_CountAliveMonsters(gw);
+    DebugLog(DEBUG_SPAWNER, "SpawnFallback: total=%d monsters spawned", aliveCount);
+    TraceLog(LOG_INFO, "Spawner: %d monsters placed", aliveCount);
 }
 
 #define MAX_MONSTERS 100
@@ -363,6 +391,8 @@ void SpawnMonstersForFloor(GameWorld* game) {
             if (wi >= def->weaponPoolCount) wi = def->weaponPoolCount - 1;
             chosenWeapon = def->weaponPool[wi];
         }
+        if (floorNumber == 1 && chosenType == MONSTER_GOBLIN && chosenWeapon == EQUIP_SIMPLE_BOW)
+            chosenWeapon = EQUIP_DAGGER;
         if (def->armorPoolCount > 0) {
             int ai = (int)(monsterShare * (float)(def->armorPoolCount - 1) + 0.5f);
             if (ai >= def->armorPoolCount) ai = def->armorPoolCount - 1;
@@ -451,10 +481,19 @@ void SpawnMonstersForFloor(GameWorld* game) {
         game->aliveMonsterCount++;
         game->monstersEverSpawned = true;
 
-        remaining -= Monster_CalcCR(def, floorNumber);
+        float cr = Monster_CalcCR(def, floorNumber);
+        DebugLog(DEBUG_SPAWNER, "SpawnBudget: %s type=%d at (%d,%d) floor=%d CR=%.2f hp=%d/%d atk=%d def=%d lvl=%d weapon=%d armor=%d",
+                 n->name, (int)chosenType, sx, sy, floorNumber, cr,
+                 s->hp, s->maxHp, s->attack, s->defense, s->level,
+                 (int)chosenWeapon, (int)chosenArmor);
+
+        remaining -= cr;
         spawned++;
     }
 
+    DebugLog(DEBUG_SPAWNER, "SpawnBudget: total CR=%.2f spent=%.2f count=%d",
+             budget, budget - remaining, spawned);
+    if (spawned == 0) TraceLog(LOG_WARNING, "SpawnMonstersForFloor: 0 monsters spawned despite budget=%.2f [floor=%d]", budget, floorNumber);
     TraceLog(LOG_INFO, "Spawner(budget): %d monsters placed (%.1f budget remaining)", spawned, remaining);
 }
 
@@ -513,6 +552,7 @@ void SpawnShopRoom(GameWorld* game)
         strncpy(n->name, "Shopkeeper", sizeof(n->name) - 1);
 
         game->shopkeeperEntity = e;
+        DebugLog(DEBUG_SPAWNER, "ShopSpawn: at (%d,%d) room=%d floor=%d", cx, cy, r, game->currentFloor);
         TraceLog(LOG_INFO, "Shop room spawned at (%d, %d)", cx, cy);
         return;
     }
@@ -628,6 +668,9 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw) {
             if (pk->isEquip) pk->equipType = (EquipType)chosen->typeId;
             else pk->itemType = (ItemType)chosen->typeId;
             pk->quantity = 1;
+            DebugLog(DEBUG_SPAWNER, "SpawnPickup: %sqty=%d at (%d,%d) tier=%d",
+                     pk->isEquip ? "equip=" : "potion=",
+                     pk->quantity, lx, ly, chosenTier);
         }
     }
 
@@ -635,6 +678,8 @@ void SpawnerSystem_SpawnPickups(GameWorld* gw) {
 }
 
 EntityId SpawnerSystem_FindPickupAt(GameWorld* gw, int x, int y) {
+    if (!gw) return ENTITY_NONE;
+    if (!Validate_TilePos(gw, x, y)) { TraceLog(LOG_WARNING, "SpawnerSystem_FindPickupAt: tile out of bounds [x=%d y=%d]", x, y); return ENTITY_NONE; }
     for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
         if (!gw->ecs.alive[e]) continue;
         if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_PICKUP)) continue;
@@ -714,7 +759,7 @@ static EntityId FindStackablePickup(GameWorld* gw, int x, int y, bool isEquip, i
 
 static EntityId CreatePickupEntity(GameWorld* gw, int x, int y, bool isEquip, int typeId, int qty) {
     EntityId e = World_CreateEntity(&gw->ecs);
-    if (e == ENTITY_NONE) return ENTITY_NONE;
+    if (e == ENTITY_NONE) { TraceLog(LOG_WARNING, "CreatePickupEntity: no free entity slot [isEquip=%d type=%d at (%d,%d)]", (int)isEquip, typeId, x, y); return ENTITY_NONE; }
 
     World_AddComponent(&gw->ecs, e, COMP_POSITION);
     CPosition* pos = World_GetPosition(&gw->ecs, e);

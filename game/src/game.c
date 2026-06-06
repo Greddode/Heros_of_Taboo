@@ -1,4 +1,5 @@
 #include "game.h"
+#include "validation.h"
 #include "systems/spawner_system.h"
 #include "world.h"
 #include "data/monster_data.h"
@@ -298,6 +299,12 @@ void DescendFloor(GameWorld* game) {
     if (game->playerEntity != ENTITY_NONE) {
         World* w = &game->ecs;
         EntityId pe = game->playerEntity;
+        uint32_t requiredMask = COMP_POSITION | COMP_STATS | COMP_SPRITE_ANIM | COMP_PLAYER_TAG;
+        if (!Validate_EntityId(w, pe)) {
+            TraceLog(LOG_ERROR, "DescendFloor: player entity invalid after restore [e=%d]", (int)pe);
+        } else if (!World_HasComponents(w, pe, requiredMask)) {
+            TraceLog(LOG_ERROR, "DescendFloor: player missing required components after restore [e=%d mask=0x%x]", (int)pe, w->masks[pe]);
+        }
         for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
             if (game->equipped[i] != EQUIP_NONE) {
                 EquipmentBonus_Apply(w, pe, game->equipped[i]);
@@ -332,6 +339,13 @@ void DescendFloor(GameWorld* game) {
     LoadTilesets(game, NULL);
 
     Floor_InitNewFloor(game);
+
+    if (game->aliveMonsterCount == 0) {
+        TraceLog(LOG_WARNING, "DescendFloor: 0 alive monsters after floor init [floor=%d]", game->currentFloor);
+    }
+    if (game->stairX == 0 && game->stairY == 0) {
+        TraceLog(LOG_WARNING, "DescendFloor: stair position is (0,0) — possibly unset [floor=%d]", game->currentFloor);
+    }
 
     char floorMsg[64];
     snprintf(floorMsg, sizeof(floorMsg), "You descend to floor %d", game->currentFloor);

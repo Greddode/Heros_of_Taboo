@@ -14,9 +14,13 @@
 #include "systems/world_monster.h"
 #include "systems/spatial_hash.h"
 #include "data/monster_data.h"
+#include "data/biome_data.h"
+#include "systems/spawner_system.h"
+#include "map/procedural.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #define TEST_PASS()  printf("  PASS  %s\n", __func__)
 #define TEST_FAIL(msg) do { printf("  FAIL  %s: %s\n", __func__, msg); return false; } while(0)
@@ -336,6 +340,77 @@ static bool test_equipment_bonus_edge_cases(void)
 // Validation tests
 // =============================================================================
 
+static bool test_validate_entity_id(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    // ENTITY_NONE is invalid
+    CHECK(!Validate_EntityId(&gw.ecs, ENTITY_NONE), "ENTITY_NONE rejected");
+
+    // NULL world rejected
+    CHECK(!Validate_EntityId(NULL, ENTITY_NONE), "NULL world rejected");
+
+    // Valid entity
+    EntityId e = World_CreateEntity(&gw.ecs);
+    CHECK(e != ENTITY_NONE, "entity created");
+    CHECK(Validate_EntityId(&gw.ecs, e), "valid entity accepted");
+
+    // Destroyed entity rejected
+    World_DestroyEntity(&gw.ecs, e);
+    CHECK(!Validate_EntityId(&gw.ecs, e), "destroyed entity rejected");
+
+    // Out-of-bounds entity rejected
+    CHECK(!Validate_EntityId(&gw.ecs, (EntityId)9999), "out-of-bounds entity rejected");
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_tile_pos(void)
+{
+    GameWorld gw;
+    GameWorld_Init(&gw);
+
+    // NULL gw
+    CHECK(!Validate_TilePos(NULL, 0, 0), "NULL gw rejected");
+
+    // No map set
+    CHECK(!Validate_TilePos(&gw, 5, 5), "no map rejected");
+
+    // Set a map
+    MapData fakeMap;
+    memset(&fakeMap, 0, sizeof(fakeMap));
+    fakeMap.width = 100;
+    fakeMap.height = 100;
+    gw.map = &fakeMap;
+
+    CHECK(Validate_TilePos(&gw, 0, 0),     "(0,0) valid");
+    CHECK(Validate_TilePos(&gw, 99, 99),   "(99,99) valid");
+    CHECK(!Validate_TilePos(&gw, -1, 0),   "negative x rejected");
+    CHECK(!Validate_TilePos(&gw, 0, -1),   "negative y rejected");
+    CHECK(!Validate_TilePos(&gw, 100, 0),  "x >= width rejected");
+    CHECK(!Validate_TilePos(&gw, 0, 100),  "y >= height rejected");
+
+    TEST_PASS();
+    return true;
+}
+
+static bool test_validate_equip_slot(void)
+{
+    CHECK(Validate_EquipSlot(EQUIP_SLOT_HEAD),       "HEAD valid");
+    CHECK(Validate_EquipSlot(EQUIP_SLOT_CHEST),      "CHEST valid");
+    CHECK(Validate_EquipSlot(EQUIP_SLOT_WEAPON),     "WEAPON valid");
+    CHECK(Validate_EquipSlot(EQUIP_SLOT_OFF_HAND),   "OFF_HAND valid");
+    CHECK(Validate_EquipSlot(EQUIP_SLOT_ACCESSORY),  "ACCESSORY valid");
+    CHECK(!Validate_EquipSlot((EquipSlot)-1),         "negative slot rejected");
+    CHECK(!Validate_EquipSlot((EquipSlot)EQUIP_SLOT_COUNT), "OOB slot rejected");
+    CHECK(!Validate_EquipSlot((EquipSlot)99),         "large slot rejected");
+
+    TEST_PASS();
+    return true;
+}
+
 static bool test_validate_inventory_slot(void)
 {
     CHECK(Validate_InventorySlot(0, 16),         "slot 0 in 16");
@@ -600,6 +675,82 @@ static bool test_game_world_init_clears_grid(void)
     return true;
 }
 
+static bool test_goblin_no_bows_floor1(void)
+{
+    for (int iter = 0; iter < 50; iter++) {
+        GameWorld gw;
+        GameWorld_Init(&gw);
+
+        int* tileData = (int*)calloc(20 * 20, sizeof(int));
+        for (int i = 0; i < 20 * 20; i++) tileData[i] = TILE_FLOOR;
+
+        MapData map;
+        memset(&map, 0, sizeof(map));
+        map.width = 20; map.height = 20;
+        map.tileWidth = 32; map.tileHeight = 32;
+        map.layerCount = 1;
+        map.layers[0].width = 20; map.layers[0].height = 20;
+        map.layers[0].data = tileData;
+        gw.map = &map;
+        memset(gw.blocking, 0, sizeof(gw.blocking));
+        gw.currentBiome = BIOME_GOBLIN_DEN;
+        gw.currentFloor = 1;
+
+        EntityId player = World_CreateEntity(&gw.ecs);
+        World_AddComponent(&gw.ecs, player, COMP_POSITION);
+        CPosition* pp = World_GetPosition(&gw.ecs, player);
+        pp->x = 10; pp->y = 10;
+        gw.playerEntity = player;
+
+        Monster_InitTemplates();
+        SpawnMonstersForFloor(&gw);
+
+        int bowCount = 0;
+        for (EntityId e = 1; e < (EntityId)gw.ecs.count; e++) {
+            if (!gw.ecs.alive[e]) continue;
+            if (!World_HasComponents(&gw.ecs, e, COMP_AI)) continue;
+            CAI* ai = World_GetAI(&gw.ecs, e);
+            if (ai->type == MONSTER_GOBLIN && ai->equippedWeapon == EQUIP_SIMPLE_BOW)
+                bowCount++;
+        }
+
+        CHECK_EQ(bowCount, 0, "floor 1 goblins have no bows");
+
+        free(tileData);
+    }
+    TEST_PASS();
+    return true;
+}
+
+static bool test_goblin_den_room_corners(void)
+{
+    ProceduralMap_SetBiome(BIOME_GOBLIN_DEN);
+    MapData* map = GenerateProceduralMap(40, 40, 0);
+    CHECK(map != NULL, "map generated");
+
+    ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+    int count = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
+    CHECK(count >= 1, "at least one room");
+
+    int* data = map->layers[0].data;
+    int w = map->width;
+    for (int i = 0; i < count; i++) {
+        int rx = rooms[i].x, ry = rooms[i].y, rw = rooms[i].w, rh = rooms[i].h;
+        int nw = data[(ry - 1) * w + (rx - 1)];
+        int ne = data[(ry - 1) * w + (rx + rw)];
+        int sw = data[(ry + rh) * w + (rx - 1)];
+        int se = data[(ry + rh) * w + (rx + rw)];
+        CHECK(nw != 0 && !IsFloorGID(nw), "NW corner is wall tile");
+        CHECK(ne != 0 && !IsFloorGID(ne), "NE corner is wall tile");
+        CHECK(sw != 0 && !IsFloorGID(sw), "SW corner is wall tile");
+        CHECK(se != 0 && !IsFloorGID(se), "SE corner is wall tile");
+    }
+
+    UnloadTMX(map);
+    TEST_PASS();
+    return true;
+}
+
 // =============================================================================
 // Test runner
 // =============================================================================
@@ -633,6 +784,9 @@ static struct {
     {"equip_bonus_edge_cases",   test_equipment_bonus_edge_cases},
 
     // Validation
+    {"validate_entity_id",       test_validate_entity_id},
+    {"validate_tile_pos",        test_validate_tile_pos},
+    {"validate_equip_slot",      test_validate_equip_slot},
     {"validate_inventory_slot",  test_validate_inventory_slot},
     {"validate_equip_type",      test_validate_equip_type},
     {"validate_item_type",       test_validate_item_type},
@@ -642,6 +796,8 @@ static struct {
     {"clamp_int",                test_clamp_int},
 
     // Challenge Rating
+    {"goblin_no_bows_floor1",    test_goblin_no_bows_floor1},
+    {"goblin_den_room_corners",  test_goblin_den_room_corners},
     {"floor_1_goblin_cr",        test_floor_1_goblin_cr},
     {"floor_budget_increases",   test_floor_budget_increases},
     {"floor_scale_never_below_one", test_floor_scale_never_below_one},

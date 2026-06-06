@@ -1,13 +1,16 @@
 #include "equipment_bonus.h"
 #include "game_balance.h"
+#include "raylib.h"
 
 void EquipmentBonus_Apply(World* w, EntityId unit, EquipType type)
 {
-    if (!w || unit == ENTITY_NONE || type == EQUIP_NONE) return;
-    if (!World_HasComponents(w, unit, COMP_STATS)) return;
+    if (!w) { TraceLog(LOG_WARNING, "EquipmentBonus_Apply: NULL world"); return; }
+    if (unit == ENTITY_NONE) { TraceLog(LOG_WARNING, "EquipmentBonus_Apply: ENTITY_NONE [unit=%d]", (int)unit); return; }
+    if (type == EQUIP_NONE) { TraceLog(LOG_WARNING, "EquipmentBonus_Apply: EQUIP_NONE [unit=%d]", (int)unit); return; }
+    if (!World_HasComponents(w, unit, COMP_STATS)) { TraceLog(LOG_WARNING, "EquipmentBonus_Apply: missing COMP_STATS [unit=%d]", (int)unit); return; }
 
     const EquipData* data = GetEquipData(type);
-    if (!data) return;
+    if (!data) { TraceLog(LOG_WARNING, "EquipmentBonus_Apply: unknown equip type [type=%d]", (int)type); return; }
 
     CStats* s = World_GetStats(w, unit);
     s->attack  += data->bonusAttack;
@@ -23,11 +26,13 @@ void EquipmentBonus_Apply(World* w, EntityId unit, EquipType type)
 
 void EquipmentBonus_Remove(World* w, EntityId unit, EquipType type)
 {
-    if (!w || unit == ENTITY_NONE || type == EQUIP_NONE) return;
-    if (!World_HasComponents(w, unit, COMP_STATS)) return;
+    if (!w) { TraceLog(LOG_WARNING, "EquipmentBonus_Remove: NULL world"); return; }
+    if (unit == ENTITY_NONE) { TraceLog(LOG_WARNING, "EquipmentBonus_Remove: ENTITY_NONE [unit=%d]", (int)unit); return; }
+    if (type == EQUIP_NONE) { TraceLog(LOG_WARNING, "EquipmentBonus_Remove: EQUIP_NONE [unit=%d]", (int)unit); return; }
+    if (!World_HasComponents(w, unit, COMP_STATS)) { TraceLog(LOG_WARNING, "EquipmentBonus_Remove: missing COMP_STATS [unit=%d]", (int)unit); return; }
 
     const EquipData* data = GetEquipData(type);
-    if (!data) return;
+    if (!data) { TraceLog(LOG_WARNING, "EquipmentBonus_Remove: unknown equip type [type=%d]", (int)type); return; }
 
     CStats* s = World_GetStats(w, unit);
     s->attack  -= data->bonusAttack;
@@ -43,8 +48,9 @@ void EquipmentBonus_Remove(World* w, EntityId unit, EquipType type)
 
 void EquipmentBonus_Recalculate(World* w, EntityId unit)
 {
-    if (!w || unit == ENTITY_NONE) return;
-    if (!World_HasComponents(w, unit, COMP_STATS)) return;
+    if (!w) { TraceLog(LOG_WARNING, "EquipmentBonus_Recalculate: NULL world"); return; }
+    if (unit == ENTITY_NONE) { TraceLog(LOG_WARNING, "EquipmentBonus_Recalculate: ENTITY_NONE [unit=%d]", (int)unit); return; }
+    if (!World_HasComponents(w, unit, COMP_STATS)) { TraceLog(LOG_WARNING, "EquipmentBonus_Recalculate: missing COMP_STATS [unit=%d]", (int)unit); return; }
 
     CStats* s = World_GetStats(w, unit);
     int oldMax = s->maxHp;

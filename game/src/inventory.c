@@ -1,4 +1,6 @@
 #include "game.h"
+#include "debug_log.h"
+#include "validation.h"
 #include "ui/inspector.h"
 #include "resources.h"
 #include "game_balance.h"
@@ -82,7 +84,7 @@ static const EquipData EQUIP_TABLE[EQUIP_COUNT] = {
 
 // ---- Helpers ---------------------------------------------------------------
 const EquipData* GetEquipData(EquipType type) {
-    if (type < 0 || type >= EQUIP_COUNT) return NULL;
+    if (type < 0 || type >= EQUIP_COUNT) { TraceLog(LOG_WARNING, "GetEquipData: invalid type [type=%d]", (int)type); return NULL; }
     return &EQUIP_TABLE[type];
 }
 
@@ -98,23 +100,24 @@ int GetEquipRangeBonus(EquipType type) {
 }
 
 const char* GetItemName(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return "";
+    if (type < 0 || type >= ITEM_COUNT) { TraceLog(LOG_WARNING, "GetItemName: invalid type [type=%d]", (int)type); return ""; }
     return ITEM_NAMES[type];
 }
 
 int GetItemHealAmount(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return 0;
+    if (type < 0 || type >= ITEM_COUNT) { TraceLog(LOG_WARNING, "GetItemHealAmount: invalid type [type=%d]", (int)type); return 0; }
     return ITEM_HEALS[type];
 }
 
 const char* GetItemDescription(ItemType type) {
-    if (type < 0 || type >= ITEM_COUNT) return "";
+    if (type < 0 || type >= ITEM_COUNT) { TraceLog(LOG_WARNING, "GetItemDescription: invalid type [type=%d]", (int)type); return ""; }
     return ITEM_DESCS[type];
 }
 
 // ---- Inventory (potions) ---------------------------------------------------
 bool InventoryAdd(GameWorld* game, ItemType type) {
-    if (type == ITEM_NONE) return false;
+    if (type == ITEM_NONE) { TraceLog(LOG_WARNING, "InventoryAdd: ITEM_NONE"); return false; }
+    if (type >= ITEM_COUNT) { TraceLog(LOG_WARNING, "InventoryAdd: type out of range [type=%d]", (int)type); return false; }
     for (int i = 0; i < game->inventorySlotCount; i++) {
         if (game->inventory[i].type == type) {
             game->inventory[i].quantity++;
@@ -129,17 +132,22 @@ bool InventoryAdd(GameWorld* game, ItemType type) {
 }
 
 bool InventoryUse(GameWorld* game, int slot) {
-        if (slot < 0 || slot >= game->inventorySlotCount) return false;
+    if (!game) { TraceLog(LOG_WARNING, "InventoryUse: NULL game"); return false; }
+    if (game->playerEntity == ENTITY_NONE) { TraceLog(LOG_WARNING, "InventoryUse: player entity is ENTITY_NONE"); return false; }
+    if (slot < 0 || slot >= game->inventorySlotCount) { TraceLog(LOG_WARNING, "InventoryUse: slot out of range [slot=%d count=%d]", slot, game->inventorySlotCount); return false; }
     InventorySlot* s = &game->inventory[slot];
-    if (s->type == ITEM_NONE || s->quantity <= 0) return false;
+    if (s->type == ITEM_NONE || s->quantity <= 0) { TraceLog(LOG_WARNING, "InventoryUse: slot empty [slot=%d]", slot); return false; }
 
     int healPercent = GetItemHealAmount(s->type);
     if (healPercent > 0) {
         CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
+        int oldHP = ps->hp;
         int heal = calc_potion_heal(ps->maxHp, healPercent, ps->intel);
         ps->hp += heal;
         if (ps->hp > ps->maxHp)
             ps->hp = ps->maxHp;
+        DebugLog(DEBUG_INVENTORY, "UsePotion: type=%d HP=%d->%d heal=%d intelBonus=%d",
+                 (int)s->type, oldHP, ps->hp, ps->hp - oldHP, (int)ps->intel);
         {
             CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
             int tw = game->map->tileWidth;
@@ -200,9 +208,11 @@ void LoadPotionTextures(GameWorld* game) {
 
 // ---- Equipment management --------------------------------------------------
 bool EquipItem(GameWorld* game, EquipType type) {
-    if (type == EQUIP_NONE) return false;
+    if (type == EQUIP_NONE) { TraceLog(LOG_WARNING, "EquipItem: EQUIP_NONE"); return false; }
+    if (!game) { TraceLog(LOG_WARNING, "EquipItem: NULL game"); return false; }
+    if (game->playerEntity == ENTITY_NONE) { TraceLog(LOG_WARNING, "EquipItem: player entity is ENTITY_NONE"); return false; }
     const EquipData* data = GetEquipData(type);
-    if (!data) return false;
+    if (!data) { TraceLog(LOG_WARNING, "EquipItem: unknown equip type [type=%d]", (int)type); return false; }
 
         int slotIdx = (int)data->slot;
     CStats* ps = World_GetStats(&game->ecs, game->playerEntity);
@@ -240,6 +250,8 @@ bool EquipItem(GameWorld* game, EquipType type) {
         if (a->count < 1) a->count = 1;
     }
 
+    DebugLog(DEBUG_INVENTORY, "EquipItem: %s slot=%d atk=%d def=%d str=%d dex=%d int=%d con=%d lck=%d",
+             data->name, slotIdx, data->bonusAttack, data->bonusDefense, data->bonusStr, data->bonusDex, data->bonusInt, data->bonusCon, data->bonusLck);
     return true;
 }
 
@@ -269,6 +281,7 @@ void UnequipSlot(GameWorld* game, EquipSlot slot) {
     const EquipData* data = GetEquipData(oldType);
     if (!data) return;
 
+    DebugLog(DEBUG_INVENTORY, "UnequipSlot: %s slot=%d", data->name, slotIdx);
     EquipmentBonus_Remove(&game->ecs, game->playerEntity, oldType);
 
     game->equipped[slotIdx] = EQUIP_NONE;
@@ -326,14 +339,15 @@ bool IsDualWielding(const GameWorld* game) {
 }
 
 bool AddEquipToInventory(GameWorld* game, EquipType type) {
-    if (type == EQUIP_NONE) return false;
-        if (game->equipInventoryCount >= MAX_INVENTORY_SLOTS) return false;
+    if (type == EQUIP_NONE) { TraceLog(LOG_WARNING, "AddEquipToInventory: EQUIP_NONE"); return false; }
+    if (type >= EQUIP_COUNT) { TraceLog(LOG_WARNING, "AddEquipToInventory: type out of range [type=%d]", (int)type); return false; }
+        if (game->equipInventoryCount >= MAX_INVENTORY_SLOTS) { TraceLog(LOG_WARNING, "AddEquipToInventory: inventory full [count=%d]", game->equipInventoryCount); return false; }
     game->equipInventory[game->equipInventoryCount++] = type;
     return true;
 }
 
 bool RemoveEquipFromInventory(GameWorld* game, int slot) {
-        if (slot < 0 || slot >= game->equipInventoryCount) return false;
+        if (slot < 0 || slot >= game->equipInventoryCount) { TraceLog(LOG_WARNING, "RemoveEquipFromInventory: slot out of range [slot=%d count=%d]", slot, game->equipInventoryCount); return false; }
     for (int i = slot; i < game->equipInventoryCount - 1; i++)
         game->equipInventory[i] = game->equipInventory[i + 1];
     game->equipInventoryCount--;

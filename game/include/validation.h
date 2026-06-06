@@ -2,7 +2,11 @@
 #define VALIDATION_H
 
 #include "game_types.h"
+#include "ecs.h"
 #include <stdbool.h>
+
+// Forward declaration — GameWorld defined in world.h, included by .c files.
+struct GameWorld;
 
 // =============================================================================
 // validation.h — Lightweight input validation helpers for API boundaries
@@ -10,6 +14,20 @@
 // All functions are pure predicates or clamps — no side effects, no logging,
 // no behaviour changes.  Callers decide how to handle invalid inputs.
 // =============================================================================
+
+// --- Entity / world validation -----------------------------------------------
+// Returns true if e is not ENTITY_NONE, within world bounds, and alive.
+// w may be NULL.
+bool Validate_EntityId(const World* w, EntityId e);
+
+// --- Tile position validation ------------------------------------------------
+// Returns true if (x,y) is within the map bounds of gw.
+// gw or gw->map may be NULL.
+bool Validate_TilePos(const struct GameWorld* gw, int x, int y);
+
+// --- Equip slot validation ---------------------------------------------------
+// Returns true if slot is in [0, EQUIP_SLOT_COUNT-1].
+bool Validate_EquipSlot(EquipSlot slot);
 
 // --- Inventory & equipment slot validation -----------------------------------
 // Returns true if slot is a valid index into an array of slotCount elements.

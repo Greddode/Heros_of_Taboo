@@ -17,12 +17,16 @@ bool IsInRoom(int x, int y) {
 }
 
 void RevealFOW(GameWorld* game) {
-    int px = (game->playerEntity != ENTITY_NONE)
-        ? World_GetPosition(&game->ecs, game->playerEntity)->x
-        : 0;
-    int py = (game->playerEntity != ENTITY_NONE)
-        ? World_GetPosition(&game->ecs, game->playerEntity)->y
-        : 0;
+    if (game->playerEntity == ENTITY_NONE) {
+        TraceLog(LOG_WARNING, "RevealFOW: player entity is ENTITY_NONE");
+        return;
+    }
+    if (!World_HasComponents(&game->ecs, game->playerEntity, COMP_POSITION)) {
+        TraceLog(LOG_WARNING, "RevealFOW: player entity missing COMP_POSITION");
+        return;
+    }
+    int px = World_GetPosition(&game->ecs, game->playerEntity)->x;
+    int py = World_GetPosition(&game->ecs, game->playerEntity)->y;
 
     for (int y = 0; y < game->map->height; y++) {
         for (int x = 0; x < game->map->width; x++) {
@@ -100,14 +104,7 @@ void RevealFOW(GameWorld* game) {
                     if (wx < 0 || wx >= game->map->width || wy < 0 || wy >= game->map->height)
                         continue;
                     if (game->visibility[wy][wx] == 1) continue;
-                    if (!game->blocking[wy][wx]) continue;
-                    int cx = nx + diag[n][0];
-                    int cy = ny;
-                    int c2x = nx;
-                    int c2y = ny + diag[n][1];
-                    if (cx >= 0 && cx < game->map->width &&
-                        c2y >= 0 && c2y < game->map->height &&
-                        game->blocking[cy][cx] && game->blocking[c2y][c2x])
+                    if (game->blocking[wy][wx])
                         game->visibility[wy][wx] = 1;
                 }
             }
@@ -169,7 +166,8 @@ void SpawnShadow(GameWorld* game) {
 }
 
 void BuildBlockingMap(GameWorld* game) {
-    if (!game || !game->map) return;
+    if (!game) { TraceLog(LOG_WARNING, "BuildBlockingMap: NULL game"); return; }
+    if (!game->map) { TraceLog(LOG_WARNING, "BuildBlockingMap: game->map is NULL"); return; }
 
     int w = game->map->width;
     int h = game->map->height;
@@ -197,7 +195,11 @@ void BuildBlockingMap(GameWorld* game) {
 }
 
 void SpawnEntitiesFromObjects(GameWorld* game) {
-    if (!game || !game->map) return;
+    if (!game) { TraceLog(LOG_WARNING, "SpawnEntitiesFromObjects: NULL game"); return; }
+    if (!game->map) { TraceLog(LOG_WARNING, "SpawnEntitiesFromObjects: game->map is NULL"); return; }
+    if (game->map->objectCount > MAX_OBJECTS) {
+        TraceLog(LOG_WARNING, "SpawnEntitiesFromObjects: object count exceeds MAX_OBJECTS [count=%d max=%d]", game->map->objectCount, MAX_OBJECTS);
+    }
 
     for (int i = 0; i < game->map->objectCount; i++) {
         MapObject* obj = &game->map->objects[i];

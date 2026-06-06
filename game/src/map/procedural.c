@@ -1,4 +1,5 @@
 #include "procedural.h"
+#include "debug_log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,6 +28,12 @@ typedef struct {
 // Copy of the generated rooms exposed via GetGeneratedRooms() for the spawner
 static ProceduralRoom s_generatedRooms[MAX_GENERATED_ROOMS];
 static int s_generatedRoomCount = 0;
+
+static BiomeType s_currentBiome = BIOME_NONE;
+
+void ProceduralMap_SetBiome(BiomeType biome) {
+    s_currentBiome = biome;
+}
 
 // Stair tile position on the current generated map
 static int s_stairX = -1;
@@ -94,6 +101,33 @@ static int RectClearSkip(int* data, int mapW, int mapH,
         }
     }
     return 1;
+}
+
+// Cave carving: ellipse-based blob with random border erosion for GOBLIN_DEN biome
+static void CarveRoomCave(int* data, int mapW, int mapH,
+                          int roomX, int roomY, int rw, int rh)
+{
+    int maxCut = rw / 4;
+    if (rh / 4 < maxCut) maxCut = rh / 4;
+    if (maxCut < 1) maxCut = 1;
+    if (maxCut > 2) maxCut = 2;
+    int c = GetRandomValue(1, maxCut);
+
+    for (int y = roomY; y < roomY + rh; y++) {
+        for (int x = roomX; x < roomX + rw; x++) {
+            int fl = x - roomX;
+            int fr = (roomX + rw - 1) - x;
+            int ft = y - roomY;
+            int fb = (roomY + rh - 1) - y;
+
+            if (fl < c && ft < c) continue;
+            if (fr < c && ft < c) continue;
+            if (fl < c && fb < c) continue;
+            if (fr < c && fb < c) continue;
+
+            data[y * mapW + x] = RandomFloorGID();
+        }
+    }
 }
 
 // Sprout a new branch from an existing room.
@@ -222,9 +256,14 @@ static int GrowBranch(int* data, int mapW, int mapH,
     else CarveVLine(data, mapW, mapH, ty, ry, tx);
 
     // Carve the room
-    for (int y = roomY; y < roomY + rh; y++)
-        for (int x = roomX; x < roomX + rw; x++)
-            data[y * mapW + x] = RandomFloorGID();
+    if (s_currentBiome == BIOME_GOBLIN_DEN) {
+        CarveRoomCave(data, mapW, mapH, roomX, roomY, rw, rh);
+        data[ry * mapW + rx] = RandomFloorGID();
+    } else {
+        for (int y = roomY; y < roomY + rh; y++)
+            for (int x = roomX; x < roomX + rw; x++)
+                data[y * mapW + x] = RandomFloorGID();
+    }
 
     rooms[*roomCount] = (Room){ roomX, roomY, rw, rh, roomCX, roomCY, 0 };
     (*roomCount)++;
@@ -288,6 +327,11 @@ static void PlaceCornersNW(int* data, int mapW, int mapH) {
                 data[y * mapW + (x + 1)] == TILE_WALL_NORTH &&
                 data[(y + 1) * mapW + x] == TILE_WALL_WEST)
                 data[y * mapW + x] = TILE_WALL_CORNER_NW;
+            else if (data[y * mapW + x] == 0 &&
+                     IsFloorGID(data[(y + 1) * mapW + (x + 1)]) &&
+                     !IsFloorGID(data[y * mapW + (x + 1)]) &&
+                     !IsFloorGID(data[(y + 1) * mapW + x]))
+                data[y * mapW + x] = TILE_WALL_CORNER_NW;
 }
 
 static void PlaceCornersNE(int* data, int mapW, int mapH) {
@@ -296,6 +340,11 @@ static void PlaceCornersNE(int* data, int mapW, int mapH) {
             if (data[y * mapW + x] == 0 &&
                 data[y * mapW + (x - 1)] == TILE_WALL_NORTH &&
                 data[(y + 1) * mapW + x] == TILE_WALL_EAST)
+                data[y * mapW + x] = TILE_WALL_CORNER_NE;
+            else if (data[y * mapW + x] == 0 &&
+                     IsFloorGID(data[(y + 1) * mapW + (x - 1)]) &&
+                     !IsFloorGID(data[y * mapW + (x - 1)]) &&
+                     !IsFloorGID(data[(y + 1) * mapW + x]))
                 data[y * mapW + x] = TILE_WALL_CORNER_NE;
 }
 
@@ -306,6 +355,11 @@ static void PlaceCornersSW(int* data, int mapW, int mapH) {
                 data[(y - 1) * mapW + x] == TILE_WALL_WEST &&
                 data[y * mapW + (x + 1)] == TILE_WALL_SOUTH)
                 data[y * mapW + x] = TILE_WALL_CORNER_SW;
+            else if (data[y * mapW + x] == 0 &&
+                     IsFloorGID(data[(y - 1) * mapW + (x + 1)]) &&
+                     !IsFloorGID(data[(y - 1) * mapW + x]) &&
+                     !IsFloorGID(data[y * mapW + (x + 1)]))
+                data[y * mapW + x] = TILE_WALL_CORNER_SW;
 }
 
 static void PlaceCornersSE(int* data, int mapW, int mapH) {
@@ -314,6 +368,11 @@ static void PlaceCornersSE(int* data, int mapW, int mapH) {
             if (data[y * mapW + x] == 0 &&
                 data[(y - 1) * mapW + x] == TILE_WALL_EAST &&
                 data[y * mapW + (x - 1)] == TILE_WALL_SOUTH)
+                data[y * mapW + x] = TILE_WALL_CORNER_SE;
+            else if (data[y * mapW + x] == 0 &&
+                     IsFloorGID(data[(y - 1) * mapW + (x - 1)]) &&
+                     !IsFloorGID(data[(y - 1) * mapW + x]) &&
+                     !IsFloorGID(data[y * mapW + (x - 1)]))
                 data[y * mapW + x] = TILE_WALL_CORNER_SE;
 }
 
@@ -395,9 +454,13 @@ MapData* GenerateProceduralMap(int width, int height, int generateStairs) {
     int sy = height / 2 - sh / 2;
     rooms[roomCount++] = (Room){ sx, sy, sw, sh, sx + sw / 2, sy + sh / 2, 0 };
 
-    for (int y = sy; y < sy + sh; y++)
-        for (int x = sx; x < sx + sw; x++)
-            layer->data[y * width + x] = RandomFloorGID();
+    if (s_currentBiome == BIOME_GOBLIN_DEN) {
+        CarveRoomCave(layer->data, width, height, sx, sy, sw, sh);
+    } else {
+        for (int y = sy; y < sy + sh; y++)
+            for (int x = sx; x < sx + sw; x++)
+                layer->data[y * width + x] = RandomFloorGID();
+    }
 
     // ---- Grow branches like a plant: each room tries to sprout in unused directions ----
     for (int attempt = 0; attempt < MAX_ATTEMPTS && roomCount < MAX_ROOMS; attempt++) {
@@ -454,6 +517,19 @@ MapData* GenerateProceduralMap(int width, int height, int generateStairs) {
     PlaceICornersNW(layer->data, width, height);
     PlaceICornersSE(layer->data, width, height);
     PlaceICornersSW(layer->data, width, height);
+
+    // Fill any void diagonal corners on room bounding boxes
+    for (int i = 0; i < roomCount; i++) {
+        int rx = rooms[i].x, ry = rooms[i].y, rw = rooms[i].w, rh = rooms[i].h;
+        if (rx > 0 && ry > 0 && layer->data[(ry - 1) * width + (rx - 1)] == 0)
+            layer->data[(ry - 1) * width + (rx - 1)] = TILE_WALL_CORNER_NW;
+        if (rx + rw < width && ry > 0 && layer->data[(ry - 1) * width + (rx + rw)] == 0)
+            layer->data[(ry - 1) * width + (rx + rw)] = TILE_WALL_CORNER_NE;
+        if (rx > 0 && ry + rh < height && layer->data[(ry + rh) * width + (rx - 1)] == 0)
+            layer->data[(ry + rh) * width + (rx - 1)] = TILE_WALL_CORNER_SW;
+        if (rx + rw < width && ry + rh < height && layer->data[(ry + rh) * width + (rx + rw)] == 0)
+            layer->data[(ry + rh) * width + (rx + rw)] = TILE_WALL_CORNER_SE;
+    }
 
     // Sync the collision layer: anything that is not void and not floor is a wall
     for (int i = 0; i < tileCount; i++)
@@ -556,6 +632,13 @@ MapData* GenerateProceduralMap(int width, int height, int generateStairs) {
     obj->y = (float)(rooms[0].cy * map->tileHeight);
     map->objectCount = 1;
 
+    DebugLog(DEBUG_GENERATION, "Procedural: Generated %dx%d map biome=%d rooms=%d",
+             width, height, (int)s_currentBiome, roomCount);
+    for (int i = 0; i < roomCount; i++) {
+        DebugLog(DEBUG_GENERATION, "Procedural: room[%d] pos=(%d,%d) size=%dx%d center=(%d,%d)",
+                 i, rooms[i].x, rooms[i].y, rooms[i].w, rooms[i].h, rooms[i].cx, rooms[i].cy);
+    }
+    DebugLog(DEBUG_GENERATION, "Procedural: stairs=(%d,%d)", s_stairX, s_stairY);
     TraceLog(LOG_INFO, "Procedural: Generated %dx%d map", width, height);
     return map;
 }

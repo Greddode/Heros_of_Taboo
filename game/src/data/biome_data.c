@@ -9,8 +9,8 @@ static const BiomeDef BIOME_TABLE[BIOME_COUNT] = {
         .minFloor      = 1,
         .maxFloor      = 5,
         .spawnWeight   = 10,
-        .monsterPool   = { MONSTER_GOBLIN },
-        .monsterCount  = 1,
+        .monsterPool   = { MONSTER_GOBLIN, MONSTER_RANGER_GOBLIN },
+        .monsterCount  = 2,
         .tilesetPath   = "resources/tilesets/dungeon.png",
     },
 };

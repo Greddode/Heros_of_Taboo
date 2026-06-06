@@ -1,4 +1,6 @@
 #include "floor_init.h"
+#include "debug_log.h"
+#include "validation.h"
 #include "systems/spawner_system.h"
 #include "data/monster_data.h"
 #include "systems/world_monster.h"
@@ -8,7 +10,8 @@
 
 void Floor_InitNewFloor(GameWorld* game)
 {
-    if (!game || !game->map) return;
+    if (!game) { TraceLog(LOG_WARNING, "Floor_InitNewFloor: NULL game"); return; }
+    if (!game->map) { TraceLog(LOG_WARNING, "Floor_InitNewFloor: game->map is NULL"); return; }
 
     game->shopkeeperEntity = ENTITY_NONE;
 
@@ -17,6 +20,7 @@ void Floor_InitNewFloor(GameWorld* game)
     Monster_InitTemplates();
 
     game->currentBiome = Biome_SelectForFloor(game->currentFloor);
+    ProceduralMap_SetBiome(game->currentBiome);
 
     SpawnEntitiesFromObjects(game);
 
@@ -58,4 +62,22 @@ void Floor_InitNewFloor(GameWorld* game)
     game->camera.offset = (Vector2){ GetScreenWidth() / 2, GetScreenHeight() / 2 };
     game->camera.rotation = 0;
     game->camera.zoom = DEFAULT_CAMERA_ZOOM;
+
+    DebugLog(DEBUG_FLOOR, "Floor_Init: floor=%d biome=%d map=%dx%d",
+             game->currentFloor, (int)game->currentBiome, game->map->width, game->map->height);
+    {
+        ProceduralRoom rooms[MAX_GENERATED_ROOMS];
+        int rc = GetGeneratedRooms(rooms, MAX_GENERATED_ROOMS);
+        if (rc == 0) TraceLog(LOG_WARNING, "Floor_InitNewFloor: no rooms generated [floor=%d]", game->currentFloor);
+        DebugLog(DEBUG_FLOOR, "Floor_Init: rooms=%d", rc);
+        for (int i = 0; i < rc; i++) {
+            DebugLog(DEBUG_GENERATION, "Floor_Init: room[%d] pos=(%d,%d) size=%dx%d",
+                     i, rooms[i].x, rooms[i].y, rooms[i].w, rooms[i].h);
+        }
+    }
+    if (game->stairX == 0 && game->stairY == 0 && game->currentFloor > 0)
+        TraceLog(LOG_WARNING, "Floor_InitNewFloor: stair position is (0,0) [floor=%d]", game->currentFloor);
+    DebugLog(DEBUG_FLOOR, "Floor_Init: stairs=(%d,%d)", game->stairX, game->stairY);
+    if (game->escapeSpawned)
+        DebugLog(DEBUG_FLOOR, "Floor_Init: escape=(%d,%d)", game->escapeX, game->escapeY);
 }
