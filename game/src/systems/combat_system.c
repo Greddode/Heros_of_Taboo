@@ -154,30 +154,30 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
             }
             if (ms->hp <= 0) {
                 DebugLog(DEBUG_COMBAT, "Kill: %s XP=%d (off-hand)", monName, ms->expValue);
-                ms->alive = false;
-                ms->hp = 0;
+                GainExperience(game, ms->expValue);
+                DropMonsterEquipment(game, mon);
                 {
                     CPosition* dp = World_GetPosition(&game->ecs, mon);
                     SpatialHash_Remove(game, mon, dp->x, dp->y);
                 }
-                DropMonsterEquipment(game, mon);
+                World_DestroyEntity(&game->ecs, mon);
                 game->aliveMonsterCount--;
-                GainExperience(game, ms->expValue);
+                ms = NULL;
+                return true;
             }
         }
     }
 
-    if (ms->hp <= 0) {
+    if (ms && ms->hp <= 0) {
         DebugLog(DEBUG_COMBAT, "Kill: %s XP=%d", monName, ms->expValue);
-        ms->alive = false;
-        ms->hp = 0;
+        GainExperience(game, ms->expValue);
+        DropMonsterEquipment(game, mon);
         {
             CPosition* dp = World_GetPosition(&game->ecs, mon);
             SpatialHash_Remove(game, mon, dp->x, dp->y);
         }
-        DropMonsterEquipment(game, mon);
+        World_DestroyEntity(&game->ecs, mon);
         game->aliveMonsterCount--;
-        GainExperience(game, ms->expValue);
     }
     return true;
 }
@@ -306,15 +306,14 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
 
     if (ms->hp <= 0) {
         DebugLog(DEBUG_COMBAT, "Kill: %s XP=%d (ranged)", monName, ms->expValue);
-        ms->alive = false;
-        ms->hp = 0;
+        GainExperience(game, ms->expValue);
+        DropMonsterEquipment(game, target);
         {
             CPosition* dp = World_GetPosition(&game->ecs, target);
             SpatialHash_Remove(game, target, dp->x, dp->y);
         }
-        DropMonsterEquipment(game, target);
+        World_DestroyEntity(&game->ecs, target);
         game->aliveMonsterCount--;
-        GainExperience(game, ms->expValue);
     }
 
     return true;
@@ -458,15 +457,14 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
 
             if (ms->hp <= 0) {
                 DebugLog(DEBUG_COMBAT, "Kill: %s XP=%d (throw)", monName, ms->expValue);
-                ms->alive = false;
-                ms->hp = 0;
+                GainExperience(game, ms->expValue);
+                DropMonsterEquipment(game, target);
                 {
                     CPosition* dp = World_GetPosition(&game->ecs, target);
                     SpatialHash_Remove(game, target, dp->x, dp->y);
                 }
-                DropMonsterEquipment(game, target);
+                World_DestroyEntity(&game->ecs, target);
                 game->aliveMonsterCount--;
-                GainExperience(game, ms->expValue);
             }
         }
     }

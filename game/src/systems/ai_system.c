@@ -438,7 +438,7 @@ bool AISystem_ProcessAll(GameWorld* gw, int timeWaited) {
         CAI* ai = World_GetAI(&gw->ecs, e);
 
         if (!s->alive) {
-            TraceLog(LOG_WARNING, "AISystem_ProcessAll: desync — ecs.alive=true but CStats.alive=false [e=%d type=%d]", (int)e, (int)ai->type);
+            TraceLog(LOG_ERROR, "AISystem_ProcessAll: desync — ecs.alive=true but CStats.alive=false [e=%d type=%d]", (int)e, (int)ai->type);
             continue;
         }
 
