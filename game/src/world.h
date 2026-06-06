@@ -120,9 +120,18 @@ typedef struct GameWorld {
 
     // Minimap
     bool mapOpen;
+
+    // Shop UI state
+    int shopSelection;
+    int shopSection;
+
+    // Pre-filtered visible monsters cache (for render performance)
+    EntityId visibleMonsters[MAX_ENTITIES];
+    int visibleMonsterCount;
 } GameWorld;
 
 void GameWorld_Init(GameWorld* gw);
+void GameWorld_RefreshVisibleMonsters(GameWorld* gw);
 
 void DamageNumber_Spawn(DamageNumberPool* pool, int value, int tileX, int tileY, int tw, int th, Color color);
 void DamageNumber_UpdateAll(DamageNumberPool* pool, float dt);

@@ -39,6 +39,11 @@ The game is composed of **stateless systems** that operate on the `GameWorld` st
 | Spatial Hash | `spatial_hash.c` | Spawn/move/death | On position change |
 | World Monster | `world_monster.c` | Queries / animation | On demand / every frame |
 | Ability | `ability_system.c` | (stub) | Not yet active |
+| Atlas | `atlas.c` | Startup | Once per session |
+| Event Bus | `event_bus.c` | At publish points | On event |
+| Config | `config.c` | Startup / F3 | Once per session / on demand |
+| Debug Log | `debug_log.c` | At log points | On every log call |
+| Crash Handler | `debug_log.c` | On unhandled exception | On crash |
 
 ---
 
@@ -577,6 +582,100 @@ The `CAbilities` component exists and is populated on the player and some monste
 
 ---
 
+## Event Bus
+
+**File**: `event_bus.h/c`
+
+### Design
+
+A synchronous publish/subscribe event bus with 9 event types and fixed subscriber table (max 8 per event). File-scope singleton (same pattern as `game_audio.c`). Events fire immediately at publish time — no queue or flush step needed.
+
+### Event Types
+
+| Event | Payload | Published From |
+|-------|---------|---------------|
+| `EVT_MONSTER_KILLED` | id, type, pos, xp, gold, dropped equip | combat_system.c (4 death blocks) |
+| `EVT_MONSTER_SPAWNED` | id, type, pos | spawner_system.c (both paths) |
+| `EVT_PLAYER_LEVEL_UP` | old level, new level, stat points | player.c ApplyLevelUp |
+| `EVT_PLAYER_DAMAGED` | damage, hp remaining | ai_system.c (3 attack points) |
+| `EVT_ITEM_PICKED_UP` | pos, equip/potion, type id, qty | movement_system.c |
+| `EVT_ITEM_EQUIPPED` | equip type | equipment_management.c EquipItem |
+| `EVT_ITEM_UNEQUIPPED` | equip type | equipment_management.c UnequipSlot |
+| `EVT_FLOOR_DESCENDED` | old floor, new floor | game.c DescendFloor |
+| `EVT_GOLD_GAINED` | amount, total gold | shop_ui.c sell points |
+
+### Current Subscribers
+
+- `EVT_MONSTER_KILLED` → DebugLog handler
+- `EVT_PLAYER_LEVEL_UP` → DebugLog handler
+- `EVT_FLOOR_DESCENDED` → DebugLog handler
+
+---
+
+## JSON Configuration
+
+**Files**: `config.h/c`, `resources/balance.json`
+
+### Design
+
+File-scope cJSON singleton. Loads `balance.json` at startup via raylib's `LoadFileText()`. All `game_balance.h` inline formulas call `Config_GetInt/Float/Bool("section", "key", DEFAULT_MACRO)`. Missing file or keys silently return the `#define` fallback. F3 reloads config at runtime in DEBUG builds.
+
+### Config Hierarchy
+
+15 sections in `balance.json`: player, hp, xp, combat, wait, ai, camera, ui, gold, mp, shadow, atlas, potion, throw, magic.
+
+---
+
+## Texture Atlas
+
+**File**: `atlas.h/c`
+
+### Design
+
+Runtime atlas builder. At startup, loads all monster/equipment/potion sprites via `LoadImage()`, packs them row-by-row into 3 atlases (1024px wide), converts to `Texture2D`. All draw calls use shared atlas textures with per-sprite source rectangles — reducing N individual texture binds to 3 atlases.
+
+### Atlases
+
+| Atlas | Contents | Entries |
+|-------|----------|---------|
+| Monster | All 11 monster spritesheets | 11 |
+| Equipment | All 25+ equipment icons | 25 |
+| Item | 3 potion sprites | 3 |
+
+---
+
+## Render Filter & Animation Cache
+
+**Files**: `world.h` (GameWorld fields), `world.c` (GameWorld_RefreshVisibleMonsters), `render_system.c`, `world_monster.c`
+
+### Design
+
+`GameWorld.visibleMonsters[MAX_ENTITIES]` pre-filters visible monsters once per frame via `GameWorld_RefreshVisibleMonsters()`. Both `RenderSystem_DrawMonsters()` and `World_UpdateMonsterAnimations()` iterate the cached array instead of scanning all 128 entities. Cache refreshed at render start and after `RevealFOW()`.
+
+---
+
+## Debug Logging & Crash Handler
+
+**Files**: `debug_log.h/c`
+
+### Design
+
+Category-filtered debug logging with bitmask enum (8 categories + DEBUG_ALL). Output to `logs/latest/debug.log` with automatic archiving to `logs/old/` on restart. `SetUnhandledExceptionFilter` crash handler writes register dump to `logs/crash/crash_TIMESTAMP.txt` on access violations.
+
+### Log Hierarchy
+
+```
+logs/
+├── latest/
+│   └── debug.log       ← current session
+├── old/
+│   └── debug_YYYY-MM-DD_HH-MM-SS.log  ← archived
+└── crash/
+    └── crash_YYYY-MM-DD_HH-MM-SS.txt  ← crash reports
+```
+
+---
+
 ## System Interaction Matrix
 
 This matrix shows which systems call functions from other systems:
@@ -621,6 +720,8 @@ Key interactions:
 | `equipped` | inventory.c | inventory_ui, renderer, input, Combat |
 | `gold` | Combat | renderer, shop_ui |
 | `currentFloor` | game.c (DescendFloor) | floor_init, spawner, renderer |
+| `visibleMonsters` | World_Renderer, map_helpers | render_system, world_monster |
+| `shopSelection` | shop_ui | shop_ui |
 | `damageNumbers` | Combat, inventory.c | game.c (update), renderer.c |
 | `floatMsgs` | Combat, Movement, game.c, inventory.c | game.c (update), renderer.c |
 

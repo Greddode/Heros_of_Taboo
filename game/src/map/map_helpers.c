@@ -110,6 +110,7 @@ void RevealFOW(GameWorld* game) {
             }
         }
     }
+    GameWorld_RefreshVisibleMonsters(game);
 }
 
 Vector2 TileToScreen(int x, int y, int tw, int th) {

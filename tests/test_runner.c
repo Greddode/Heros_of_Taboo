@@ -17,6 +17,8 @@
 #include "data/biome_data.h"
 #include "systems/spawner_system.h"
 #include "map/procedural.h"
+#include "event_bus.h"
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -484,8 +486,86 @@ static bool test_clamp_int(void)
 }
 
 // =============================================================================
-// Challenge Rating tests
+// Event bus tests
 // =============================================================================
+
+static int s_evtCount = 0;
+static void EvtCounter(void* data) {
+    (void)data;
+    s_evtCount++;
+}
+
+static bool test_eventbus_subscribe_publish(void)
+{
+    EventBus_Init();
+    s_evtCount = 0;
+    EventBus_Subscribe(EVT_MONSTER_KILLED, EvtCounter);
+    MonsterKilledEvent evt = { 0, 0, 0, 0, 0, 0, 0 };
+    EventBus_Publish(EVT_MONSTER_KILLED, &evt);
+    CHECK_EQ(s_evtCount, 1, "subscriber fired");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_eventbus_multiple_subscribers(void)
+{
+    EventBus_Init();
+    s_evtCount = 0;
+    EventBus_Subscribe(EVT_PLAYER_LEVEL_UP, EvtCounter);
+    EventBus_Subscribe(EVT_PLAYER_LEVEL_UP, EvtCounter);
+    EventBus_Subscribe(EVT_PLAYER_LEVEL_UP, EvtCounter);
+    PlayerLevelUpEvent evt = { 1, 2, 2 };
+    EventBus_Publish(EVT_PLAYER_LEVEL_UP, &evt);
+    CHECK_EQ(s_evtCount, 3, "all 3 subscribers fired");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_eventbus_no_subscribers(void)
+{
+    EventBus_Init();
+    EventBus_Publish(EVT_FLOOR_DESCENDED, NULL);
+    TEST_PASS();
+    return true;
+}
+
+static bool test_eventbus_subscriber_table_full(void)
+{
+    EventBus_Init();
+    for (int i = 0; i < EVT_MAX_SUBSCRIBERS + 4; i++)
+        EventBus_Subscribe(EVT_ITEM_PICKED_UP, EvtCounter);
+    s_evtCount = 0;
+    ItemPickedUpEvent evt = { 0, 0, false, 0, 0 };
+    EventBus_Publish(EVT_ITEM_PICKED_UP, &evt);
+    CHECK_EQ(s_evtCount, EVT_MAX_SUBSCRIBERS, "capped at max subscribers");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_eventbus_clear(void)
+{
+    EventBus_Init();
+    EventBus_Subscribe(EVT_ITEM_EQUIPPED, EvtCounter);
+    EventBus_Clear();
+    s_evtCount = 0;
+    ItemEquippedEvent evt = { EQUIP_SURVIVAL_KNIFE };
+    EventBus_Publish(EVT_ITEM_EQUIPPED, &evt);
+    CHECK_EQ(s_evtCount, 0, "clear removes subscribers");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_eventbus_null_callback_rejected(void)
+{
+    EventBus_Init();
+    s_evtCount = 0;
+    EventBus_Subscribe(EVT_GOLD_GAINED, NULL);
+    GoldGainedEvent evt = { 10, 100 };
+    EventBus_Publish(EVT_GOLD_GAINED, &evt);
+    CHECK_EQ(s_evtCount, 0, "NULL callback ignored");
+    TEST_PASS();
+    return true;
+}
 
 static bool test_floor_1_goblin_cr(void)
 {
@@ -517,13 +597,11 @@ static bool test_floor_scale_never_below_one(void)
     Monster_InitTemplates();
     const MonsterTemplate* goblin = Monster_GetTemplate(MONSTER_GOBLIN);
     CHECK(goblin != NULL, "goblin template exists");
-    // minFloor is 1, so floor 0 should clamp scale to 1.0
     float cr0 = Monster_CalcCR(goblin, 0);
     CHECK(cr0 > 0, "CR positive even below min floor");
     TEST_PASS();
     return true;
 }
-// =============================================================================
 
 static bool test_spatial_hash_basic(void)
 {
@@ -532,17 +610,14 @@ static bool test_spatial_hash_basic(void)
 
     CHECK_EQ(gw.aliveMonsterCount, 0, "initial monster count is 0");
 
-    // spawn something that isn't a monster — should not touch grid
     EntityId e = World_CreateEntity(&gw.ecs);
     CHECK(e != ENTITY_NONE, "entity creation");
     World_AddComponent(&gw.ecs, e, COMP_POSITION);
     World_AddComponent(&gw.ecs, e, COMP_STATS);
     World_GetStats(&gw.ecs, e)->alive = true;
 
-    // No COMP_AI — not a monster, not in grid
     CHECK_EQ(World_FindMonsterAt(&gw, 5, 5, ENTITY_NONE), ENTITY_NONE, "no monster in grid");
 
-    // Create a real monster (with COMP_AI) and add to grid manually
     EntityId m = World_CreateEntity(&gw.ecs);
     CHECK(m != ENTITY_NONE, "monster entity creation");
     World_AddComponent(&gw.ecs, m, COMP_POSITION);
@@ -577,12 +652,10 @@ static bool test_spatial_hash_move(void)
     SpatialHash_Add(&gw, m, 3, 4);
     CHECK_EQ(World_FindMonsterAt(&gw, 3, 4, ENTITY_NONE), m, "monster at start");
 
-    // Move to (5,6)
     SpatialHash_Move(&gw, m, 3, 4, 5, 6);
     CHECK_EQ(World_FindMonsterAt(&gw, 3, 4, ENTITY_NONE), ENTITY_NONE, "old tile cleared");
     CHECK_EQ(World_FindMonsterAt(&gw, 5, 6, ENTITY_NONE), m, "monster at new tile");
 
-    // Move again to (0,0)
     SpatialHash_Move(&gw, m, 5, 6, 0, 0);
     CHECK_EQ(World_FindMonsterAt(&gw, 5, 6, ENTITY_NONE), ENTITY_NONE, "intermediate tile cleared");
     CHECK_EQ(World_FindMonsterAt(&gw, 0, 0, ENTITY_NONE), m, "monster at (0,0)");
@@ -605,14 +678,11 @@ static bool test_spatial_hash_exclude(void)
     World_GetStats(&gw.ecs, b)->alive = true;
 
     SpatialHash_Add(&gw, a, 7, 7);
-    SpatialHash_Add(&gw, b, 7, 7);  // overwrites — two monsters can't share tile
+    SpatialHash_Add(&gw, b, 7, 7);
 
-    // Without exclude, should find whatever is in the grid
     CHECK_EQ(World_FindMonsterAt(&gw, 7, 7, ENTITY_NONE), b, "b occupies tile after overwrite");
 
-    // Excluding b should still find b in the grid (or none if grid is stale)
     if (World_HasComponents(&gw.ecs, b, COMP_AI)) {
-        // grid has b — excluding b returns none
         CHECK_EQ(World_FindMonsterAt(&gw, 7, 7, b), ENTITY_NONE, "exclude b returns none");
     }
 
@@ -626,7 +696,6 @@ static bool test_alive_monster_counter(void)
     GameWorld_Init(&gw);
     CHECK_EQ(gw.aliveMonsterCount, 0, "initial count zero");
 
-    // Spawn a monster (simulate what SpawnerSystem_SpawnMonster does)
     EntityId m = World_CreateEntity(&gw.ecs);
     CHECK(m != ENTITY_NONE, "entity creation");
     World_AddComponent(&gw.ecs, m, COMP_POSITION | COMP_STATS | COMP_AI);
@@ -637,7 +706,6 @@ static bool test_alive_monster_counter(void)
     CHECK_EQ(gw.aliveMonsterCount, 1, "count after spawn");
     CHECK_EQ(World_CountAliveMonsters(&gw), 1, "count function matches");
 
-    // Kill it (simulate combat death)
     World_GetStats(&gw.ecs, m)->alive = false;
     SpatialHash_Remove(&gw, m, 0, 0);
     gw.aliveMonsterCount--;
@@ -645,7 +713,6 @@ static bool test_alive_monster_counter(void)
     CHECK_EQ(gw.aliveMonsterCount, 0, "count after death");
     CHECK(World_AreAllMonstersDead(&gw), "all monsters dead");
 
-    // Reinit clears counter
     GameWorld_Init(&gw);
     CHECK_EQ(gw.aliveMonsterCount, 0, "count after reinit");
 
@@ -658,10 +725,8 @@ static bool test_game_world_init_clears_grid(void)
     GameWorld gw;
     GameWorld_Init(&gw);
 
-    // After init, grid should be cleared (all ENTITY_NONE)
     CHECK_EQ(World_FindMonsterAt(&gw, 50, 50, ENTITY_NONE), ENTITY_NONE, "init clears grid");
 
-    // Add something, reinit, verify cleared
     EntityId m = World_CreateEntity(&gw.ecs);
     World_AddComponent(&gw.ecs, m, COMP_POSITION | COMP_STATS | COMP_AI);
     World_GetStats(&gw.ecs, m)->alive = true;
@@ -671,6 +736,67 @@ static bool test_game_world_init_clears_grid(void)
     GameWorld_Init(&gw);
     CHECK_EQ(World_FindMonsterAt(&gw, 30, 40, ENTITY_NONE), ENTITY_NONE, "reinit clears grid");
 
+    TEST_PASS();
+    return true;
+}
+
+// =============================================================================
+// Config tests
+// =============================================================================
+
+static bool test_config_not_loaded_returns_default(void)
+{
+    Config_Unload();
+    int val = Config_GetInt("player", "base_str", 42);
+    CHECK_EQ(val, 42, "default returned when not loaded");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_config_missing_section_returns_default(void)
+{
+    Config_LoadFromString("{\"other\":{\"x\":1}}");
+    int val = Config_GetInt("player", "base_str", 99);
+    CHECK_EQ(val, 99, "default on missing section");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_config_missing_key_returns_default(void)
+{
+    Config_LoadFromString("{\"player\":{\"other\":1}}");
+    int val = Config_GetInt("player", "base_str", 88);
+    CHECK_EQ(val, 88, "default on missing key");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_config_float_parsed_correctly(void)
+{
+    Config_LoadFromString("{\"combat\":{\"dex_ranged_mult\":1.5}}");
+    float val = Config_GetFloat("combat", "dex_ranged_mult", 0.0f);
+    CHECK_EQ((int)(val * 10), 15, "float parsed as 1.5");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_config_bool_true_false(void)
+{
+    Config_LoadFromString("{\"test\":{\"yes\":true,\"no\":false}}");
+    bool t = Config_GetBool("test", "yes", false);
+    bool f = Config_GetBool("test", "no", true);
+    CHECK(t, "bool true parsed");
+    CHECK(!f, "bool false parsed");
+    TEST_PASS();
+    return true;
+}
+
+static bool test_config_unload_returns_defaults(void)
+{
+    Config_LoadFromString("{\"player\":{\"base_str\":10}}");
+    Config_Unload();
+    int val = Config_GetInt("player", "base_str", 7);
+    CHECK_EQ(val, 7, "default after unload");
     TEST_PASS();
     return true;
 }
@@ -794,6 +920,22 @@ static struct {
     {"validate_stat_index",      test_validate_stat_index},
     {"validate_floor",           test_validate_floor},
     {"clamp_int",                test_clamp_int},
+
+    // Config
+    {"config_not_loaded_default",  test_config_not_loaded_returns_default},
+    {"config_missing_section",     test_config_missing_section_returns_default},
+    {"config_missing_key",         test_config_missing_key_returns_default},
+    {"config_float_parsed",        test_config_float_parsed_correctly},
+    {"config_bool_true_false",     test_config_bool_true_false},
+    {"config_unload",              test_config_unload_returns_defaults},
+
+    // Event bus
+    {"eventbus_subscribe_publish",   test_eventbus_subscribe_publish},
+    {"eventbus_multiple_subscribers", test_eventbus_multiple_subscribers},
+    {"eventbus_no_subscribers",      test_eventbus_no_subscribers},
+    {"eventbus_table_full",          test_eventbus_subscriber_table_full},
+    {"eventbus_clear",               test_eventbus_clear},
+    {"eventbus_null_callback",       test_eventbus_null_callback_rejected},
 
     // Challenge Rating
     {"goblin_no_bows_floor1",    test_goblin_no_bows_floor1},

@@ -26,13 +26,9 @@ bool World_AreAllMonstersDead(GameWorld* gw) {
 
 void World_UpdateMonsterAnimations(GameWorld* gw, float dt) {
     if (!gw) return;
-    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
-        if (!gw->ecs.alive[e]) continue;
-        if (!World_HasComponents(&gw->ecs, e, COMP_STATS | COMP_SPRITE_ANIM | COMP_AI)) continue;
-        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
-
-        CStats* s = World_GetStats(&gw->ecs, e);
-        if (!s->alive) continue;
+    GameWorld_RefreshVisibleMonsters(gw);
+    for (int i = 0; i < gw->visibleMonsterCount; i++) {
+        EntityId e = gw->visibleMonsters[i];
 
         CHitFlash* hf = World_HasComponents(&gw->ecs, e, COMP_HIT_FLASH)
             ? World_GetHitFlash(&gw->ecs, e) : NULL;

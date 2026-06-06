@@ -1,5 +1,7 @@
 #include "raylib.h"
 #include "game.h"
+#include "debug_log.h"
+#include "config.h"
 #include "audio.h"
 #include "game_audio.h"
 #include "ui/menu.h"
@@ -21,6 +23,9 @@ typedef enum {
 
 int main(void)
 {
+    DebugLog_InitCrashHandler();
+    DebugLog(DEBUG_GENERATION, "main: started");
+
     const int screenWidth = 1024;
     const int screenHeight = 768;
 
@@ -31,6 +36,8 @@ int main(void)
     SetExitKey(KEY_NULL);
 
     SetRandomSeed((unsigned int)time(NULL));
+
+    Config_Load("resources/balance.json");
 
     InitAudioSystem();
     GameAudio_Init();
@@ -181,6 +188,11 @@ int main(void)
                         restartGame = true;
                     }
 
+                    if (IsKeyPressed(KEY_F3)) {
+                        Config_Reload();
+                        TraceLog(LOG_INFO, "Config reloaded via F3");
+                    }
+
                     if (!restartGame) {
                     if (game.state == STATE_SHOP) {
                         ShopUI_HandleInput(&game);
@@ -249,6 +261,7 @@ int main(void)
     }
 
     CleanupGame(&game);
+    Config_Unload();
     ShutdownAudioSystem();
     CloseWindow();
     return 0;

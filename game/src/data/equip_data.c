@@ -1,5 +1,4 @@
 #include "data/equip_data.h"
-#include "inventory.h"
 #include "game_balance.h"
 
 int Equip_GetPowerScore(const EquipData* d)

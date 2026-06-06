@@ -10,6 +10,24 @@ void GameWorld_Init(GameWorld* gw) {
     gw->selectedMonsterEntity = ENTITY_NONE;
 }
 
+void GameWorld_RefreshVisibleMonsters(GameWorld* gw) {
+    gw->visibleMonsterCount = 0;
+    int w = gw->map ? gw->map->width : 0;
+    int h = gw->map ? gw->map->height : 0;
+    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
+        if (!gw->ecs.alive[e]) continue;
+        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
+        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS)) continue;
+        CPosition* p = World_GetPosition(&gw->ecs, e);
+        CStats* s = World_GetStats(&gw->ecs, e);
+        if (!s->alive) continue;
+        if (p->x < 0 || p->x >= w || p->y < 0 || p->y >= h) continue;
+        if (gw->visibility[p->y][p->x] != 1) continue;
+        if (gw->visibleMonsterCount < MAX_ENTITIES)
+            gw->visibleMonsters[gw->visibleMonsterCount++] = e;
+    }
+}
+
 void DamageNumber_Spawn(DamageNumberPool* pool, int value, int tileX, int tileY, int tw, int th, Color color) {
     if (!pool) return;
     for (int i = 0; i < MAX_DAMAGE_NUMBERS; i++) {

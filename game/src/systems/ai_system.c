@@ -1,6 +1,7 @@
 #include "ai_system.h"
 #include "debug_log.h"
 #include "validation.h"
+#include "event_bus.h"
 #include "game_audio.h"
 #include "data/monster_data.h"
 #include "world_monster.h"
@@ -235,6 +236,10 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
             playerStats->hp -= dmg;
             if (playerStats->hp < 0) playerStats->hp = 0;
             {
+                PlayerDamagedEvent evt = { dmg, playerStats->hp };
+                EventBus_Publish(EVT_PLAYER_DAMAGED, &evt);
+            }
+            {
                 CHitFlash* hf = World_GetHitFlash(&gw->ecs, monster);
                 hf->timer = 0.15f;
             }
@@ -285,6 +290,10 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
+                {
+                    PlayerDamagedEvent evt = { dmg, playerStats->hp };
+                    EventBus_Publish(EVT_PLAYER_DAMAGED, &evt);
+                }
                 {
                     int tw = gw->map->tileWidth;
                     int th = gw->map->tileHeight;
@@ -368,6 +377,10 @@ static void ProcessMonsterAI(GameWorld* gw, EntityId monster,
                 }
                 playerStats->hp -= dmg;
                 if (playerStats->hp < 0) playerStats->hp = 0;
+                {
+                    PlayerDamagedEvent evt = { dmg, playerStats->hp };
+                    EventBus_Publish(EVT_PLAYER_DAMAGED, &evt);
+                }
                 {
                     int tw = gw->map->tileWidth;
                     int th = gw->map->tileHeight;

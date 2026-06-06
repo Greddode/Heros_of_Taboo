@@ -491,7 +491,7 @@ game_types.h (LEAF)
 
 ## Anti-Patterns & Known Debt
 
-### 1. inventory.c Is Monolithic
+### 1. inventory.c Is Monolithic **[FIXED v0.0.12]**
 
 `inventory.c` (341 lines) contains both data tables AND logic. It mixes:
 - Static equipment table (`EQUIP_TABLE[30]`)
@@ -502,7 +502,7 @@ game_types.h (LEAF)
 
 **Ideal**: Split into `item_data.c`, `equip_table.c`, `inventory_logic.c`, `equipment_management.c`.
 
-### 2. renderer.c Is a God Function
+### 2. renderer.c Is a God Function **[FIXED v0.0.12]**
 
 `renderer.c` (516 lines) handles ALL rendering in a single `RenderGame()` function:
 - Map tiles, pickups, player, shopkeeper, projectiles
@@ -514,7 +514,7 @@ game_types.h (LEAF)
 
 **Ideal**: Split into `hud_renderer.c`, `world_renderer.c`, `overlay_renderer.c`.
 
-### 3. shop_ui.c Uses Static State
+### 3. shop_ui.c Uses Static State **[FIXED v0.0.12]**
 
 `shop_ui.c` has `static int s_selection` and `static ShopSection s_section` — violating the stateless systems rule. This works because there's only one shop at a time, but it's inconsistent with the rest of the architecture.
 

@@ -1,6 +1,7 @@
 #include "combat_system.h"
 #include "debug_log.h"
 #include "validation.h"
+#include "event_bus.h"
 #include "world.h"
 #include "world_monster.h"
 #include "spatial_hash.h"
@@ -158,9 +159,12 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
                 DropMonsterEquipment(game, mon);
                 {
                     CPosition* dp = World_GetPosition(&game->ecs, mon);
+                    CAI* oai = World_HasComponents(&game->ecs, mon, COMP_AI) ? World_GetAI(&game->ecs, mon) : NULL;
+                    MonsterKilledEvent evt = { mon, oai ? oai->type : 0, dp->x, dp->y, ms->expValue, 0, oai ? oai->equippedWeapon : 0 };
                     SpatialHash_Remove(game, mon, dp->x, dp->y);
+                    World_DestroyEntity(&game->ecs, mon);
+                    EventBus_Publish(EVT_MONSTER_KILLED, &evt);
                 }
-                World_DestroyEntity(&game->ecs, mon);
                 game->aliveMonsterCount--;
                 ms = NULL;
                 return true;
@@ -174,9 +178,12 @@ bool CombatSystem_PlayerMeleeAttack(GameWorld* game, EntityId attackerId, int ta
         DropMonsterEquipment(game, mon);
         {
             CPosition* dp = World_GetPosition(&game->ecs, mon);
+            CAI* mai = World_HasComponents(&game->ecs, mon, COMP_AI) ? World_GetAI(&game->ecs, mon) : NULL;
+            MonsterKilledEvent evt = { mon, mai ? mai->type : 0, dp->x, dp->y, ms->expValue, 0, mai ? mai->equippedWeapon : 0 };
             SpatialHash_Remove(game, mon, dp->x, dp->y);
+            World_DestroyEntity(&game->ecs, mon);
+            EventBus_Publish(EVT_MONSTER_KILLED, &evt);
         }
-        World_DestroyEntity(&game->ecs, mon);
         game->aliveMonsterCount--;
     }
     return true;
@@ -310,9 +317,12 @@ bool CombatSystem_PlayerRangedAttack(GameWorld* game, EntityId attackerId) {
         DropMonsterEquipment(game, target);
         {
             CPosition* dp = World_GetPosition(&game->ecs, target);
+            CAI* rtai = World_HasComponents(&game->ecs, target, COMP_AI) ? World_GetAI(&game->ecs, target) : NULL;
+            MonsterKilledEvent evt = { target, rtai ? rtai->type : 0, dp->x, dp->y, ms->expValue, 0, rtai ? rtai->equippedWeapon : 0 };
             SpatialHash_Remove(game, target, dp->x, dp->y);
+            World_DestroyEntity(&game->ecs, target);
+            EventBus_Publish(EVT_MONSTER_KILLED, &evt);
         }
-        World_DestroyEntity(&game->ecs, target);
         game->aliveMonsterCount--;
     }
 
@@ -461,9 +471,12 @@ bool CombatSystem_PlayerThrowWeapon(GameWorld* game, EntityId attackerId) {
                 DropMonsterEquipment(game, target);
                 {
                     CPosition* dp = World_GetPosition(&game->ecs, target);
+                    CAI* thai = World_HasComponents(&game->ecs, target, COMP_AI) ? World_GetAI(&game->ecs, target) : NULL;
+                    MonsterKilledEvent evt = { target, thai ? thai->type : 0, dp->x, dp->y, ms->expValue, 0, thai ? thai->equippedWeapon : 0 };
                     SpatialHash_Remove(game, target, dp->x, dp->y);
+                    World_DestroyEntity(&game->ecs, target);
+                    EventBus_Publish(EVT_MONSTER_KILLED, &evt);
                 }
-                World_DestroyEntity(&game->ecs, target);
                 game->aliveMonsterCount--;
             }
         }

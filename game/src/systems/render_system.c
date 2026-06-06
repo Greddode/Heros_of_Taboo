@@ -2,6 +2,7 @@
 #include "map/map_helpers.h"
 #include "systems/renderer.h"
 #include "data/monster_data.h"
+#include "atlas.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -45,17 +46,11 @@ void RenderSystem_DrawMonsters(GameWorld* gw, float monsterT) {
     int tw = gw->map->tileWidth;
     int th = gw->map->tileHeight;
 
-    for (EntityId e = 1; e < (EntityId)gw->ecs.count; e++) {
-        if (!gw->ecs.alive[e]) continue;
-        if (World_HasComponents(&gw->ecs, e, COMP_PLAYER_TAG)) continue;
-        if (!World_HasComponents(&gw->ecs, e, COMP_POSITION | COMP_STATS)) continue;
-
+    for (int i = 0; i < gw->visibleMonsterCount; i++) {
+        EntityId e = gw->visibleMonsters[i];
         CPosition* p = World_GetPosition(&gw->ecs, e);
         CStats* s = World_GetStats(&gw->ecs, e);
         if (!s->alive) continue;
-
-        if (p->y < 0 || p->y >= gw->map->height || p->x < 0 || p->x >= gw->map->width) continue;
-        if (gw->visibility[p->y][p->x] != 1) continue;
 
         int pixelX, pixelY;
         if (monsterT >= 0.0f && monsterT <= 1.0f) {
@@ -74,7 +69,15 @@ void RenderSystem_DrawMonsters(GameWorld* gw, float monsterT) {
             CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
 
             bool drewSprite = false;
-            if (spr && spr->tex && spr->tex->id > 0 && tpl && tpl->frameCount > 0) {
+            const AtlasEntry* ae = Atlas_GetMonster(ai->type);
+            if (ae && ae->texture && ae->texture->id > 0 && ae->frameCount > 0) {
+                float ffw = (float)ae->w / (float)ae->frameCount;
+                Rectangle src = { ae->x + (float)spr->frame * ffw, (float)ae->y, ffw, (float)ae->h };
+                Rectangle dest = { (float)pixelX, (float)pixelY, ffw, (float)ae->h };
+                Color tint = (hf && hf->timer > 0.0f) ? (Color){ 255, 255, 255, 200 } : WHITE;
+                DrawTexturePro(*ae->texture, src, dest, (Vector2){ 0, 0 }, 0, tint);
+                drewSprite = true;
+            } else if (spr && spr->tex && spr->tex->id > 0 && tpl && tpl->frameCount > 0) {
                 float frameW = (float)spr->tex->width / (float)tpl->frameCount;
                 float frameH = (float)spr->tex->height;
                 Rectangle src = { (float)spr->frame * frameW, 0, frameW, frameH };

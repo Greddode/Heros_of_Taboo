@@ -1,6 +1,7 @@
 #include "movement_system.h"
 #include "debug_log.h"
 #include "validation.h"
+#include "event_bus.h"
 #include "game.h"
 #include "systems/world_monster.h"
 #include "systems/combat_system.h"
@@ -84,6 +85,10 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                         if (picked > 0) {
                             GameAudio_PlayPickupSound();
                             DebugLog(DEBUG_MOVEMENT, "PlayerMove: collected potion type=%d qty=%d", (int)pTypes[i], picked);
+                            {
+                                ItemPickedUpEvent evt = { ppos->x, ppos->y, false, (int)pTypes[i], picked };
+                                EventBus_Publish(EVT_ITEM_PICKED_UP, &evt);
+                            }
                         }
                     }
                 }
@@ -112,6 +117,10 @@ void MovementSystem_PlayerMove(GameWorld* gw, Direction dir) {
                             SpawnerSystem_ReduceEquipAt(gw, ppos->x, ppos->y, eTypes[i], picked);
                             DebugLog(DEBUG_MOVEMENT, "PlayerMove: collected equip type=%d qty=%d",
                                      (int)eTypes[i], picked);
+                            {
+                                ItemPickedUpEvent evt = { ppos->x, ppos->y, true, (int)eTypes[i], picked };
+                                EventBus_Publish(EVT_ITEM_PICKED_UP, &evt);
+                            }
                         }
                     }
                 }

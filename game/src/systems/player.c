@@ -1,5 +1,6 @@
 #include "player.h"
 #include "debug_log.h"
+#include "event_bus.h"
 #include "game.h"
 #include "world.h"
 #include "game_audio.h"
@@ -27,6 +28,10 @@ static void ApplyLevelUp(GameWorld* game) {
     {
         CPosition* pp = World_GetPosition(w, pe);
         FloatMsg_Spawn(game, pp->x, pp->y, GOLD, "Level %d!", ps->level);
+    }
+    {
+        PlayerLevelUpEvent evt = { oldLevel, ps->level, STAT_POINTS_PER_LEVEL };
+        EventBus_Publish(EVT_PLAYER_LEVEL_UP, &evt);
     }
 }
 

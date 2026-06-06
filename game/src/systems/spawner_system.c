@@ -1,6 +1,8 @@
 #include "spawner_system.h"
 #include "debug_log.h"
 #include "validation.h"
+#include "atlas.h"
+#include "event_bus.h"
 #include "data/loot_data.h"
 #include "data/monster_data.h"
 #include "data/biome_data.h"
@@ -125,7 +127,10 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
 
     World_AddComponent(&gw->ecs, e, COMP_SPRITE_ANIM);
     CSpriteAnim* spr = World_GetSprite(&gw->ecs, e);
-    spr->tex = (tpl->spritePath && tpl->frameCount > 0) ? Resources_LoadTexture(tpl->spritePath) : NULL;
+    {
+        const AtlasEntry* ae = Atlas_GetMonster(type);
+        spr->tex = ae ? ae->texture : ((tpl->spritePath && tpl->frameCount > 0) ? Resources_LoadTexture(tpl->spritePath) : NULL);
+    }
     spr->row = 0;
     spr->frame = 0;
     spr->frameCount = tpl->frameCount;
@@ -160,6 +165,11 @@ EntityId SpawnerSystem_SpawnMonster(GameWorld* gw, MonsterType type, int x, int 
 
     DebugLog(DEBUG_SPAWNER, "SpawnMonster: %s type=%d at (%d,%d) floor=%d hp=%d/%d atk=%d def=%d lvl=%d exp=%d",
              n->name, (int)type, x, y, floor, s->hp, s->maxHp, s->attack, s->defense, s->level, s->expValue);
+
+    {
+        MonsterSpawnedEvent evt = { e, type, x, y };
+        EventBus_Publish(EVT_MONSTER_SPAWNED, &evt);
+    }
 
     return e;
 }
@@ -431,7 +441,10 @@ void SpawnMonstersForFloor(GameWorld* game) {
 
         World_AddComponent(&game->ecs, e, COMP_SPRITE_ANIM);
         CSpriteAnim* spr = World_GetSprite(&game->ecs, e);
-        spr->tex = (def->spritePath && def->frameCount > 0) ? Resources_LoadTexture(def->spritePath) : NULL;
+        {
+            const AtlasEntry* ae = Atlas_GetMonster(chosenType);
+            spr->tex = ae ? ae->texture : ((def->spritePath && def->frameCount > 0) ? Resources_LoadTexture(def->spritePath) : NULL);
+        }
         spr->row = 0;
         spr->frame = 0;
         spr->frameCount = def->frameCount;
@@ -486,6 +499,11 @@ void SpawnMonstersForFloor(GameWorld* game) {
                  n->name, (int)chosenType, sx, sy, floorNumber, cr,
                  s->hp, s->maxHp, s->attack, s->defense, s->level,
                  (int)chosenWeapon, (int)chosenArmor);
+
+        {
+            MonsterSpawnedEvent evt = { e, chosenType, sx, sy };
+            EventBus_Publish(EVT_MONSTER_SPAWNED, &evt);
+        }
 
         remaining -= cr;
         spawned++;

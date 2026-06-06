@@ -23,6 +23,9 @@ extern unsigned int g_debugCategories;
 // Set the active debug categories (bitmask OR of DebugCategory values)
 void DebugLog_SetFilter(unsigned int mask);
 
+// Install a Windows unhandled exception filter that writes crash reports
+void DebugLog_InitCrashHandler(void);
+
 #ifdef DEBUG
 
 void DebugLog_Write(unsigned int category, const char* fmt, ...);

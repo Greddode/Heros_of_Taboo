@@ -1,6 +1,6 @@
 # Potential Improvements & Refactors
 
-**Heroes of Taboo** — v0.0.10 | June 5, 2026
+**Heroes of Taboo** — v0.0.12 | June 5, 2026
 
 ---
 
@@ -41,7 +41,7 @@
 
 ---
 
-### 2. Split inventory.c
+### 2. Split inventory.c **[DONE v0.0.12]**
 
 **Current State**: `inventory.c` (341 lines) is a monolithic file containing:
 - Static item data tables (names, heals, descriptions, sprites)
@@ -66,7 +66,7 @@
 
 ---
 
-### 3. Split renderer.c
+### 3. Split renderer.c **[DONE v0.0.12]**
 
 **Current State**: `renderer.c` (516 lines) handles ALL rendering in a single `RenderGame()` function.
 
@@ -83,7 +83,7 @@
 
 ---
 
-### 4. Remove Static State from shop_ui.c
+### 4. Remove Static State from shop_ui.c **[DONE v0.0.12]**
 
 **Current State**: `shop_ui.c` uses `static int s_selection` and `static ShopSection s_section`.
 
@@ -246,7 +246,7 @@ GameError InitGame(GameWorld* game, const char* tmxFile);
 
 ## Performance Optimizations
 
-### 14. Render Filter (Open from Profiling Report)
+### 14. Render Filter **[DONE v0.0.12]**
 
 **Current State**: `RenderSystem_DrawMonsters()` iterates ALL entities and checks visibility per entity.
 
@@ -258,7 +258,7 @@ GameError InitGame(GameWorld* game, const char* tmxFile);
 **Effort**: ~15 lines of code
 **Expected Improvement**: Skip invisible entities entirely during render loop
 
-### 15. Animation Cache (Open from Profiling Report)
+### 15. Animation Cache **[DONE v0.0.12]**
 
 **Current State**: `World_UpdateMonsterAnimations()` iterates ALL entities every frame.
 
@@ -267,7 +267,7 @@ GameError InitGame(GameWorld* game, const char* tmxFile);
 **Effort**: ~5 lines of code
 **Expected Improvement**: Skip animation updates for off-screen monsters
 
-### 16. Texture Atlas
+### 16. Texture Atlas **[DONE v0.0.12]**
 
 **Current State**: Each equipment/potion/monster has its own texture file. Many small textures.
 
@@ -288,7 +288,7 @@ GameError InitGame(GameWorld* game, const char* tmxFile);
 
 ## Architecture Improvements
 
-### 18. Event System
+### 18. Event System **[DONE v0.0.12]**
 
 **Current State**: Systems directly call each other. Combat system calls `GainExperience()`, `SpatialHash_Remove()`, `DamageNumber_Spawn()`, etc.
 
@@ -301,7 +301,7 @@ void EventBus_Subscribe(EventType type, void (*callback)(void* data));
 
 **Benefits**: Decouples systems, makes it easier to add new reactions to events (achievements, analytics, sound effects).
 
-### 19. Configuration System
+### 19. Configuration System **[DONE v0.0.12]**
 
 **Current State**: All tuning values are `#define` macros in `game_balance.h`. Changing values requires recompilation.
 

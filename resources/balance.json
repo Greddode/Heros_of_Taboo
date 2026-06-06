@@ -1,0 +1,31 @@
+{
+  "player": {
+    "base_str": 3, "base_dex": 3, "base_int": 3, "base_con": 3, "base_lck": 2,
+    "base_attack": 5, "base_defense": 1, "stat_points_per_level": 2
+  },
+  "hp": { "base_constant": 30, "per_con": 5 },
+  "xp": { "base": 50, "per_level": 40 },
+  "combat": {
+    "str_melee_mult": 2, "dex_ranged_mult": 1.5, "dex_throw_mult": 2,
+    "crit_mult": 2, "mega_crit_threshold": 100, "mega_crit_chance": 50,
+    "dual_wield_offhand_mult": 0.5, "min_damage": 1,
+    "dodge_per_dex": 2, "dodge_cap_pct": 60
+  },
+  "wait": { "heal_base": 1, "heal_intel_div": 2, "cooldown": 0.08 },
+  "ai": { "hunt_turns": 4, "wander_range_extra": 8 },
+  "camera": { "default_zoom": 4.0 },
+  "ui": {
+    "base_width": 1024, "base_height": 768,
+    "gui_scale_min": 1.0, "gui_scale_max": 4.0
+  },
+  "gold": {
+    "sell_ratio": 0.5, "rarity_bonus_uncommon": 50,
+    "rarity_bonus_rare": 150, "rarity_bonus_legendary": 500
+  },
+  "mp": { "base": 10, "per_int": 2, "regen_per_turn": 1, "bonus_on_kill": 3 },
+  "shadow": { "spawn_waits": 15, "double_move_min": 25, "double_move_fast": 35 },
+  "atlas": {
+    "path": "resources/atlas.png",
+    "tile_width": 16, "tile_height": 16
+  }
+}

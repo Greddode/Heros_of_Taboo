@@ -1,5 +1,8 @@
 #include "game.h"
+#include "debug_log.h"
 #include "validation.h"
+#include "atlas.h"
+#include "event_bus.h"
 #include "systems/spawner_system.h"
 #include "world.h"
 #include "data/monster_data.h"
@@ -16,6 +19,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static void OnMonsterKilled(void* data) {
+    MonsterKilledEvent* e = (MonsterKilledEvent*)data;
+    DebugLog(DEBUG_COMBAT, "Event: MONSTER_KILLED id=%d type=%d pos=(%d,%d) xp=%d",
+             (int)e->monsterId, (int)e->monsterType, e->x, e->y, e->xpValue);
+}
+
+static void OnPlayerLevelUp(void* data) {
+    PlayerLevelUpEvent* e = (PlayerLevelUpEvent*)data;
+    DebugLog(DEBUG_PLAYER, "Event: PLAYER_LEVEL_UP %d->%d points=%d", e->oldLevel, e->newLevel, e->statPointsGranted);
+}
+
+static void OnFloorDescended(void* data) {
+    FloorDescendedEvent* e = (FloorDescendedEvent*)data;
+    DebugLog(DEBUG_FLOOR, "Event: FLOOR_DESCENDED %d->%d", e->oldFloor, e->newFloor);
+}
 
 static float s_guiScaleSetting = 1.0f;
 
@@ -338,6 +357,7 @@ void DescendFloor(GameWorld* game) {
 
     LoadTilesets(game, NULL);
 
+    Atlas_BuildAll();
     Floor_InitNewFloor(game);
 
     if (game->aliveMonsterCount == 0) {
@@ -354,12 +374,21 @@ void DescendFloor(GameWorld* game) {
         CPosition* pp = World_GetPosition(&game->ecs, game->playerEntity);
         FloatMsg_Spawn(game, pp->x, pp->y, WHITE, "Floor %d", game->currentFloor);
     }
+    {
+        FloorDescendedEvent evt = { game->currentFloor - 1, game->currentFloor };
+        EventBus_Publish(EVT_FLOOR_DESCENDED, &evt);
+    }
 }
 
 bool InitGame(GameWorld* game, const char* tmxFile) {
     if (!game) return false;
     memset(game, 0, sizeof(GameWorld));
     GameWorld_Init(game);
+
+    EventBus_Init();
+    EventBus_Subscribe(EVT_MONSTER_KILLED, OnMonsterKilled);
+    EventBus_Subscribe(EVT_PLAYER_LEVEL_UP, OnPlayerLevelUp);
+    EventBus_Subscribe(EVT_FLOOR_DESCENDED, OnFloorDescended);
 
     game->map = LoadTMX(tmxFile);
     if (!game->map) {
@@ -390,6 +419,7 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
 
     game->currentFloor = DEFAULT_START_FLOOR;
 
+    Atlas_BuildAll();
     Floor_InitNewFloor(game);
 
     game->selectedMonsterEntity = ENTITY_NONE;
@@ -402,6 +432,8 @@ bool InitGame(GameWorld* game, const char* tmxFile) {
 
 void CleanupGame(GameWorld* game) {
     if (!game) return;
+
+    Atlas_Destroy();
 
     // Unload all ResourceManager-cached textures
     Resources_UnloadAll();
